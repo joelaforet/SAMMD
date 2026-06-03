@@ -1,8 +1,17 @@
 """Tests for INTERFACE Fcc metal parameters."""
 
+from importlib.resources import files
+from xml.etree import ElementTree
+
 import pytest
 
-from sammd.forcefields import FCC_METAL_LJ_REGISTRY, get_fcc_metal_parameters, sigma_from_rmin_half
+from sammd.forcefields import (
+    FCC_METAL_LJ_REGISTRY,
+    generate_interface_metal_offxml,
+    get_fcc_metal_parameters,
+    sigma_from_rmin_half,
+    write_interface_metal_offxml,
+)
 
 
 def test_registry_contains_all_fcc_metals() -> None:
@@ -37,3 +46,63 @@ def test_unsupported_metal_fails_clearly() -> None:
 
     with pytest.raises(ValueError, match="unsupported Fcc metal"):
         get_fcc_metal_parameters("Fe")
+
+
+def test_generated_offxml_is_well_formed() -> None:
+    """Generate loadable XML without requiring OpenFF imports."""
+
+    root = ElementTree.fromstring(generate_interface_metal_offxml())
+
+    assert root.tag == "SMIRNOFF"
+
+
+def test_generated_offxml_contains_one_atom_per_fcc_metal() -> None:
+    """Emit one vdW atom entry for each registered Fcc metal."""
+
+    root = ElementTree.fromstring(generate_interface_metal_offxml())
+    atoms = root.find("vdW").findall("Atom")
+
+    assert len(atoms) == len(FCC_METAL_LJ_REGISTRY)
+    assert {atom.attrib["id"] for atom in atoms} == set(FCC_METAL_LJ_REGISTRY)
+
+
+def test_generated_offxml_reproduces_pd_parameters_with_units() -> None:
+    """Use positive OpenFF epsilon and CHARMM Rmin/2 for Pd."""
+
+    root = ElementTree.fromstring(generate_interface_metal_offxml())
+    pd_atom = next(atom for atom in root.find("vdW").findall("Atom") if atom.attrib["id"] == "Pd")
+
+    assert pd_atom.attrib["smirks"] == "[#46:1]"
+    assert pd_atom.attrib["epsilon"] == "6.15 * kilocalorie_per_mole"
+    assert pd_atom.attrib["rmin_half"] == "1.4095 * angstrom"
+
+
+def test_generated_offxml_matches_packaged_resource() -> None:
+    """Keep the packaged resource synchronized with registry output."""
+
+    resource_text = files("sammd.data").joinpath("interface_fcc_metals.offxml").read_text(
+        encoding="utf-8"
+    )
+
+    assert resource_text == generate_interface_metal_offxml()
+
+
+def test_write_helper_writes_deterministic_loadable_xml(tmp_path) -> None:
+    """Write the generated OFFXML exactly once to a user path."""
+
+    output_path = tmp_path / "metals.offxml"
+
+    write_interface_metal_offxml(output_path)
+
+    written_text = output_path.read_text(encoding="utf-8")
+    assert written_text == generate_interface_metal_offxml()
+    assert ElementTree.fromstring(written_text).tag == "SMIRNOFF"
+
+
+def test_generated_offxml_excludes_pcff_96_parameters() -> None:
+    """Avoid mixing unsupported PCFF 9-6 parameters into the export."""
+
+    offxml = generate_interface_metal_offxml()
+
+    assert "PCFF" not in offxml
+    assert "9-6" not in offxml

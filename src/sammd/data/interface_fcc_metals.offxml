@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SMIRNOFF version="0.3" aromaticity_model="OEAroModel_MDL">
+  <!-- Generated from CHARMM-INTERFACE Fcc metal Lennard-Jones parameters. -->
+  <!-- Provenance: Heinz et al.; CHARMM-INTERFACE; https://github.com/CHARMM-INTERFACE/ -->
+  <Author>SAMMD contributors</Author>
+  <Date>2026-06-03</Date>
+  <vdW version="0.4" potential="Lennard-Jones-12-6" combining_rules="Lorentz-Berthelot" scale12="0.0" scale13="0.0" scale14="0.5" scale15="1.0" cutoff="9.0 * angstrom" switch_width="1.0 * angstrom" method="cutoff">
+    <Atom smirks="[#47:1]" id="Ag" epsilon="4.56 * kilocalorie_per_mole" rmin_half="1.4775 * angstrom"/>
+    <Atom smirks="[#13:1]" id="Al" epsilon="4.02 * kilocalorie_per_mole" rmin_half="1.4625 * angstrom"/>
+    <Atom smirks="[#79:1]" id="Au" epsilon="5.29 * kilocalorie_per_mole" rmin_half="1.4755 * angstrom"/>
+    <Atom smirks="[#29:1]" id="Cu" epsilon="4.72 * kilocalorie_per_mole" rmin_half="1.3080 * angstrom"/>
+    <Atom smirks="[#28:1]" id="Ni" epsilon="5.65 * kilocalorie_per_mole" rmin_half="1.2760 * angstrom"/>
+    <Atom smirks="[#82:1]" id="Pb" epsilon="2.93 * kilocalorie_per_mole" rmin_half="1.7825 * angstrom"/>
+    <Atom smirks="[#46:1]" id="Pd" epsilon="6.15 * kilocalorie_per_mole" rmin_half="1.4095 * angstrom"/>
+    <Atom smirks="[#78:1]" id="Pt" epsilon="7.80 * kilocalorie_per_mole" rmin_half="1.4225 * angstrom"/>
+  </vdW>
+</SMIRNOFF>

@@ -3,6 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+
+INTERFACE_SOURCE_URL = "https://github.com/CHARMM-INTERFACE/"
+
+
+_FCC_METAL_ATOMIC_NUMBERS: dict[str, int] = {
+    "Ag": 47,
+    "Al": 13,
+    "Au": 79,
+    "Cu": 29,
+    "Ni": 28,
+    "Pb": 82,
+    "Pd": 46,
+    "Pt": 78,
+}
 
 
 @dataclass(frozen=True)
@@ -81,3 +96,49 @@ def get_fcc_metal_parameters(symbol: str) -> FccMetalLJParameters:
         supported = ", ".join(sorted(FCC_METAL_LJ_REGISTRY))
         msg = f"unsupported Fcc metal '{symbol}'; supported metals: {supported}"
         raise ValueError(msg) from error
+
+
+def generate_interface_metal_offxml() -> str:
+    """Generate SMIRNOFF OFFXML for registered INTERFACE Fcc metals.
+
+    Returns
+    -------
+    str
+        Deterministic XML text containing one ``vdW`` ``Atom`` entry per registered Fcc metal.
+    """
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<SMIRNOFF version="0.3" aromaticity_model="OEAroModel_MDL">',
+        "  <!-- Generated from CHARMM-INTERFACE Fcc metal Lennard-Jones parameters. -->",
+        "  <!-- Provenance: Heinz et al.; CHARMM-INTERFACE; "
+        f"{INTERFACE_SOURCE_URL} -->",
+        "  <Author>SAMMD contributors</Author>",
+        "  <Date>2026-06-03</Date>",
+        '  <vdW version="0.4" potential="Lennard-Jones-12-6" '
+        'combining_rules="Lorentz-Berthelot" scale12="0.0" scale13="0.0" '
+        'scale14="0.5" scale15="1.0" cutoff="9.0 * angstrom" '
+        'switch_width="1.0 * angstrom" method="cutoff">',
+    ]
+    for symbol in sorted(FCC_METAL_LJ_REGISTRY):
+        parameters = FCC_METAL_LJ_REGISTRY[symbol]
+        atomic_number = _FCC_METAL_ATOMIC_NUMBERS[symbol]
+        lines.append(
+            f'    <Atom smirks="[#{atomic_number}:1]" id="{symbol}" '
+            f'epsilon="{parameters.openff_epsilon_kcal_mol:.2f} * kilocalorie_per_mole" '
+            f'rmin_half="{parameters.rmin_half_angstrom:.4f} * angstrom"/>'
+        )
+    lines.extend(["  </vdW>", "</SMIRNOFF>", ""])
+    return "\n".join(lines)
+
+
+def write_interface_metal_offxml(path: str | Path) -> None:
+    """Write generated INTERFACE Fcc metal OFFXML to a path.
+
+    Parameters
+    ----------
+    path
+        Destination path for the generated OFFXML text.
+    """
+
+    Path(path).write_text(generate_interface_metal_offxml(), encoding="utf-8")

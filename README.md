@@ -6,6 +6,9 @@ validated YAML configuration schema, a minimal CLI, lightweight INTERFACE metal
 parameter metadata, and reporter configuration helpers without requiring
 OpenMM/OpenFF build steps during unit tests.
 
+The package also includes a generated CHARMM-INTERFACE Fcc metal OFFXML resource
+for future OpenFF force field assembly without making OpenFF a test dependency.
+
 See [docs/project-scope.md](docs/project-scope.md) for the source-of-truth scope
 and scientific defaults.
 
