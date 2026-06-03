@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 THERMODYNAMIC_FIELD_TO_OPENMM: dict[str, str] = {
     "step": "step",
@@ -107,3 +108,62 @@ def build_state_data_reporter_config(
         report_interval=interval_steps,
         kwargs=kwargs,
     )
+
+
+def create_openmm_reporters(
+    reporting_config: Any,
+    output_paths: Any,
+    *,
+    total_steps: int | None = None,
+    app_module: Any | None = None,
+) -> list[Any]:
+    """Create OpenMM runtime reporter objects lazily.
+
+    Parameters
+    ----------
+    reporting_config
+        Reporter config with interval, field, and test-all-fields attributes.
+    output_paths
+        Resolved output paths with trajectory and thermodynamics attributes.
+    total_steps
+        Total expected simulation steps, required for progress and remaining time.
+    app_module
+        Optional injected OpenMM app-like module for tests.
+
+    Returns
+    -------
+    list[Any]
+        OpenMM reporter instances for trajectory and thermodynamic reporting.
+    """
+
+    app = app_module if app_module is not None else _import_openmm_app()
+    interval_steps = reporting_config.interval_steps
+    state_data_config = build_state_data_reporter_config(
+        str(output_paths.thermodynamics),
+        interval_steps=interval_steps,
+        fields=reporting_config.fields,
+        test_all_fields=reporting_config.test_all_fields,
+        total_steps=total_steps,
+    )
+    dcd_reporter = app.DCDReporter(str(output_paths.trajectory), interval_steps)
+    state_data_reporter = app.StateDataReporter(
+        state_data_config.file,
+        state_data_config.report_interval,
+        separator=",",
+        **state_data_config.kwargs,
+    )
+    return [dcd_reporter, state_data_reporter]
+
+
+def _import_openmm_app() -> Any:
+    """Import OpenMM application reporters only when runtime construction is requested."""
+
+    try:
+        from openmm import app
+    except ImportError as error:
+        msg = (
+            "OpenMM is required to construct runtime reporters. Install OpenMM to use "
+            "create_openmm_reporters."
+        )
+        raise ImportError(msg) from error
+    return app

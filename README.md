@@ -12,6 +12,11 @@ Solution composition planning is available for converting solvent volume
 fractions plus salt/reactant molarities into deterministic molecule counts while
 remaining independent of PACKMOL and OpenFF during MVP scaffolding.
 
+Visualization output planning now resolves deterministic mmCIF/PDBx topology,
+DCD trajectory, and OpenMM thermodynamics CSV artifact paths. A lightweight
+mmCIF writer can emit planned scaffold atoms for PyMOL inspection, while full
+trajectory production still awaits OpenMM builder integration.
+
 See [docs/project-scope.md](docs/project-scope.md) for the source-of-truth scope
 and scientific defaults.
 

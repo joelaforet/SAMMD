@@ -226,6 +226,8 @@ class OutputConfig(SAMMDBaseModel):
     topology: str = "topology.cif"
     trajectory: str = "trajectory.dcd"
     thermodynamics: str = "thermodynamics.csv"
+    checkpoint: str | None = None
+    state: str | None = None
 
 
 class ReporterConfig(SAMMDBaseModel):
