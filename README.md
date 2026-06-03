@@ -34,6 +34,10 @@ milestone.
 See [docs/project-scope.md](docs/project-scope.md) for the source-of-truth scope
 and scientific defaults.
 
+The documentation scaffold lives in [docs/source](docs/source/index.rst) for
+future ReadTheDocs builds. The interactive MVP walkthrough is available at
+[notebooks/canonical_workflow.ipynb](notebooks/canonical_workflow.ipynb).
+
 ## Quick start
 
 ```bash
