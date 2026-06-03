@@ -18,17 +18,15 @@ def test_public_imports() -> None:
     assert "plan_sam_placements" not in sammd.__all__
 
 
-def test_build_system_stub_fails_clearly() -> None:
+def test_build_system_returns_lightweight_plan() -> None:
     """Keep docs workflow importable while backend construction is deferred."""
 
     from sammd import build_system
     from sammd.config import SAMMDConfig
 
     config = SAMMDConfig()
-    try:
-        build_system(config)
-    except NotImplementedError as error:
-        assert "Full OpenFF/OpenMM system construction is not implemented" in str(error)
-        assert "scaffolding milestone" in str(error)
-    else:  # pragma: no cover - defensive failure path
-        raise AssertionError("build_system should raise NotImplementedError")
+    plan = build_system(config)
+
+    assert plan.config is config
+    assert not plan.full_construction_available
+    assert plan.openmm_construction_implemented is False
