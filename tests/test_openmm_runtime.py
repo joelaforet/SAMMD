@@ -266,6 +266,15 @@ def test_add_position_restraints_validates_inputs() -> None:
         add_position_restraints(system, [0], [(0.0, 0.0, 0.0)], k_kj_mol_nm2=-1.0)
     with pytest.raises(ValueError, match="outside system"):
         add_position_restraints(system, [2], [(0.0, 0.0, 0.0)], openmm_module=FakeOpenMM)
+    with pytest.raises(ValueError, match="non-negative integers"):
+        add_position_restraints(system, [True], [(0.0, 0.0, 0.0)], openmm_module=FakeOpenMM)
+    with pytest.raises(ValueError, match="duplicates"):
+        add_position_restraints(
+            system,
+            [0, 0],
+            [(0.0, 0.0, 0.0), (0.1, 0.1, 0.1)],
+            openmm_module=FakeOpenMM,
+        )
     with pytest.raises(ValueError, match="length must match"):
         add_position_restraints(system, [0, 1], [(0.0, 0.0, 0.0)], openmm_module=FakeOpenMM)
     with pytest.raises(ValueError, match="finite xyz"):

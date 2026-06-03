@@ -300,6 +300,8 @@ def _validate_positive_finite(value: float, name: str) -> None:
 def _validate_atom_indices(
     system: Any,
     atom_indices: list[int] | tuple[int, ...],
+    *,
+    allow_duplicates: bool = False,
 ) -> tuple[int, ...]:
     """Validate atom indices against system size when available."""
 
@@ -309,12 +311,15 @@ def _validate_atom_indices(
         raise ValueError(msg)
     particle_count = system.getNumParticles() if hasattr(system, "getNumParticles") else None
     for atom_index in indices:
-        if not isinstance(atom_index, int) or atom_index < 0:
+        if isinstance(atom_index, bool) or not isinstance(atom_index, int) or atom_index < 0:
             msg = "atom indices must be non-negative integers"
             raise ValueError(msg)
         if particle_count is not None and atom_index >= particle_count:
             msg = f"atom index {atom_index} is outside system particle count {particle_count}"
             raise ValueError(msg)
+    if not allow_duplicates and len(set(indices)) != len(indices):
+        msg = "atom_indices must not contain duplicates"
+        raise ValueError(msg)
     return indices
 
 
@@ -361,7 +366,7 @@ def _validate_pairs(
 
     validated_pairs_tuple = tuple(validated_pairs)
     flattened = [atom_index for pair in validated_pairs_tuple for atom_index in pair]
-    _validate_atom_indices(system, tuple(flattened))
+    _validate_atom_indices(system, tuple(flattened), allow_duplicates=True)
     return validated_pairs_tuple
 
 
