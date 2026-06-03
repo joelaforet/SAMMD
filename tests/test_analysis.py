@@ -5,6 +5,7 @@ import math
 import pytest
 
 from sammd.analysis import (
+    VECTOR_NORM_TOLERANCE,
     analyze_orientation,
     angle_degrees,
     center_of_mass,
@@ -70,6 +71,8 @@ def test_analyze_orientation_uses_side_specific_normals() -> None:
     assert top.vector == pytest.approx((0.0, 0.0, 1.0))
     assert top.normal == (0.0, 0.0, 1.0)
     assert top.side == "top"
+    assert top.selected_atom_indices == (1,)
+    assert top.target_kind == "atom"
     assert bottom.angle_degrees == pytest.approx(180.0)
     assert bottom.normal == (0.0, 0.0, -1.0)
     assert bottom.side == "bottom"
@@ -87,6 +90,49 @@ def test_analyze_orientation_accepts_explicit_normal() -> None:
     assert result.side is None
 
 
+def test_analyze_orientation_validates_side_with_explicit_normal() -> None:
+    """Reject invalid side values even when an explicit normal is supplied."""
+
+    coordinates = [(0.0, 0.0, 0.0), (0.0, 2.0, 0.0)]
+
+    with pytest.raises(ValueError, match="side must"):
+        analyze_orientation(
+            coordinates,
+            atom_index=1,
+            side="middle",  # type: ignore[arg-type]
+            normal=(0.0, 0.0, 1.0),
+        )
+
+
+def test_analyze_orientation_populates_selection_and_frame_metadata() -> None:
+    """Store deterministic selection and lightweight trajectory metadata."""
+
+    coordinates = [(0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (4.0, 0.0, 0.0)]
+
+    midpoint = analyze_orientation(
+        coordinates,
+        atom_indices=[1, 2],
+        normal=(1.0, 0.0, 0.0),
+        frame_index=7,
+        time=3.5,
+        reactant_label="cinnamaldehyde-1",
+    )
+    centroid = analyze_orientation(
+        coordinates,
+        atom_indices=[0, 1, 2],
+        masses=[1.0, 1.0, 2.0],
+        normal=(1.0, 0.0, 0.0),
+    )
+
+    assert midpoint.selected_atom_indices == (1, 2)
+    assert midpoint.target_kind == "midpoint"
+    assert midpoint.frame_index == 7
+    assert midpoint.time == pytest.approx(3.5)
+    assert midpoint.reactant_label == "cinnamaldehyde-1"
+    assert centroid.selected_atom_indices == (0, 1, 2)
+    assert centroid.target_kind == "centroid"
+
+
 @pytest.mark.parametrize("indices", [[-1], [2]])
 def test_invalid_indices_fail_clearly(indices: list[int]) -> None:
     """Reject atom selections outside the 0-based coordinate range."""
@@ -95,11 +141,30 @@ def test_invalid_indices_fail_clearly(indices: list[int]) -> None:
         target_point([(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)], atom_indices=indices)
 
 
+@pytest.mark.parametrize("indices", [[1, 1], [0, 1, 1]])
+def test_duplicate_indices_fail_clearly(indices: list[int]) -> None:
+    """Reject duplicate target selection indices."""
+
+    coordinates = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)]
+
+    with pytest.raises(ValueError, match="duplicate"):
+        target_point(coordinates, atom_indices=indices)
+
+
 def test_zero_length_orientation_vector_fails_clearly() -> None:
     """Reject target points identical to the center of mass."""
 
-    with pytest.raises(ValueError, match="nonzero"):
+    with pytest.raises(ValueError, match="vector norm"):
         orientation_vector((1.0, 1.0, 1.0), (1.0, 1.0, 1.0))
+
+
+def test_near_zero_orientation_vector_fails_clearly() -> None:
+    """Reject COM-to-target vectors below the named norm tolerance."""
+
+    target = (VECTOR_NORM_TOLERANCE / 10.0, 0.0, 0.0)
+
+    with pytest.raises(ValueError, match="vector norm"):
+        orientation_vector((0.0, 0.0, 0.0), target)
 
 
 def test_mismatched_masses_fail_clearly() -> None:

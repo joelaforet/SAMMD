@@ -9,6 +9,8 @@ from typing import Literal
 
 Coordinate = tuple[float, float, float]
 SurfaceSide = Literal["top", "bottom"]
+TargetKind = Literal["atom", "midpoint", "centroid"]
+VECTOR_NORM_TOLERANCE = 1.0e-12
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,16 @@ class OrientationResult:
         Selected target atom, midpoint, or centroid in the same units as input coordinates.
     side
         Surface side used to choose the normal, or ``None`` when an explicit normal is supplied.
+    selected_atom_indices
+        0-based atom indices used to define the target point.
+    target_kind
+        Selection kind used to define the target point.
+    frame_index
+        Optional trajectory frame index associated with this result.
+    time
+        Optional trajectory time associated with this result.
+    reactant_label
+        Optional reactant label associated with this result.
     """
 
     angle_degrees: float
@@ -37,6 +49,11 @@ class OrientationResult:
     com: Coordinate
     target_point: Coordinate
     side: SurfaceSide | None
+    selected_atom_indices: tuple[int, ...]
+    target_kind: TargetKind
+    frame_index: int | None = None
+    time: float | None = None
+    reactant_label: str | None = None
 
 
 def dot(a: Coordinate, b: Coordinate) -> float:
@@ -95,13 +112,13 @@ def normalize(vector: Coordinate) -> Coordinate:
     Raises
     ------
     ValueError
-        If the vector has zero length.
+        If the vector norm is below ``VECTOR_NORM_TOLERANCE``.
     """
 
     validated = _validate_vector(vector, "vector")
     vector_norm = norm(validated)
-    if vector_norm == 0.0:
-        msg = "vector must be nonzero"
+    if vector_norm <= VECTOR_NORM_TOLERANCE:
+        msg = f"vector norm must exceed {VECTOR_NORM_TOLERANCE:g}"
         raise ValueError(msg)
     return tuple(component / vector_norm for component in validated)
 
@@ -196,13 +213,11 @@ def target_point(
         index = _validate_index(atom_index, len(validated_coordinates), "atom_index")
         return validated_coordinates[index]
 
-    if atom_indices is None or len(atom_indices) == 0:
-        msg = "atom_indices must contain at least one index"
-        raise ValueError(msg)
-    indices = [
-        _validate_index(index, len(validated_coordinates), "atom_indices")
-        for index in atom_indices
-    ]
+    indices = _selected_atom_indices(
+        atom_index=atom_index,
+        atom_indices=atom_indices,
+        coordinate_count=len(validated_coordinates),
+    )
     return tuple(
         sum(validated_coordinates[index][axis] for index in indices) / len(indices)
         for axis in range(3)
@@ -267,6 +282,9 @@ def analyze_orientation(
     masses: Sequence[float] | None = None,
     side: SurfaceSide | None = "top",
     normal: Coordinate | None = None,
+    frame_index: int | None = None,
+    time: float | None = None,
+    reactant_label: str | None = None,
 ) -> OrientationResult:
     """Analyze reactant orientation relative to a surface normal.
 
@@ -284,6 +302,12 @@ def analyze_orientation(
         Surface side used when ``normal`` is not supplied.
     normal
         Optional explicit surface normal vector.
+    frame_index
+        Optional trajectory frame index to store with the result.
+    time
+        Optional trajectory time to store with the result.
+    reactant_label
+        Optional reactant label to store with the result.
 
     Returns
     -------
@@ -291,18 +315,30 @@ def analyze_orientation(
         Orientation angle and intermediate geometry values.
     """
 
-    com = center_of_mass(coordinates, masses)
-    target = target_point(coordinates, atom_index=atom_index, atom_indices=atom_indices)
+    validated_side = surface_normal(side) if side is not None else None
+    validated_coordinates = _validate_coordinates(coordinates)
+    selected_atom_indices = _selected_atom_indices(
+        atom_index=atom_index,
+        atom_indices=atom_indices,
+        coordinate_count=len(validated_coordinates),
+    )
+    _validate_frame_metadata(frame_index=frame_index, time=time, reactant_label=reactant_label)
+
+    com = center_of_mass(validated_coordinates, masses)
+    target = target_point(validated_coordinates, atom_index=atom_index, atom_indices=atom_indices)
     vector = orientation_vector(com, target)
     result_side = side
     if normal is None:
         if side is None:
             msg = "side is required when normal is not supplied"
             raise ValueError(msg)
-        result_normal = surface_normal(side)
+        result_normal = validated_side
     else:
         result_normal = normalize(normal)
         result_side = None
+    if result_normal is None:
+        msg = "side is required when normal is not supplied"
+        raise ValueError(msg)
     angle = angle_degrees(vector, result_normal)
     return OrientationResult(
         angle_degrees=angle,
@@ -311,6 +347,11 @@ def analyze_orientation(
         com=com,
         target_point=target,
         side=result_side,
+        selected_atom_indices=selected_atom_indices,
+        target_kind=_target_kind(selected_atom_indices, atom_index=atom_index),
+        frame_index=frame_index,
+        time=time,
+        reactant_label=reactant_label,
     )
 
 
@@ -353,6 +394,58 @@ def _validate_masses(masses: Sequence[float], coordinate_count: int) -> tuple[fl
         msg = "masses must be positive"
         raise ValueError(msg)
     return validated
+
+
+def _selected_atom_indices(
+    *,
+    atom_index: int | None,
+    atom_indices: Sequence[int] | None,
+    coordinate_count: int,
+) -> tuple[int, ...]:
+    """Validate and normalize target selection indices."""
+
+    if (atom_index is None) == (atom_indices is None):
+        msg = "define exactly one of atom_index or atom_indices"
+        raise ValueError(msg)
+    if atom_index is not None:
+        return (_validate_index(atom_index, coordinate_count, "atom_index"),)
+    if atom_indices is None or len(atom_indices) == 0:
+        msg = "atom_indices must contain at least one index"
+        raise ValueError(msg)
+    indices = tuple(
+        _validate_index(index, coordinate_count, "atom_indices") for index in atom_indices
+    )
+    if len(set(indices)) != len(indices):
+        msg = "atom_indices must not contain duplicate indices"
+        raise ValueError(msg)
+    return indices
+
+
+def _target_kind(selected_atom_indices: tuple[int, ...], *, atom_index: int | None) -> TargetKind:
+    """Classify target selection metadata for trajectory analysis."""
+
+    if atom_index is not None:
+        return "atom"
+    if len(selected_atom_indices) == 2:
+        return "midpoint"
+    return "centroid"
+
+
+def _validate_frame_metadata(
+    *, frame_index: int | None, time: float | None, reactant_label: str | None
+) -> None:
+    """Validate optional lightweight trajectory metadata."""
+
+    if frame_index is not None and (
+        isinstance(frame_index, bool) or not isinstance(frame_index, int) or frame_index < 0
+    ):
+        msg = "frame_index must be a nonnegative integer"
+        raise ValueError(msg)
+    if time is not None:
+        _validate_finite_number(time, "time")
+    if reactant_label is not None and not reactant_label:
+        msg = "reactant_label must not be empty"
+        raise ValueError(msg)
 
 
 def _validate_index(index: int, coordinate_count: int, name: str) -> int:
