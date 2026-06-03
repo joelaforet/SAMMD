@@ -1,5 +1,7 @@
 # SAMMD
 
+[![CI](https://github.com/joelaforet/SAMMD/actions/workflows/ci.yml/badge.svg)](https://github.com/joelaforet/SAMMD/actions/workflows/ci.yml)
+
 SAMMD is a Python package for reproducible molecular dynamics setup of
 self-assembled monolayers on metal supports. The MVP workflow now provides a
 validated YAML configuration schema, a minimal CLI, lightweight INTERFACE metal
@@ -68,3 +70,28 @@ plan.write_planned_slab_mmcif()  # Writes outputs/planned_slab.cif by default
 The emitted mmCIF is a slab-only visualization scaffold, not a complete system
 topology or final simulation cell. The configured `topology.cif` path remains
 reserved for the future full topology artifact.
+
+## Developer checks
+
+Use the lightweight development environment for routine checks; optional
+OpenFF/OpenMM science tests skip unless those packages are available.
+
+```bash
+python -m pytest --cov=sammd --cov-report=term-missing
+ruff check src/sammd tests
+```
+
+With pixi, the same checks are available as:
+
+```bash
+pixi run test
+pixi run lint
+```
+
+The docs/notebook smoke coverage is included in pytest. To force a Sphinx docs
+build locally, install the docs extras and run:
+
+```bash
+python -m pip install -e ".[dev,docs]"
+python -m sphinx -W -b html docs/source docs/_build/html
+```

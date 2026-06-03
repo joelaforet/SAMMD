@@ -13,9 +13,14 @@ pyyaml = ">=6"
 sammd = { path = ".", editable = true }
 
 [feature.dev.dependencies]
+coverage = ">=7"
 pytest = ">=8"
 pytest-cov = ">=5"
 ruff = ">=0.8"
+
+[feature.docs.dependencies]
+sphinx = ">=8"
+myst-parser = ">=4"
 
 [feature.science.dependencies]
 openmm = "*"
@@ -28,8 +33,9 @@ packmol = "*"
 [environments]
 default = ["dev"]
 dev = ["dev"]
+docs = ["dev", "docs"]
 science = ["dev", "science"]
 
 [tasks]
-test = "python -m pytest"
-lint = "ruff check src tests"
+test = "python -m pytest --cov=sammd --cov-report=term-missing"
+lint = "ruff check src/sammd tests"
