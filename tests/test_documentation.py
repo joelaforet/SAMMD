@@ -1,7 +1,15 @@
 """Documentation and notebook scaffold checks."""
 
 import json
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
+
+from sammd import build_system, load_config
+from sammd.analysis import analyze_orientation
+from sammd.config import CONFIG_TEMPLATE
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -43,3 +51,66 @@ def test_canonical_notebook_has_expected_sections() -> None:
     for heading in expected_headings:
         assert heading in headings
     assert notebook["metadata"]["kernelspec"]["language"] == "python"
+
+
+def test_sphinx_docs_build_without_warnings(tmp_path: Path) -> None:
+    """Build Sphinx docs with warnings treated as errors when Sphinx is available."""
+
+    pytest.importorskip("sphinx")
+    source_dir = PROJECT_ROOT / "docs" / "source"
+    build_dir = tmp_path / "html"
+    result = subprocess.run(
+        [sys.executable, "-m", "sphinx", "-W", "-b", "html", str(source_dir), str(build_dir)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (build_dir / "index.html").is_file()
+
+
+def test_project_scope_page_uses_published_safe_link() -> None:
+    """Ensure project-scope docs avoid source-relative links that break in HTML."""
+
+    page = PROJECT_ROOT / "docs" / "source" / "explanation" / "project-scope.rst"
+    content = page.read_text(encoding="utf-8")
+    assert "../../project-scope.md" not in content
+    assert "https://github.com/joelaforet/SAMMD/blob/main/docs/project-scope.md" in content
+
+
+def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:
+    """Reproduce the notebook workflow using current lightweight package APIs."""
+
+    config_path = tmp_path / "sammd.yaml"
+    output_dir = tmp_path / "outputs"
+    config_path.write_text(CONFIG_TEMPLATE, encoding="utf-8")
+
+    config = load_config(config_path)
+    plan = build_system(config, output_dir=output_dir)
+    planned_slab_path = plan.write_planned_slab_mmcif(overwrite=True)
+
+    toy_coordinates = [
+        (-0.30, 0.00, 0.00),
+        (-0.10, 0.15, 0.02),
+        (0.10, 0.10, 0.05),
+        (0.30, 0.00, 0.12),
+        (0.45, -0.08, 0.24),
+    ]
+    orientation = analyze_orientation(
+        toy_coordinates,
+        atom_index=4,
+        masses=[12.0, 12.0, 12.0, 12.0, 16.0],
+        side="top",
+        reactant_label="toy cinnamaldehyde",
+    )
+
+    assert planned_slab_path.is_file()
+    assert plan.slab.metal == "Pd"
+    assert plan.slab.facet == "111"
+    assert len(plan.binding_sites) > 0
+    assert len(plan.sam_placements.placements) > 0
+    assert plan.solution.molecule_counts["water"] > 0
+    assert plan.output_paths.topology == output_dir / "topology.cif"
+    assert not plan.full_construction_available
+    assert 0.0 <= orientation.angle_degrees <= 180.0
+    assert orientation.reactant_label == "toy cinnamaldehyde"

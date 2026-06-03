@@ -2,9 +2,11 @@ Project scope
 =============
 
 The source-of-truth scope document is maintained in the repository at
-``docs/project-scope.md``.
+``docs/project-scope.md``. Published documentation links to the stable repository
+copy so the reference remains valid after ReadTheDocs builds HTML pages.
 
-Read it directly in the source tree: `project-scope.md <../../project-scope.md>`_.
+Read the full scope document on GitHub:
+`docs/project-scope.md <https://github.com/joelaforet/SAMMD/blob/main/docs/project-scope.md>`_.
 
 In brief, SAMMD aims to grow from the current lightweight planning workflow into
 a Python-first OpenFF/OpenMM setup package for self-assembled monolayers on metal
