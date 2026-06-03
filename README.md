@@ -18,9 +18,12 @@ mmCIF writer can emit planned scaffold atoms for PyMOL inspection, while full
 trajectory production still awaits OpenMM builder integration.
 
 `build_system()` currently returns a lightweight plan rather than OpenFF/OpenMM
-objects. The plan contains the validated config, a commensurate Pd(111) slab,
-fcc binding sites, seeded top/bottom SAM placement choices, solution molecule
-counts, and output paths. Full backend construction is the next milestone.
+objects. The plan contains the validated config, a centered double-sided
+commensurate Pd(111) slab, fcc/hcp hollow binding sites, seeded top/bottom SAM
+placement choices, solution molecule counts from an approximate composition
+planning volume, and output paths. Bridge/atop sites and one-sided or off-center
+slabs remain future build-planner work. Full backend construction is the next
+milestone.
 
 See [docs/project-scope.md](docs/project-scope.md) for the source-of-truth scope
 and scientific defaults.
@@ -42,3 +45,6 @@ print(plan.slab.metal, plan.slab.facet)
 print(plan.solution.molecule_counts)
 plan.write_planned_slab_mmcif()
 ```
+
+The emitted mmCIF is a slab-only visualization scaffold, not a complete system
+topology or final simulation cell.

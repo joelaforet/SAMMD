@@ -128,7 +128,8 @@ def plan_solution_composition(config: SAMMDConfig, box_volume_nm3: float) -> Sol
     config
         Validated SAMMD configuration.
     box_volume_nm3
-        Simulation box volume in nm^3.
+        Volume in nm^3 used for solution count planning. Lightweight build plans may pass an
+        approximate composition-planning volume rather than a final simulation cell volume.
 
     Returns
     -------
@@ -152,7 +153,7 @@ def plan_solution_components(
     reactants: list[Any] | tuple[Any, ...] = (),
     water_model: str = "TIP3P",
 ) -> SolutionPlan:
-    """Plan solution counts from config-like or dataclass component inputs."""
+    """Plan solution counts from a count-planning volume and component inputs."""
 
     _validate_box_volume(box_volume_nm3)
     total_volume_fraction = sum(

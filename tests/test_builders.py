@@ -1,11 +1,15 @@
 """Tests for lightweight build-plan composition."""
 
+import json
+import os
+import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 from sammd.builders import DEFAULT_SOLVENT_PADDING_NM, build_system
-from sammd.config import CONFIG_TEMPLATE, SAMMDConfig
+from sammd.config import CONFIG_TEMPLATE, AnchorConfig, SAMComponentConfig, SAMConfig, SAMMDConfig
 from sammd.solvation import round_half_up
 from sammd.surfaces import plan_pd111_slab
 
@@ -53,8 +57,8 @@ def test_planning_box_uses_adjusted_commensurate_lateral_dimensions() -> None:
     plan = build_system(config)
 
     assert plan.slab.requested_lateral_size_nm == requested_lateral_size_nm
-    assert plan.planning_box.lateral_size_nm == slab.lateral_size_nm
-    assert plan.planning_box.lateral_size_nm != requested_lateral_size_nm
+    assert plan.composition_planning_box.lateral_size_nm == slab.lateral_size_nm
+    assert plan.composition_planning_box.lateral_size_nm != requested_lateral_size_nm
     assert plan.sam_placements.lateral_area_nm2 == pytest.approx(
         slab.lateral_size_nm[0] * slab.lateral_size_nm[1]
     )
@@ -64,14 +68,15 @@ def test_default_solvation_counts_are_deterministic() -> None:
     """Convert the default derived planning box into stable molecule counts."""
 
     plan = build_system(SAMMDConfig())
+    count_planning_volume_nm3 = plan.composition_planning_box.count_planning_volume_nm3
     expected_water = round_half_up(
-        0.997 * plan.planning_box.volume_nm3 * 1.0e-24 * 1000.0 / 18.01528 * 6.02214076e23
+        0.997 * count_planning_volume_nm3 * 1.0e-24 * 1000.0 / 18.01528 * 6.02214076e23
     )
     expected_reactant = round_half_up(
-        0.05 * plan.planning_box.volume_nm3 * 1.0e-24 * 6.02214076e23
+        0.05 * count_planning_volume_nm3 * 1.0e-24 * 6.02214076e23
     )
 
-    assert plan.planning_box.solvent_padding_nm == DEFAULT_SOLVENT_PADDING_NM
+    assert plan.composition_planning_box.solvent_padding_nm == DEFAULT_SOLVENT_PADDING_NM
     assert plan.solution.solvent_components[0].count == expected_water
     assert plan.solution.reactants[0].count == expected_reactant
 
@@ -85,12 +90,61 @@ def test_build_plan_writes_planned_slab_mmcif_and_refuses_overwrite(tmp_path) ->
     text = written_path.read_text(encoding="utf-8")
 
     assert written_path == tmp_path / "topology.cif"
-    assert text.startswith("data_sammd_planned_slab")
+    assert text.startswith("data_sammd_planned_slab_only")
     assert "_atom_site.Cartn_x" in text
     assert text.count("HETATM") == len(plan.slab.positions_nm)
-    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+    with pytest.raises(NotImplementedError, match="write_planned_slab_mmcif"):
         plan.write_planned_topology()
-    plan.write_planned_topology(overwrite=True)
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        plan.write_planned_slab_mmcif()
+    plan.write_planned_slab_mmcif(overwrite=True)
+
+
+@pytest.mark.parametrize(
+    ("config_data", "message"),
+    [
+        ({"surface": {"slab": {"centered": False}}}, "centered=False is not implemented"),
+        (
+            {"surface": {"slab": {"double_sided": False}}},
+            "double_sided=False is not implemented",
+        ),
+    ],
+)
+def test_build_system_rejects_unsupported_slab_options(config_data, message) -> None:
+    """Fail clearly for schema-allowed slab options outside the MVP geometry."""
+
+    with pytest.raises(NotImplementedError, match=message):
+        build_system(config_data)
+
+
+@pytest.mark.parametrize("site_kind", ["bridge", "atop"])
+def test_build_system_rejects_unimplemented_anchor_sites(site_kind: str) -> None:
+    """Fail before planning for schema-allowed anchor sites outside the MVP."""
+
+    config = SAMMDConfig(sam=SAMConfig(anchor=AnchorConfig(site=site_kind)))
+
+    with pytest.raises(NotImplementedError, match=f"{site_kind}.*not implemented"):
+        build_system(config)
+
+
+def test_build_system_rejects_unimplemented_component_anchor_sites() -> None:
+    """Validate component-specific anchor requests before surface planning."""
+
+    config = SAMMDConfig(
+        sam=SAMConfig(
+            components=[
+                SAMComponentConfig(
+                    name="atop-component",
+                    smiles="CCCS",
+                    fraction=1.0,
+                    anchor=AnchorConfig(site="atop"),
+                )
+            ]
+        )
+    )
+
+    with pytest.raises(NotImplementedError, match=r"atop.*not implemented"):
+        build_system(config)
 
 
 def test_seed_override_deterministically_controls_sam_site_choices() -> None:
@@ -107,8 +161,23 @@ def test_seed_override_deterministically_controls_sam_site_choices() -> None:
 
 
 def test_build_import_avoids_heavy_backend_modules() -> None:
-    """Keep import-time behavior independent of heavy molecular backends."""
+    """Check import-time behavior in a fresh process for heavy backend modules."""
 
     heavy_modules = ("openmm", "openff", "rdkit", "mbuild", "MDAnalysis", "parmed", "pdbfixer")
+    code = (
+        "import json, sys; "
+        "import sammd, sammd.builders; "
+        f"heavy_modules = {heavy_modules!r}; "
+        "print(json.dumps([name for name in heavy_modules if name in sys.modules]))"
+    )
+    src_path = Path(__file__).resolve().parents[1] / "src"
+    pythonpath = os.pathsep.join(filter(None, (str(src_path), os.environ.get("PYTHONPATH", ""))))
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        capture_output=True,
+        env={**os.environ, "PYTHONPATH": pythonpath},
+        text=True,
+    )
 
-    assert all(module_name not in sys.modules for module_name in heavy_modules)
+    assert json.loads(result.stdout) == []

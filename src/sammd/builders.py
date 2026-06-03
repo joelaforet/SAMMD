@@ -16,15 +16,23 @@ DEFAULT_SOLVENT_PADDING_NM = 3.0
 OPENMM_CONSTRUCTION_IMPLEMENTED = False
 
 
+SUPPORTED_MVP_ANCHOR_SITES = frozenset({"fcc_hollow", "hcp_hollow"})
+
+
 @dataclass(frozen=True)
-class PlanningBox:
-    """Derived MVP box dimensions used only for composition counts."""
+class CompositionPlanningBox:
+    """Approximate MVP volume used only for solution composition counts.
+
+    These dimensions are not final simulation cell vectors. The volume includes the
+    commensurate slab thickness plus solvent padding and intentionally omits SAM and
+    packed molecule extents until full backend construction is implemented.
+    """
 
     lateral_size_nm: tuple[float, float]
     slab_thickness_nm: float
     solvent_padding_nm: float
-    dimensions_nm: tuple[float, float, float]
-    volume_nm3: float
+    approximate_dimensions_nm: tuple[float, float, float]
+    count_planning_volume_nm3: float
 
 
 @dataclass(frozen=True)
@@ -37,7 +45,7 @@ class SAMMDBuildPlan:
     sam_placements: SAMPlacementPlan
     solution: SolutionPlan
     output_paths: OutputPaths
-    planning_box: PlanningBox
+    composition_planning_box: CompositionPlanningBox
     openmm_construction_implemented: bool = OPENMM_CONSTRUCTION_IMPLEMENTED
 
     @property
@@ -60,12 +68,13 @@ class SAMMDBuildPlan:
     def write_planned_slab_mmcif(
         self, path: str | Path | None = None, *, overwrite: bool = False
     ) -> Path:
-        """Write the planned Pd slab as an mmCIF visualization artifact.
+        """Write only the planned Pd slab as an mmCIF visualization artifact.
 
         Parameters
         ----------
         path
-            Optional destination path. Defaults to the planned topology path.
+            Optional destination path. Defaults to the configured topology path, but the
+            emitted artifact is slab-only rather than a complete topology.
         overwrite
             Whether an existing destination may be replaced.
 
@@ -79,15 +88,19 @@ class SAMMDBuildPlan:
         return write_mmcif(
             destination,
             slab_to_atom_records(self.slab),
-            data_name="sammd_planned_slab",
-            cell_lengths_nm=self.planning_box.dimensions_nm,
+            data_name="sammd_planned_slab_only",
             overwrite=overwrite,
         )
 
     def write_planned_topology(self, *, overwrite: bool = False) -> Path:
-        """Write the current lightweight planned topology artifact."""
+        """Raise because full topology writing is not implemented for this plan."""
 
-        return self.write_planned_slab_mmcif(overwrite=overwrite)
+        _ = overwrite
+        msg = (
+            "Full planned topology writing is not implemented yet; use "
+            "write_planned_slab_mmcif() for the slab-only visualization artifact."
+        )
+        raise NotImplementedError(msg)
 
 
 def build_system(
@@ -113,6 +126,7 @@ def build_system(
     """
 
     loaded_config = _load_build_config(config)
+    _validate_mvp_build_config(loaded_config)
     active_seed = loaded_config.simulation.seed if seed is None else seed
     if active_seed < 0:
         msg = "seed must be non-negative"
@@ -124,14 +138,16 @@ def build_system(
         centered=loaded_config.surface.slab.centered,
     )
     binding_sites = generate_binding_sites(slab, loaded_config.sam.anchor.site)
-    planning_box = _derive_planning_box(loaded_config, slab)
+    composition_planning_box = _derive_composition_planning_box(loaded_config, slab)
     sam_placements = plan_sam_placements(
         loaded_config.sam,
         binding_sites,
-        planning_box.lateral_size_nm[0] * planning_box.lateral_size_nm[1],
+        composition_planning_box.lateral_size_nm[0] * composition_planning_box.lateral_size_nm[1],
         seed=active_seed,
     )
-    solution = plan_solution_composition(loaded_config, planning_box.volume_nm3)
+    solution = plan_solution_composition(
+        loaded_config, composition_planning_box.count_planning_volume_nm3
+    )
     output_paths = plan_output_paths(loaded_config, "." if output_dir is None else output_dir)
 
     return SAMMDBuildPlan(
@@ -141,7 +157,7 @@ def build_system(
         sam_placements=sam_placements,
         solution=solution,
         output_paths=output_paths,
-        planning_box=planning_box,
+        composition_planning_box=composition_planning_box,
     )
 
 
@@ -158,21 +174,49 @@ def _load_build_config(config: SAMMDConfig | str | Path | dict[str, Any]) -> SAM
     raise TypeError(msg)
 
 
-def _derive_planning_box(config: SAMMDConfig, slab: SurfaceSlab) -> PlanningBox:
-    """Derive the MVP box used for count planning from adjusted slab dimensions."""
+def _validate_mvp_build_config(config: SAMMDConfig) -> None:
+    """Reject schema-allowed options not implemented by the MVP build planner."""
+
+    if not config.surface.slab.centered:
+        msg = "surface.slab.centered=False is not implemented by the MVP build planner"
+        raise NotImplementedError(msg)
+    if not config.surface.slab.double_sided:
+        msg = "surface.slab.double_sided=False is not implemented by the MVP build planner"
+        raise NotImplementedError(msg)
+    requested_sites = {config.sam.anchor.site}
+    requested_sites.update(
+        component.anchor.site for component in config.sam.components if component.anchor is not None
+    )
+    unsupported_sites = sorted(requested_sites - SUPPORTED_MVP_ANCHOR_SITES)
+    if unsupported_sites:
+        supported = ", ".join(sorted(SUPPORTED_MVP_ANCHOR_SITES))
+        requested = ", ".join(unsupported_sites)
+        msg = (
+            f"SAM anchor site kind(s) {requested} are not implemented by the MVP build "
+            f"planner; supported site kinds: {supported}"
+        )
+        raise NotImplementedError(msg)
+
+
+def _derive_composition_planning_box(
+    config: SAMMDConfig, slab: SurfaceSlab
+) -> CompositionPlanningBox:
+    """Derive approximate dimensions used only for solution count planning."""
 
     padding_nm = getattr(config.solvent, "padding_nm", DEFAULT_SOLVENT_PADDING_NM)
     box_z_nm = slab.slab_extent_nm[2] + 2.0 * padding_nm
-    dimensions_nm = (
+    approximate_dimensions_nm = (
         slab.lateral_size_nm[0],
         slab.lateral_size_nm[1],
         box_z_nm,
     )
-    volume_nm3 = dimensions_nm[0] * dimensions_nm[1] * dimensions_nm[2]
-    return PlanningBox(
+    count_planning_volume_nm3 = (
+        approximate_dimensions_nm[0] * approximate_dimensions_nm[1] * approximate_dimensions_nm[2]
+    )
+    return CompositionPlanningBox(
         lateral_size_nm=slab.lateral_size_nm,
         slab_thickness_nm=slab.slab_extent_nm[2],
         solvent_padding_nm=padding_nm,
-        dimensions_nm=dimensions_nm,
-        volume_nm3=volume_nm3,
+        approximate_dimensions_nm=approximate_dimensions_nm,
+        count_planning_volume_nm3=count_planning_volume_nm3,
     )
