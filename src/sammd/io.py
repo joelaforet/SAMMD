@@ -354,10 +354,15 @@ def _validate_atom_records(
     """Validate atom records before writing mmCIF rows."""
 
     validated_records = tuple(atom_records)
+    serials: set[int] = set()
     for record in validated_records:
         if record.serial <= 0:
             msg = "atom record serial must be positive"
             raise ValueError(msg)
+        if record.serial in serials:
+            msg = f"atom record serial values must be unique; duplicate serial {record.serial}"
+            raise ValueError(msg)
+        serials.add(record.serial)
         if record.residue_id <= 0:
             msg = "atom record residue_id must be positive"
             raise ValueError(msg)
@@ -419,12 +424,26 @@ def _build_entity_ids(atom_records: tuple[AtomRecord, ...]) -> dict[str, int]:
 def _quote_cif_value(value: str) -> str:
     """Quote mmCIF values only when required."""
 
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        msg = "mmCIF values must not contain control characters"
+        raise ValueError(msg)
     reserved_prefixes = ("_", "#", ";", "data_", "loop_", "save_", "stop_")
-    if value and all(character not in value for character in " \t\n'\"") and not value.startswith(
-        reserved_prefixes
-    ):
+    lower_value = value.lower()
+    is_reserved_token = value in {".", "?"}
+    requires_quotes = (
+        is_reserved_token
+        or any(character.isspace() for character in value)
+        or value.startswith(("_", "#", ";"))
+        or lower_value.startswith(reserved_prefixes[3:])
+    )
+    if "'" in value and '"' in value:
+        msg = "mmCIF values containing both single and double quotes are not supported"
+        raise ValueError(msg)
+    if not requires_quotes and "'" not in value and '"' not in value:
         return value
-    return "'" + value.replace("'", "''") + "'"
+    if "'" in value:
+        return f'"{value}"'
+    return f"'{value}'"
 
 
 def _slab_layer_label(layer_index: int, layers: int) -> tuple[str, str]:

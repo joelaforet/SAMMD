@@ -1,6 +1,5 @@
 """Tests for output planning and mmCIF scaffolds."""
 
-import shlex
 from math import inf, nan
 
 import pytest
@@ -117,7 +116,7 @@ def test_mmcif_writer_formats_required_atom_site_fields_and_angstrom_coordinates
     assert "_atom_site.occupancy" in text
     assert "_atom_site.B_iso_or_equiv" in text
     atom_line = next(line for line in text.splitlines() if line.startswith("HETATM"))
-    tokens = shlex.split(atom_line)
+    tokens = _split_cif_line(atom_line)
     assert tokens[:8] == ["HETATM", "1", "Pd", "Pd1", "PDT", "M", "1", "1"]
     assert tokens[8:11] == ["1.000000", "-2.000000", "3.000000"]
     assert tokens[11:13] == ["1.00", "0.00"]
@@ -154,6 +153,18 @@ def test_mmcif_writer_rejects_invalid_atom_records(overrides, message) -> None:
         format_mmcif((_base_atom_record(**overrides),))
 
 
+def test_mmcif_writer_rejects_duplicate_atom_serials() -> None:
+    """Reject duplicate atom IDs before formatting atom-site rows."""
+
+    records = (
+        _base_atom_record(serial=1),
+        _base_atom_record(serial=1, atom_name="Pd2", residue_id=2),
+    )
+
+    with pytest.raises(ValueError, match="duplicate serial 1"):
+        format_mmcif(records)
+
+
 def test_mmcif_writer_quotes_safe_strings_and_uses_numeric_entity_ids() -> None:
     """Quote string values while keeping atom-site entity IDs internally consistent."""
 
@@ -183,7 +194,7 @@ def test_mmcif_writer_quotes_safe_strings_and_uses_numeric_entity_ids() -> None:
     lines = text.splitlines()
     entity_rows = _loop_rows(lines, "_entity.id")
     sammd_entity_rows = _loop_rows(lines, "_sammd_entity.id")
-    atom_rows = [shlex.split(line) for line in lines if line.startswith("HETATM")]
+    atom_rows = [_split_cif_line(line) for line in lines if line.startswith("HETATM")]
 
     assert entity_rows == [
         ["1", "non-polymer", "metal top layer"],
@@ -192,9 +203,36 @@ def test_mmcif_writer_quotes_safe_strings_and_uses_numeric_entity_ids() -> None:
     assert sammd_entity_rows == [["1", "metal top layer"], ["2", "metal slab"]]
     assert [row[6] for row in atom_rows] == ["1", "2", "1"]
     assert atom_rows[0][3] == "Pd top"
-    assert atom_rows[0][4] == "Pds"
+    assert atom_rows[0][4] == "Pd's"
     assert atom_rows[1][3] == "#Pd2"
     assert "metal top layer" not in {row[6] for row in atom_rows}
+
+
+def test_mmcif_writer_quotes_reserved_tokens_and_double_quotes() -> None:
+    """Round-trip reserved CIF tokens and values containing double quotes."""
+
+    records = (
+        _base_atom_record(atom_name="?", residue_name='Pd "top"', component_label="."),
+    )
+
+    text = format_mmcif(records)
+    entity_rows = _loop_rows(text.splitlines(), "_entity.id")
+    atom_row = next(
+        _split_cif_line(line) for line in text.splitlines() if line.startswith("HETATM")
+    )
+
+    assert entity_rows == [["1", "non-polymer", "."]]
+    assert atom_row[3] == "?"
+    assert atom_row[4] == 'Pd "top"'
+
+
+def test_mmcif_writer_rejects_values_with_both_quote_types() -> None:
+    """Fail clearly rather than emitting invalid mixed-quote CIF values."""
+
+    record = _base_atom_record(atom_name='Pd "top\'')
+
+    with pytest.raises(ValueError, match="both single and double quotes"):
+        format_mmcif((record,))
 
 
 def test_slab_to_atom_records_gives_deterministic_pd_layer_labels() -> None:
@@ -223,6 +261,35 @@ def _loop_rows(lines: list[str], first_field: str) -> list[list[str]]:
         index += 1
     rows: list[list[str]] = []
     while index < len(lines) and lines[index] != "#":
-        rows.append(shlex.split(lines[index]))
+        rows.append(_split_cif_line(lines[index]))
         index += 1
     return rows
+
+
+def _split_cif_line(line: str) -> list[str]:
+    """Split the simple one-line CIF values emitted by the writer."""
+
+    tokens: list[str] = []
+    index = 0
+    while index < len(line):
+        while index < len(line) and line[index].isspace():
+            index += 1
+        if index >= len(line):
+            break
+        if line[index] in {"'", '"'}:
+            quote = line[index]
+            index += 1
+            start = index
+            while index < len(line) and line[index] != quote:
+                index += 1
+            if index >= len(line):
+                msg = "unterminated CIF quote in test helper"
+                raise ValueError(msg)
+            tokens.append(line[start:index])
+            index += 1
+        else:
+            start = index
+            while index < len(line) and not line[index].isspace():
+                index += 1
+            tokens.append(line[start:index])
+    return tokens
