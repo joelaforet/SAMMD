@@ -63,6 +63,7 @@ def build_state_data_reporter_config(
     interval_steps: int,
     fields: list[str],
     test_all_fields: bool = False,
+    total_steps: int | None = None,
 ) -> StateDataReporterConfig:
     """Build OpenMM StateDataReporter keyword arguments.
 
@@ -76,6 +77,8 @@ def build_state_data_reporter_config(
         User-requested SAMMD thermodynamic field names.
     test_all_fields
         Whether to request every supported field.
+    total_steps
+        Total expected simulation steps, required for progress and remaining time.
 
     Returns
     -------
@@ -86,10 +89,19 @@ def build_state_data_reporter_config(
     if interval_steps <= 0:
         msg = "interval_steps must be positive"
         raise ValueError(msg)
+    if total_steps is not None and total_steps <= 0:
+        msg = "total_steps must be positive"
+        raise ValueError(msg)
     resolved_fields = get_reporter_fields(fields, test_all_fields=test_all_fields)
+    fields_requiring_total_steps = {"progress", "remaining_time"}
+    if fields_requiring_total_steps.intersection(resolved_fields) and total_steps is None:
+        msg = "progress and remaining_time reporter fields require total_steps"
+        raise ValueError(msg)
     kwargs: dict[str, bool | int | str] = {
         THERMODYNAMIC_FIELD_TO_OPENMM[field]: True for field in resolved_fields
     }
+    if total_steps is not None:
+        kwargs["totalSteps"] = total_steps
     return StateDataReporterConfig(
         file=output_path,
         report_interval=interval_steps,

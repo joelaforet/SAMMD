@@ -37,8 +37,29 @@ def test_reporter_test_all_fields_mode() -> None:
         interval_steps=100,
         fields=["step"],
         test_all_fields=True,
+        total_steps=1000,
     )
-    assert len(config.kwargs) == len(SUPPORTED_THERMODYNAMIC_FIELDS)
+    assert len(config.kwargs) == len(SUPPORTED_THERMODYNAMIC_FIELDS) + 1
+    assert config.kwargs["totalSteps"] == 1000
+
+
+def test_reporter_progress_requires_total_steps() -> None:
+    """Require total steps for OpenMM progress and remaining-time fields."""
+
+    with pytest.raises(ValueError, match="require total_steps"):
+        build_state_data_reporter_config(
+            "thermodynamics.csv",
+            interval_steps=100,
+            fields=["progress"],
+        )
+
+    with pytest.raises(ValueError, match="require total_steps"):
+        build_state_data_reporter_config(
+            "thermodynamics.csv",
+            interval_steps=100,
+            fields=["step"],
+            test_all_fields=True,
+        )
 
 
 def test_reporter_invalid_inputs_fail_clearly() -> None:

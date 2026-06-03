@@ -2,27 +2,37 @@
 
 from __future__ import annotations
 
+from math import sqrt
 from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 AnchorMode = Literal["nonbonded", "bonded"]
 AnchorSite = Literal["fcc_hollow", "hcp_hollow", "bridge", "atop"]
 Facet = Literal["111"]
 Metal = Literal["Pd"]
 WaterModel = Literal["TIP3P"]
+PD_LATTICE_CONSTANT_NM = 0.389
+EXPECTED_GRAFTING_DENSITY_UNIT = "nm^2 / molecule"
+EXPECTED_PD_RESTRAINT_UNIT = "kJ mol^-1 nm^-2"
 
 
-class UnitValue(BaseModel):
+class SAMMDBaseModel(BaseModel):
+    """Strict base model for all SAMMD configuration sections."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class UnitValue(SAMMDBaseModel):
     """Numeric value paired with a human-readable unit string."""
 
     value: float = Field(gt=0)
     unit: str = Field(min_length=1)
 
 
-class SlabConfig(BaseModel):
+class SlabConfig(SAMMDBaseModel):
     """Metal slab geometry and restraint defaults."""
 
     layers: int = Field(default=8, gt=0)
@@ -30,8 +40,17 @@ class SlabConfig(BaseModel):
     centered: bool = True
     double_sided: bool = True
     positional_restraint: UnitValue = Field(
-        default_factory=lambda: UnitValue(value=10000.0, unit="kJ mol^-1 nm^-2")
+        default_factory=lambda: UnitValue(value=10000.0, unit=EXPECTED_PD_RESTRAINT_UNIT)
     )
+
+    @model_validator(mode="after")
+    def _validate_restraint_unit(self) -> SlabConfig:
+        """Validate the expected Pd positional restraint unit."""
+
+        if self.positional_restraint.unit != EXPECTED_PD_RESTRAINT_UNIT:
+            msg = f"positional_restraint unit must be '{EXPECTED_PD_RESTRAINT_UNIT}'"
+            raise ValueError(msg)
+        return self
 
     @field_validator("lateral_size_nm")
     @classmethod
@@ -44,7 +63,7 @@ class SlabConfig(BaseModel):
         return value
 
 
-class SurfaceConfig(BaseModel):
+class SurfaceConfig(SAMMDBaseModel):
     """Metal surface configuration."""
 
     metal: Metal = "Pd"
@@ -52,13 +71,13 @@ class SurfaceConfig(BaseModel):
     slab: SlabConfig = Field(default_factory=SlabConfig)
 
 
-class AnchorNonbondedConfig(BaseModel):
+class AnchorNonbondedConfig(SAMMDBaseModel):
     """Nonbonded sulfur-metal anchor proxy configuration."""
 
     scale_factor: float = Field(default=4.0, gt=0)
 
 
-class AnchorConfig(BaseModel):
+class AnchorConfig(SAMMDBaseModel):
     """SAM anchor strategy and adsorption site configuration."""
 
     mode: AnchorMode = "nonbonded"
@@ -66,7 +85,7 @@ class AnchorConfig(BaseModel):
     nonbonded: AnchorNonbondedConfig = Field(default_factory=AnchorNonbondedConfig)
 
 
-class SAMComponentConfig(BaseModel):
+class SAMComponentConfig(SAMMDBaseModel):
     """Single SAM molecular component definition."""
 
     name: str = Field(min_length=1)
@@ -85,11 +104,11 @@ class SAMComponentConfig(BaseModel):
         return self
 
 
-class SAMConfig(BaseModel):
+class SAMConfig(SAMMDBaseModel):
     """SAM composition and grafting-density configuration."""
 
     grafting_density: UnitValue = Field(
-        default_factory=lambda: UnitValue(value=0.25, unit="nm^2 / molecule")
+        default_factory=lambda: UnitValue(value=0.25, unit=EXPECTED_GRAFTING_DENSITY_UNIT)
     )
     anchor: AnchorConfig = Field(default_factory=AnchorConfig)
     components: list[SAMComponentConfig] = Field(
@@ -103,6 +122,9 @@ class SAMConfig(BaseModel):
     def _validate_mixed_composition(self) -> SAMConfig:
         """Validate that mixed SAMs use fractions or counts consistently."""
 
+        if self.grafting_density.unit != EXPECTED_GRAFTING_DENSITY_UNIT:
+            msg = f"grafting_density unit must be '{EXPECTED_GRAFTING_DENSITY_UNIT}'"
+            raise ValueError(msg)
         fraction_count = sum(component.fraction is not None for component in self.components)
         explicit_count = sum(component.count is not None for component in self.components)
         if fraction_count and explicit_count:
@@ -114,8 +136,29 @@ class SAMConfig(BaseModel):
             raise ValueError(msg)
         return self
 
+    def validate_component_counts(self, total_sites: int) -> None:
+        """Validate explicit SAM component counts against selected grafting sites.
 
-class SolventComponentConfig(BaseModel):
+        Parameters
+        ----------
+        total_sites
+            Number of selected grafting sites available for one decorated composition.
+        """
+
+        if total_sites <= 0:
+            msg = "total_sites must be positive"
+            raise ValueError(msg)
+        counts = [component.count for component in self.components]
+        if any(count is None for count in counts):
+            msg = "SAM component count validation requires explicit count mode"
+            raise ValueError(msg)
+        total_count = sum(count or 0 for count in counts)
+        if total_count != total_sites:
+            msg = f"SAM component counts sum to {total_count}, but total_sites is {total_sites}"
+            raise ValueError(msg)
+
+
+class SolventComponentConfig(SAMMDBaseModel):
     """Solvent component specified by volume fraction."""
 
     name: str = Field(min_length=1)
@@ -124,7 +167,7 @@ class SolventComponentConfig(BaseModel):
     density_g_ml: float | None = Field(default=None, gt=0)
 
 
-class SolventConfig(BaseModel):
+class SolventConfig(SAMMDBaseModel):
     """Solvent model and composition configuration."""
 
     water_model: WaterModel = "TIP3P"
@@ -142,10 +185,14 @@ class SolventConfig(BaseModel):
         if abs(total - 1.0) > 1e-6:
             msg = "solvent component volume fractions must sum to 1.0"
             raise ValueError(msg)
+        for component in self.components:
+            if component.name.lower() != "water" and component.density_g_ml is None:
+                msg = f"co-solvent '{component.name}' must define density_g_ml"
+                raise ValueError(msg)
         return self
 
 
-class SaltConfig(BaseModel):
+class SaltConfig(SAMMDBaseModel):
     """Salt composition specified by molar concentration."""
 
     cation: str = Field(default="Na+", min_length=1)
@@ -154,7 +201,7 @@ class SaltConfig(BaseModel):
     neutralize: bool = True
 
 
-class ReactantConfig(BaseModel):
+class ReactantConfig(SAMMDBaseModel):
     """Reactant molecule specified by SMILES and target concentration."""
 
     name: str = Field(min_length=1)
@@ -162,7 +209,7 @@ class ReactantConfig(BaseModel):
     concentration_molar: float = Field(gt=0)
 
 
-class OutputConfig(BaseModel):
+class OutputConfig(SAMMDBaseModel):
     """Default visualization and reporter output paths."""
 
     topology: str = "topology.cif"
@@ -170,7 +217,7 @@ class OutputConfig(BaseModel):
     thermodynamics: str = "thermodynamics.csv"
 
 
-class ReporterConfig(BaseModel):
+class ReporterConfig(SAMMDBaseModel):
     """Thermodynamic reporter field selection."""
 
     interval_steps: int = Field(default=1000, gt=0)
@@ -193,7 +240,7 @@ class ReporterConfig(BaseModel):
 
     @field_validator("fields")
     @classmethod
-    def _validate_supported_fields(cls, value: list[str], info: ValidationInfo) -> list[str]:
+    def _validate_supported_fields(cls, value: list[str]) -> list[str]:
         """Validate reporter field names against the lightweight registry."""
 
         from sammd.reporting import SUPPORTED_THERMODYNAMIC_FIELDS
@@ -208,20 +255,19 @@ class ReporterConfig(BaseModel):
         return value
 
 
-class SimulationConfig(BaseModel):
+class SimulationConfig(SAMMDBaseModel):
     """Lightweight simulation defaults used before backend construction."""
 
     timestep_fs: float = Field(default=2.0, gt=0)
     temperature_k: float = Field(default=300.0, gt=0)
     pressure_bar: float = Field(default=1.0, gt=0)
     nonbonded_cutoff_nm: float = Field(default=1.0, gt=0)
+    slab_cutoff_buffer_nm: float = Field(default=0.5, ge=0)
     seed: int = Field(default=2026, ge=0)
 
 
-class SAMMDConfig(BaseModel):
+class SAMMDConfig(SAMMDBaseModel):
     """Top-level SAMMD configuration model."""
-
-    model_config = ConfigDict(extra="forbid")
 
     surface: SurfaceConfig = Field(default_factory=SurfaceConfig)
     sam: SAMConfig = Field(default_factory=SAMConfig)
@@ -239,6 +285,23 @@ class SAMMDConfig(BaseModel):
     output: OutputConfig = Field(default_factory=OutputConfig)
     reporters: ReporterConfig = Field(default_factory=ReporterConfig)
     simulation: SimulationConfig = Field(default_factory=SimulationConfig)
+
+    @model_validator(mode="after")
+    def _validate_slab_thickness(self) -> SAMMDConfig:
+        """Require the Pd(111) slab to exceed the cutoff plus buffer."""
+
+        thickness_nm = self.surface.slab.layers * PD_LATTICE_CONSTANT_NM / sqrt(3)
+        minimum_thickness_nm = (
+            self.simulation.nonbonded_cutoff_nm + self.simulation.slab_cutoff_buffer_nm
+        )
+        if thickness_nm <= minimum_thickness_nm:
+            msg = (
+                "Pd(111) slab thickness must exceed nonbonded_cutoff_nm plus "
+                f"slab_cutoff_buffer_nm; got {thickness_nm:.3f} nm and require more than "
+                f"{minimum_thickness_nm:.3f} nm"
+            )
+            raise ValueError(msg)
+        return self
 
 
 CONFIG_TEMPLATE = """# SAMMD MVP configuration template
@@ -308,6 +371,7 @@ simulation:
   temperature_k: 300.0
   pressure_bar: 1.0
   nonbonded_cutoff_nm: 1.0
+  slab_cutoff_buffer_nm: 0.5
   seed: 2026
 """
 

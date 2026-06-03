@@ -82,6 +82,76 @@ def test_mixed_sam_count_validation() -> None:
         load_config_dict(data)
 
 
+def test_sam_count_sum_validation_helper() -> None:
+    """Validate explicit component counts against a supplied site count."""
+
+    data = _template_data()
+    data["sam"]["components"] = [
+        {"name": "a", "smiles": "CCCS", "count": 4},
+        {"name": "b", "smiles": "CCCCS", "count": 6},
+    ]
+    sam = load_config_dict(data).sam
+
+    sam.validate_component_counts(total_sites=10)
+    with pytest.raises(ValueError, match="counts sum to 10, but total_sites is 9"):
+        sam.validate_component_counts(total_sites=9)
+
+
+def test_unknown_nested_keys_are_forbidden() -> None:
+    """Reject unknown YAML keys in nested configuration sections."""
+
+    data = _template_data()
+    data["surface"]["extra"] = "bad"
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        load_config_dict(data)
+
+    data = _template_data()
+    data["reporters"]["extra"] = "bad"
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        load_config_dict(data)
+
+
+def test_cosolvent_density_validation() -> None:
+    """Require density for volume-fraction co-solvents."""
+
+    data = _template_data()
+    data["solvent"]["components"] = [
+        {"name": "water", "volume_fraction": 0.5},
+        {"name": "ethanol", "smiles": "CCO", "volume_fraction": 0.5},
+    ]
+    with pytest.raises(ValidationError, match="co-solvent 'ethanol' must define density_g_ml"):
+        load_config_dict(data)
+
+    data["solvent"]["components"][1]["density_g_ml"] = 0.789
+    assert load_config_dict(data).solvent.components[1].density_g_ml == 0.789
+
+
+def test_slab_thickness_validation() -> None:
+    """Require Pd(111) slab thickness to exceed cutoff plus buffer."""
+
+    config = load_config_dict(_template_data())
+    assert config.surface.slab.layers == 8
+
+    data = _template_data()
+    data["surface"]["slab"]["layers"] = 4
+    with pytest.raises(ValidationError, match="slab thickness must exceed"):
+        load_config_dict(data)
+
+
+def test_expected_unit_validation() -> None:
+    """Reject arbitrary unit strings for known physical defaults."""
+
+    data = _template_data()
+    data["sam"]["grafting_density"]["unit"] = "angstrom^2 / molecule"
+    with pytest.raises(ValidationError, match="grafting_density unit must be"):
+        load_config_dict(data)
+
+    data = _template_data()
+    data["surface"]["slab"]["positional_restraint"]["unit"] = "kcal mol^-1 angstrom^-2"
+    with pytest.raises(ValidationError, match="positional_restraint unit must be"):
+        load_config_dict(data)
+
+
 @pytest.mark.parametrize(
     ("path", "value", "message"),
     [
