@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import floor, sqrt
+from math import ceil, sqrt
 
 Vector3 = tuple[float, float, float]
 
@@ -64,7 +64,9 @@ class SurfaceSlab:
 
     metal: str
     facet: str
+    requested_lateral_size_nm: tuple[float, float]
     lateral_size_nm: tuple[float, float]
+    supercell_counts: tuple[int, int]
     layers: int
     positions_nm: tuple[Vector3, ...]
     slab_extent_nm: Vector3
@@ -156,6 +158,11 @@ def plan_pd111_slab(
     row_spacing_nm = spacing_nm * sqrt(3) / 2
     layer_spacing_nm = metadata.interlayer_spacing_nm
     layer_offsets = _abc_layer_offsets(spacing_nm, row_spacing_nm)
+    supercell_counts = _commensurate_supercell_counts(lateral_size_nm, spacing_nm, row_spacing_nm)
+    effective_lateral_size_nm = (
+        supercell_counts[0] * spacing_nm,
+        supercell_counts[1] * row_spacing_nm,
+    )
     z_origin = (layers - 1) * layer_spacing_nm / 2
 
     positions: list[Vector3] = []
@@ -166,18 +173,29 @@ def plan_pd111_slab(
         offset_x, offset_y = layer_offsets[layer % 3]
         z_nm = layer * layer_spacing_nm - z_origin
         for x_nm, y_nm in _iter_periodic_triangular_lattice_points(
-            lateral_size_nm, spacing_nm, row_spacing_nm, offset_x, offset_y
+            supercell_counts,
+            effective_lateral_size_nm,
+            spacing_nm,
+            row_spacing_nm,
+            offset_x,
+            offset_y,
         ):
             positions.append((x_nm, y_nm, z_nm))
             labels.append(f"Pd{serial}")
             layer_indices.append(layer)
             serial += 1
 
-    slab_extent_nm = (lateral_size_nm[0], lateral_size_nm[1], metadata.slab_thickness_nm(layers))
+    slab_extent_nm = (
+        effective_lateral_size_nm[0],
+        effective_lateral_size_nm[1],
+        metadata.slab_thickness_nm(layers),
+    )
     return SurfaceSlab(
         metal="Pd",
         facet="111",
-        lateral_size_nm=lateral_size_nm,
+        requested_lateral_size_nm=lateral_size_nm,
+        lateral_size_nm=effective_lateral_size_nm,
+        supercell_counts=supercell_counts,
         layers=layers,
         positions_nm=tuple(positions),
         slab_extent_nm=slab_extent_nm,
@@ -233,7 +251,12 @@ def generate_binding_sites(
             index for index, layer_index in enumerate(slab.layer_indices) if layer_index == layer
         )
         for x_nm, y_nm in _iter_periodic_triangular_lattice_points(
-            slab.lateral_size_nm, spacing_nm, row_spacing_nm, site_offset_x, site_offset_y
+            slab.supercell_counts,
+            slab.lateral_size_nm,
+            spacing_nm,
+            row_spacing_nm,
+            site_offset_x,
+            site_offset_y,
         ):
             nearest = _nearest_indices_xy(
                 (x_nm, y_nm), slab.positions_nm, face_indices, slab.lateral_size_nm, count=3
@@ -254,7 +277,26 @@ def _abc_layer_offsets(spacing_nm: float, row_spacing_nm: float) -> tuple[tuple[
     )
 
 
+def _commensurate_supercell_counts(
+    requested_lateral_size_nm: tuple[float, float], spacing_nm: float, row_spacing_nm: float
+) -> tuple[int, int]:
+    """Return integer rectangular cell counts for a periodic Pd(111) surface."""
+
+    nx = ceil(requested_lateral_size_nm[0] / spacing_nm)
+    ny = ceil(requested_lateral_size_nm[1] / row_spacing_nm)
+    if nx < 2 or ny < 2:
+        msg = "Pd(111) lateral cell must contain at least two columns and two rows"
+        raise ValueError(msg)
+    if ny % 2:
+        ny += 1
+    if nx * ny < 3:
+        msg = "Pd(111) lateral cell must contain at least three surface atoms"
+        raise ValueError(msg)
+    return nx, ny
+
+
 def _iter_periodic_triangular_lattice_points(
+    supercell_counts: tuple[int, int],
     lateral_size_nm: tuple[float, float],
     spacing_nm: float,
     row_spacing_nm: float,
@@ -263,8 +305,7 @@ def _iter_periodic_triangular_lattice_points(
 ) -> tuple[tuple[float, float], ...]:
     """Yield sorted points from a wrapped 2D triangular surface lattice."""
 
-    nx = max(1, floor(lateral_size_nm[0] / spacing_nm))
-    ny = max(1, floor(lateral_size_nm[1] / row_spacing_nm))
+    nx, ny = supercell_counts
     points: list[tuple[float, float]] = []
     for j in range(ny):
         for i in range(nx):
@@ -292,6 +333,9 @@ def _nearest_indices_xy(
 ) -> tuple[int, ...]:
     """Return nearest atom indices using minimum-image lateral distances."""
 
+    if len(candidate_indices) < count:
+        msg = f"cannot assign {count} nearest atoms from {len(candidate_indices)} candidates"
+        raise ValueError(msg)
     ranked = sorted(
         candidate_indices,
         key=lambda index: (

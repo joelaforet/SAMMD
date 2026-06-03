@@ -13,6 +13,13 @@ def _binding_sites():
     return generate_binding_sites(plan_pd111_slab((1.0, 1.0), 3))
 
 
+def _mixed_binding_sites():
+    """Return fcc and hcp binding sites for one deterministic slab."""
+
+    slab = plan_pd111_slab((1.0, 1.0), 3)
+    return generate_binding_sites(slab, "fcc_hollow") + generate_binding_sites(slab, "hcp_hollow")
+
+
 def test_grafting_density_selects_expected_site_count() -> None:
     """Convert area and grafting density to per-side selected site count."""
 
@@ -101,3 +108,30 @@ def test_anchor_site_mismatch_fails_clearly() -> None:
 
     with pytest.raises(ValueError, match=r"bridge.*supplied binding sites contain: fcc_hollow"):
         plan_sam_placements(sam_config, _binding_sites(), lateral_area_nm2=1.0, seed=19)
+
+
+def test_mixed_supplied_sites_filter_to_requested_anchor_site() -> None:
+    """Prevent placement onto a supplied site kind that was not requested."""
+
+    sam_config = SAMConfig(anchor=AnchorConfig(site="hcp_hollow"))
+
+    plan = plan_sam_placements(sam_config, _mixed_binding_sites(), lateral_area_nm2=1.0, seed=23)
+
+    assert {placement.site_kind for placement in plan.placements} == {"hcp_hollow"}
+    assert {placement.anchor_metadata["site"] for placement in plan.placements} == {"hcp_hollow"}
+
+
+def test_component_specific_mixed_anchor_sites_fail_before_assignment() -> None:
+    """Reject mixed anchor site requests until per-site-kind placement is implemented."""
+
+    sam_config = SAMConfig(
+        anchor=AnchorConfig(site="fcc_hollow"),
+        components=[
+            SAMComponentConfig(
+                name="a", smiles="CCCS", fraction=1.0, anchor=AnchorConfig(site="hcp_hollow")
+            )
+        ],
+    )
+
+    with pytest.raises(ValueError, match="mixed SAM anchor site kinds are not supported"):
+        plan_sam_placements(sam_config, _mixed_binding_sites(), lateral_area_nm2=1.0, seed=29)

@@ -74,6 +74,10 @@ def plan_sam_placements(
     requested_site_kinds.update(
         component.anchor.site for component in sam_config.components if component.anchor is not None
     )
+    if len(requested_site_kinds) > 1:
+        requested = ", ".join(sorted(requested_site_kinds))
+        msg = f"mixed SAM anchor site kinds are not supported yet; requested: {requested}"
+        raise ValueError(msg)
     supplied_site_kinds = {site.site_kind for site in binding_sites}
     missing_site_kinds = sorted(requested_site_kinds - supplied_site_kinds)
     if missing_site_kinds:
@@ -83,11 +87,16 @@ def plan_sam_placements(
             f"but supplied binding sites contain: {supplied}"
         )
         raise ValueError(msg)
+    requested_site_kind = next(iter(requested_site_kinds))
 
     rng = Random(seed)
     placements: list[SAMPlacement] = []
     for side in ("bottom", "top"):
-        side_sites = [site for site in binding_sites if site.side == side]
+        side_sites = [
+            site
+            for site in binding_sites
+            if site.side == side and site.site_kind == requested_site_kind
+        ]
         if len(side_sites) < selected_sites_per_side:
             msg = (
                 f"not enough {side} binding sites for grafting density; need "
