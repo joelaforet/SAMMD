@@ -34,6 +34,13 @@ Undefined stereochemistry follows the safer OpenFF default unless explicitly
 allowed. These helpers require the SAMMD science/pixi environment and do not
 perform full system construction.
 
+Optional OpenMM runtime helpers live in `sammd.openmm_runtime`. They lazily
+create Langevin integrators, attach DCD and thermodynamic reporters to an
+existing OpenMM `Simulation`, add default Pd positional restraints, and apply a
+pair-specific sulfur-metal LJ scaling proxy. Users must still supply existing
+OpenMM topology, system, and positions from future construction code or their
+own backend workflow; SAMMD does not yet construct complete OpenMM systems.
+
 `build_system()` currently returns a lightweight plan rather than OpenFF/OpenMM
 objects. The plan contains the validated config, a centered double-sided
 commensurate Pd(111) slab, fcc/hcp hollow binding sites, seeded top/bottom SAM
