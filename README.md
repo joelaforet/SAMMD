@@ -8,6 +8,9 @@ OpenMM/OpenFF build steps during unit tests.
 
 The package also includes a generated CHARMM-INTERFACE Fcc metal OFFXML resource
 for future OpenFF force field assembly without making OpenFF a test dependency.
+Solution composition planning is available for converting solvent volume
+fractions plus salt/reactant molarities into deterministic molecule counts while
+remaining independent of PACKMOL and OpenFF during MVP scaffolding.
 
 See [docs/project-scope.md](docs/project-scope.md) for the source-of-truth scope
 and scientific defaults.
