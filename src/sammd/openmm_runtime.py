@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
-from sammd.reporting import create_openmm_reporters
+from sammd.reporting import create_openmm_reporters, prepare_reporter_output_directories
 
 DEFAULT_PD_RESTRAINT_K_KJ_MOL_NM2 = 10000.0
 POSITION_RESTRAINT_EXPRESSION = "0.5*k*((x-x0)^2+(y-y0)^2+(z-z0)^2)"
@@ -122,6 +122,7 @@ def create_openmm_simulation(
     openmm_module: Any | None = None,
     app_module: Any | None = None,
     unit_module: Any | None = None,
+    prepare_reporter_directories: bool = False,
 ) -> Any:
     """Create and configure an OpenMM ``Simulation`` from backend artifacts.
 
@@ -147,6 +148,8 @@ def create_openmm_simulation(
         Total expected simulation steps for progress reporters.
     openmm_module, app_module, unit_module
         Optional injected OpenMM-like modules for tests.
+    prepare_reporter_directories
+        Whether to create reporter output directories before attaching reporters.
 
     Returns
     -------
@@ -176,6 +179,8 @@ def create_openmm_simulation(
         platform = openmm.Platform.getPlatformByName(platform_name)
         simulation = app.Simulation(topology, system, integrator, platform)
     simulation.context.setPositions(positions)
+    if prepare_reporter_directories:
+        prepare_reporter_output_directories(output_paths)
     simulation.reporters.extend(
         create_openmm_reporters(
             reporting_config,
@@ -232,6 +237,11 @@ def add_sulfur_metal_lj_scaling(
 
     _validate_positive_finite(scale_factor, "scale_factor")
     validated_pairs = _validate_pairs(system, pairs)
+    nonbonded_force = _find_nonbonded_force(system)
+    if nonbonded_force is None:
+        msg = "system must contain an OpenMM NonbondedForce for sulfur-metal LJ scaling"
+        raise ValueError(msg)
+    _reject_pairs_with_nonbonded_exceptions(nonbonded_force, validated_pairs)
     if scale_factor == 1.0:
         return AnchorScalingMetadata(
             pairs_requested=len(validated_pairs),
@@ -243,10 +253,6 @@ def add_sulfur_metal_lj_scaling(
     modules = None if openmm_module is not None and unit_module is not None else require_openmm()
     openmm = openmm_module if openmm_module is not None else modules.openmm
     unit = unit_module if unit_module is not None else modules.unit
-    nonbonded_force = _find_nonbonded_force(system)
-    if nonbonded_force is None:
-        msg = "system must contain an OpenMM NonbondedForce for sulfur-metal LJ scaling"
-        raise ValueError(msg)
 
     correction_force = openmm.CustomBondForce(LJ_SCALING_EXPRESSION)
     correction_force.addPerBondParameter("sigma")
@@ -318,13 +324,45 @@ def _validate_pairs(
 ) -> tuple[tuple[int, int], ...]:
     """Validate explicit sulfur-metal pair indices."""
 
-    validated_pairs = tuple((int(sulfur), int(metal)) for sulfur, metal in pairs)
-    if not validated_pairs:
+    try:
+        pair_items = tuple(pairs)
+    except TypeError as error:
+        msg = "pairs must be an iterable of sulfur-metal index pairs"
+        raise ValueError(msg) from error
+    if not pair_items:
         msg = "pairs must contain at least one sulfur-metal pair"
         raise ValueError(msg)
-    flattened = [atom_index for pair in validated_pairs for atom_index in pair]
+
+    validated_pairs = []
+    seen_pairs: set[frozenset[int]] = set()
+    for pair in pair_items:
+        try:
+            pair_tuple = tuple(pair)
+        except TypeError as error:
+            msg = "each sulfur-metal pair must contain exactly two atom indices"
+            raise ValueError(msg) from error
+        if len(pair_tuple) != 2:
+            msg = "each sulfur-metal pair must contain exactly two atom indices"
+            raise ValueError(msg)
+        sulfur_index, metal_index = pair_tuple
+        for atom_index in (sulfur_index, metal_index):
+            if isinstance(atom_index, bool) or not isinstance(atom_index, int):
+                msg = "pair atom indices must be integers and not booleans"
+                raise ValueError(msg)
+        if sulfur_index == metal_index:
+            msg = "sulfur-metal pairs must not contain self-pairs"
+            raise ValueError(msg)
+        normalized_pair = frozenset((sulfur_index, metal_index))
+        if normalized_pair in seen_pairs:
+            msg = "sulfur-metal pairs must not contain duplicate or reversed duplicate pairs"
+            raise ValueError(msg)
+        seen_pairs.add(normalized_pair)
+        validated_pairs.append((sulfur_index, metal_index))
+
+    validated_pairs_tuple = tuple(validated_pairs)
+    flattened = [atom_index for pair in validated_pairs_tuple for atom_index in pair]
     _validate_atom_indices(system, tuple(flattened))
-    return validated_pairs
+    return validated_pairs_tuple
 
 
 def _validate_positions_nm(
@@ -363,6 +401,26 @@ def _find_nonbonded_force(system: Any) -> Any | None:
         if force.__class__.__name__ == "NonbondedForce":
             return force
     return None
+
+
+def _reject_pairs_with_nonbonded_exceptions(
+    nonbonded_force: Any,
+    pairs: tuple[tuple[int, int], ...],
+) -> None:
+    """Reject LJ scaling pairs covered by existing NonbondedForce exceptions."""
+
+    if not hasattr(nonbonded_force, "getNumExceptions"):
+        return
+    requested_pairs = {frozenset(pair) for pair in pairs}
+    for exception_index in range(nonbonded_force.getNumExceptions()):
+        exception_parameters = nonbonded_force.getExceptionParameters(exception_index)
+        exception_pair = frozenset((int(exception_parameters[0]), int(exception_parameters[1])))
+        if exception_pair in requested_pairs:
+            msg = (
+                "sulfur-metal LJ scaling does not support pairs with existing "
+                "NonbondedForce exceptions or exclusions"
+            )
+            raise ValueError(msg)
 
 
 def _quantity_to_float(value: Any, unit: Any | None) -> float:

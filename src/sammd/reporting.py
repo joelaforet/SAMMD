@@ -117,6 +117,7 @@ def create_openmm_reporters(
     *,
     total_steps: int | None = None,
     app_module: Any | None = None,
+    prepare_directories: bool = False,
 ) -> list[Any]:
     """Create OpenMM runtime reporter objects lazily.
 
@@ -130,6 +131,9 @@ def create_openmm_reporters(
         Total expected simulation steps, required for progress and remaining time.
     app_module
         Optional injected OpenMM app-like module for tests.
+    prepare_directories
+        Whether to create trajectory and thermodynamic output directories before reporter
+        construction.
 
     Returns
     -------
@@ -139,7 +143,8 @@ def create_openmm_reporters(
 
     app = app_module if app_module is not None else _import_openmm_app()
     interval_steps = reporting_config.interval_steps
-    _prepare_reporter_output_directories(output_paths)
+    if prepare_directories:
+        prepare_reporter_output_directories(output_paths)
     state_data_config = build_state_data_reporter_config(
         str(output_paths.thermodynamics),
         interval_steps=interval_steps,
@@ -157,8 +162,14 @@ def create_openmm_reporters(
     return [dcd_reporter, state_data_reporter]
 
 
-def _prepare_reporter_output_directories(output_paths: Any) -> None:
-    """Create runtime reporter output directories before OpenMM opens files."""
+def prepare_reporter_output_directories(output_paths: Any) -> None:
+    """Create runtime reporter output directories before OpenMM opens files.
+
+    Parameters
+    ----------
+    output_paths
+        Resolved output paths with trajectory and thermodynamics attributes.
+    """
 
     for path in (output_paths.trajectory, output_paths.thermodynamics):
         Path(path).parent.mkdir(parents=True, exist_ok=True)

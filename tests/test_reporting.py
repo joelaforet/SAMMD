@@ -12,6 +12,7 @@ from sammd.reporting import (
     build_state_data_reporter_config,
     create_openmm_reporters,
     get_reporter_fields,
+    prepare_reporter_output_directories,
 )
 
 
@@ -141,8 +142,8 @@ def test_openmm_reporter_runtime_helper_uses_expected_reporter_arguments(tmp_pat
         app_module=FakeApp,
     )
 
-    assert (tmp_path / "traj").is_dir()
-    assert (tmp_path / "reports").is_dir()
+    assert not (tmp_path / "traj").exists()
+    assert not (tmp_path / "reports").exists()
     assert reporters[0].file == str(tmp_path / "traj/run.dcd")
     assert reporters[0].report_interval == 250
     assert reporters[1].file == str(tmp_path / "reports/state.csv")
@@ -154,3 +155,18 @@ def test_openmm_reporter_runtime_helper_uses_expected_reporter_arguments(tmp_pat
         "totalSteps": 1000,
         "separator": ",",
     }
+
+
+def test_reporter_directory_preparation_is_explicit(tmp_path) -> None:
+    """Create reporter output directories only through the explicit helper."""
+
+    output_paths = OutputPaths(
+        topology=tmp_path / "topology.cif",
+        trajectory=tmp_path / "traj/run.dcd",
+        thermodynamics=tmp_path / "reports/state.csv",
+    )
+
+    prepare_reporter_output_directories(output_paths)
+
+    assert (tmp_path / "traj").is_dir()
+    assert (tmp_path / "reports").is_dir()

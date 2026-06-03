@@ -127,11 +127,18 @@ class FakeSystem:
 class NonbondedForce:
     """Fake NonbondedForce identified by class name."""
 
-    def __init__(self, parameters):
+    def __init__(self, parameters, exceptions=()):
         self.parameters = parameters
+        self.exceptions = list(exceptions)
 
     def getParticleParameters(self, index):  # noqa: N802
         return self.parameters[index]
+
+    def getNumExceptions(self):  # noqa: N802
+        return len(self.exceptions)
+
+    def getExceptionParameters(self, index):  # noqa: N802
+        return self.exceptions[index]
 
 
 class FakeApp:
@@ -269,6 +276,7 @@ def test_lj_scaling_validates_scale_factor_and_noop() -> None:
     """Validate scale factor and return metadata without adding a force at 1x."""
 
     system = FakeSystem(particle_count=2)
+    system.addForce(NonbondedForce([(0.0, 0.30, 2.0), (0.0, 0.50, 8.0)]))
     with pytest.raises(ValueError, match="scale_factor"):
         add_sulfur_metal_lj_scaling(system, [(0, 1)], scale_factor=0.0)
 
@@ -277,7 +285,39 @@ def test_lj_scaling_validates_scale_factor_and_noop() -> None:
     assert metadata.force_added is False
     assert metadata.pairs_requested == 1
     assert metadata.pairs_added == 0
-    assert system.forces == []
+    assert len(system.forces) == 1
+
+
+def test_lj_scaling_scale_factor_one_still_requires_nonbonded_force() -> None:
+    """Require baseline nonbonded parameters even when scaling is a no-op."""
+
+    system = FakeSystem(particle_count=2)
+
+    with pytest.raises(ValueError, match="NonbondedForce"):
+        add_sulfur_metal_lj_scaling(system, [(0, 1)], scale_factor=1.0)
+
+
+@pytest.mark.parametrize(
+    ("pairs", "error"),
+    [
+        ([("0", 1)], "integers"),
+        ([(0.0, 1)], "integers"),
+        ([(False, 1)], "integers"),
+        ([(0,)], "exactly two"),
+        ([(0, 1, 2)], "exactly two"),
+        ([(0, 0)], "self-pairs"),
+        ([(0, 1), (0, 1)], "duplicate"),
+        ([(0, 1), (1, 0)], "duplicate"),
+        ([(-1, 1)], "non-negative"),
+    ],
+)
+def test_lj_scaling_rejects_invalid_pairs(pairs, error) -> None:
+    """Reject malformed or ambiguous sulfur-metal pair specifications."""
+
+    system = FakeSystem(particle_count=2)
+
+    with pytest.raises(ValueError, match=error):
+        add_sulfur_metal_lj_scaling(system, pairs, scale_factor=1.0)
 
 
 def test_lj_scaling_raises_without_nonbonded_force() -> None:
@@ -286,6 +326,27 @@ def test_lj_scaling_raises_without_nonbonded_force() -> None:
     system = FakeSystem(particle_count=2)
 
     with pytest.raises(ValueError, match="NonbondedForce"):
+        add_sulfur_metal_lj_scaling(
+            system,
+            [(0, 1)],
+            scale_factor=4.0,
+            openmm_module=FakeOpenMM,
+            unit_module=FakeUnitModule,
+        )
+
+
+def test_lj_scaling_rejects_pairs_with_nonbonded_exceptions() -> None:
+    """Reject explicit pairs covered by existing exceptions or exclusions."""
+
+    system = FakeSystem(particle_count=2)
+    system.addForce(
+        NonbondedForce(
+            [(0.0, 0.30, 2.0), (0.0, 0.50, 8.0)],
+            exceptions=[(1, 0, 0.0, 0.0, 0.0)],
+        )
+    )
+
+    with pytest.raises(ValueError, match="exceptions or exclusions"):
         add_sulfur_metal_lj_scaling(
             system,
             [(0, 1)],
@@ -344,3 +405,30 @@ def test_create_openmm_simulation_attaches_reporters(tmp_path) -> None:
     assert len(simulation.reporters) == 2
     assert simulation.reporters[0].file == str(tmp_path / "traj/run.dcd")
     assert simulation.reporters[1].kwargs == {"separator": ",", "step": True}
+    assert not (tmp_path / "traj").exists()
+    assert not (tmp_path / "reports").exists()
+
+
+def test_create_openmm_simulation_prepares_reporter_directories_when_requested(tmp_path) -> None:
+    """Create reporter directories only when simulation setup explicitly opts in."""
+
+    output_paths = OutputPaths(
+        topology=tmp_path / "topology.cif",
+        trajectory=tmp_path / "traj/run.dcd",
+        thermodynamics=tmp_path / "reports/state.csv",
+    )
+
+    create_openmm_simulation(
+        topology="topology",
+        system="system",
+        positions="positions",
+        reporting_config=ReporterConfig(interval_steps=25, fields=["step"]),
+        output_paths=output_paths,
+        openmm_module=FakeOpenMM,
+        app_module=FakeApp,
+        unit_module=FakeUnitModule,
+        prepare_reporter_directories=True,
+    )
+
+    assert (tmp_path / "traj").is_dir()
+    assert (tmp_path / "reports").is_dir()
