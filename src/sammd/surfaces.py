@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import ceil, sqrt
+from math import floor, sqrt
 
 Vector3 = tuple[float, float, float]
 
@@ -56,14 +56,18 @@ class FccSurfaceMetadata:
 
 @dataclass(frozen=True)
 class SurfaceSlab:
-    """Internal coordinate plan for a centered metal slab."""
+    """Internal coordinate plan for a centered metal slab.
+
+    The ``slab_extent_nm`` field describes only the metal slab dimensions. It is not a full
+    simulation box because SAM and solvent padding are added by later builders.
+    """
 
     metal: str
     facet: str
     lateral_size_nm: tuple[float, float]
     layers: int
     positions_nm: tuple[Vector3, ...]
-    box_nm: Vector3
+    slab_extent_nm: Vector3
     top_z_nm: float
     bottom_z_nm: float
     labels: tuple[str, ...]
@@ -152,8 +156,6 @@ def plan_pd111_slab(
     row_spacing_nm = spacing_nm * sqrt(3) / 2
     layer_spacing_nm = metadata.interlayer_spacing_nm
     layer_offsets = _abc_layer_offsets(spacing_nm, row_spacing_nm)
-    half_x = lateral_size_nm[0] / 2
-    half_y = lateral_size_nm[1] / 2
     z_origin = (layers - 1) * layer_spacing_nm / 2
 
     positions: list[Vector3] = []
@@ -163,23 +165,22 @@ def plan_pd111_slab(
     for layer in range(layers):
         offset_x, offset_y = layer_offsets[layer % 3]
         z_nm = layer * layer_spacing_nm - z_origin
-        for x_nm, y_nm in _iter_triangular_lattice_points(
+        for x_nm, y_nm in _iter_periodic_triangular_lattice_points(
             lateral_size_nm, spacing_nm, row_spacing_nm, offset_x, offset_y
         ):
-            if -half_x <= x_nm < half_x and -half_y <= y_nm < half_y:
-                positions.append((x_nm, y_nm, z_nm))
-                labels.append(f"Pd{serial}")
-                layer_indices.append(layer)
-                serial += 1
+            positions.append((x_nm, y_nm, z_nm))
+            labels.append(f"Pd{serial}")
+            layer_indices.append(layer)
+            serial += 1
 
-    box_nm = (lateral_size_nm[0], lateral_size_nm[1], metadata.slab_thickness_nm(layers))
+    slab_extent_nm = (lateral_size_nm[0], lateral_size_nm[1], metadata.slab_thickness_nm(layers))
     return SurfaceSlab(
         metal="Pd",
         facet="111",
         lateral_size_nm=lateral_size_nm,
         layers=layers,
         positions_nm=tuple(positions),
-        box_nm=box_nm,
+        slab_extent_nm=slab_extent_nm,
         top_z_nm=z_origin,
         bottom_z_nm=-z_origin,
         labels=tuple(labels),
@@ -197,7 +198,7 @@ def generate_binding_sites(
     slab
         Planned slab from :func:`plan_pd111_slab`.
     site_kind
-        Surface site label. Only ``fcc_hollow`` is implemented for the MVP.
+        Surface site label. ``fcc_hollow`` and ``hcp_hollow`` are supported for Pd(111).
 
     Returns
     -------
@@ -205,8 +206,10 @@ def generate_binding_sites(
         Binding sites on both exposed faces.
     """
 
-    if site_kind != "fcc_hollow":
-        msg = f"unsupported binding site kind '{site_kind}'; supported site kinds: fcc_hollow"
+    supported_site_kinds = {"fcc_hollow", "hcp_hollow"}
+    if site_kind not in supported_site_kinds:
+        supported = ", ".join(sorted(supported_site_kinds))
+        msg = f"unsupported binding site kind '{site_kind}'; supported site kinds: {supported}"
         raise ValueError(msg)
     if slab.metal != "Pd" or slab.facet != "111":
         msg = "binding-site generation currently supports only Pd(111) slabs"
@@ -216,28 +219,26 @@ def generate_binding_sites(
     spacing_nm = metadata.nearest_neighbor_spacing_nm
     row_spacing_nm = spacing_nm * sqrt(3) / 2
     layer_offsets = _abc_layer_offsets(spacing_nm, row_spacing_nm)
-    half_x = slab.lateral_size_nm[0] / 2
-    half_y = slab.lateral_size_nm[1] / 2
     sites: list[BindingSite] = []
 
-    for side, layer, z_nm, normal in (
-        ("bottom", 0, slab.bottom_z_nm, (0.0, 0.0, -1.0)),
-        ("top", slab.layers - 1, slab.top_z_nm, (0.0, 0.0, 1.0)),
+    for side, layer, z_nm, normal, outward_step in (
+        ("bottom", 0, slab.bottom_z_nm, (0.0, 0.0, -1.0), -1),
+        ("top", slab.layers - 1, slab.top_z_nm, (0.0, 0.0, 1.0), 1),
     ):
-        layer_offset_x, layer_offset_y = layer_offsets[layer % 3]
-        hollow_x = layer_offset_x + spacing_nm / 2
-        hollow_y = layer_offset_y + row_spacing_nm / 3
+        if site_kind == "fcc_hollow":
+            site_offset_x, site_offset_y = layer_offsets[(layer + outward_step) % 3]
+        else:
+            site_offset_x, site_offset_y = layer_offsets[(layer - outward_step) % 3]
         face_indices = tuple(
             index for index, layer_index in enumerate(slab.layer_indices) if layer_index == layer
         )
-        for x_nm, y_nm in _iter_triangular_lattice_points(
-            slab.lateral_size_nm, spacing_nm, row_spacing_nm, hollow_x, hollow_y
+        for x_nm, y_nm in _iter_periodic_triangular_lattice_points(
+            slab.lateral_size_nm, spacing_nm, row_spacing_nm, site_offset_x, site_offset_y
         ):
-            if -half_x <= x_nm < half_x and -half_y <= y_nm < half_y:
-                nearest = _nearest_indices_xy(
-                    (x_nm, y_nm), slab.positions_nm, face_indices, count=3
-                )
-                sites.append(BindingSite(side, site_kind, (x_nm, y_nm, z_nm), normal, nearest))
+            nearest = _nearest_indices_xy(
+                (x_nm, y_nm), slab.positions_nm, face_indices, slab.lateral_size_nm, count=3
+            )
+            sites.append(BindingSite(side, site_kind, (x_nm, y_nm, z_nm), normal, nearest))
 
     return tuple(sites)
 
@@ -253,42 +254,56 @@ def _abc_layer_offsets(spacing_nm: float, row_spacing_nm: float) -> tuple[tuple[
     )
 
 
-def _iter_triangular_lattice_points(
+def _iter_periodic_triangular_lattice_points(
     lateral_size_nm: tuple[float, float],
     spacing_nm: float,
     row_spacing_nm: float,
     offset_x: float,
     offset_y: float,
 ) -> tuple[tuple[float, float], ...]:
-    """Yield sorted points from a triangular lattice covering a lateral rectangle."""
+    """Yield sorted points from a wrapped 2D triangular surface lattice."""
 
-    x_extent = lateral_size_nm[0] / 2 + spacing_nm
-    y_extent = lateral_size_nm[1] / 2 + row_spacing_nm
-    max_i = ceil(x_extent / spacing_nm) + 2
-    max_j = ceil(y_extent / row_spacing_nm) + 2
+    nx = max(1, floor(lateral_size_nm[0] / spacing_nm))
+    ny = max(1, floor(lateral_size_nm[1] / row_spacing_nm))
     points: list[tuple[float, float]] = []
-    for j in range(-max_j, max_j + 1):
-        for i in range(-max_i, max_i + 1):
-            x_nm = i * spacing_nm + (j % 2) * spacing_nm / 2 + offset_x
-            y_nm = j * row_spacing_nm + offset_y
+    for j in range(ny):
+        for i in range(nx):
+            x_raw = i * spacing_nm + (j % 2) * spacing_nm / 2 + offset_x
+            y_raw = j * row_spacing_nm + offset_y
+            x_nm = _wrap_centered(x_raw, lateral_size_nm[0])
+            y_nm = _wrap_centered(y_raw, lateral_size_nm[1])
             points.append((round(x_nm, 12), round(y_nm, 12)))
     return tuple(sorted(points, key=lambda point: (point[1], point[0])))
+
+
+def _wrap_centered(value_nm: float, length_nm: float) -> float:
+    """Wrap a coordinate into the centered periodic interval."""
+
+    return ((value_nm + length_nm / 2) % length_nm) - length_nm / 2
 
 
 def _nearest_indices_xy(
     xy_nm: tuple[float, float],
     positions_nm: tuple[Vector3, ...],
     candidate_indices: tuple[int, ...],
+    lateral_size_nm: tuple[float, float],
     *,
     count: int,
 ) -> tuple[int, ...]:
-    """Return nearest atom indices in the lateral plane."""
+    """Return nearest atom indices using minimum-image lateral distances."""
 
     ranked = sorted(
         candidate_indices,
         key=lambda index: (
-            (positions_nm[index][0] - xy_nm[0]) ** 2 + (positions_nm[index][1] - xy_nm[1]) ** 2,
+            _minimum_image_delta(positions_nm[index][0] - xy_nm[0], lateral_size_nm[0]) ** 2
+            + _minimum_image_delta(positions_nm[index][1] - xy_nm[1], lateral_size_nm[1]) ** 2,
             index,
         ),
     )
     return tuple(ranked[:count])
+
+
+def _minimum_image_delta(delta_nm: float, length_nm: float) -> float:
+    """Return the nearest periodic displacement for one dimension."""
+
+    return delta_nm - round(delta_nm / length_nm) * length_nm

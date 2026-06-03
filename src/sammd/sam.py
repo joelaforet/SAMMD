@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import floor
 from random import Random
 
 from sammd.config import SAMComponentConfig, SAMConfig
@@ -50,7 +51,7 @@ def plan_sam_placements(
     binding_sites
         Candidate binding sites on top and bottom faces.
     lateral_area_nm2
-        Area of one exposed face in square nanometers.
+        Area of one exposed face in square nanometers. Target site counts use half-up rounding.
     seed
         Random seed controlling deterministic site and component shuffling.
 
@@ -64,9 +65,23 @@ def plan_sam_placements(
         msg = "lateral_area_nm2 must be positive"
         raise ValueError(msg)
 
-    selected_sites_per_side = round(lateral_area_nm2 / sam_config.grafting_density.value)
+    selected_sites_per_side = floor(lateral_area_nm2 / sam_config.grafting_density.value + 0.5)
     if selected_sites_per_side <= 0:
         msg = "grafting density selects no SAM sites"
+        raise ValueError(msg)
+
+    requested_site_kinds = {sam_config.anchor.site}
+    requested_site_kinds.update(
+        component.anchor.site for component in sam_config.components if component.anchor is not None
+    )
+    supplied_site_kinds = {site.site_kind for site in binding_sites}
+    missing_site_kinds = sorted(requested_site_kinds - supplied_site_kinds)
+    if missing_site_kinds:
+        supplied = ", ".join(sorted(supplied_site_kinds)) or "none"
+        msg = (
+            f"SAM anchor site kind(s) {', '.join(missing_site_kinds)} were requested, "
+            f"but supplied binding sites contain: {supplied}"
+        )
         raise ValueError(msg)
 
     rng = Random(seed)

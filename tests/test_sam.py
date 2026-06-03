@@ -2,7 +2,7 @@
 
 import pytest
 
-from sammd.config import SAMComponentConfig, SAMConfig
+from sammd.config import AnchorConfig, SAMComponentConfig, SAMConfig
 from sammd.sam import plan_sam_placements
 from sammd.surfaces import generate_binding_sites, plan_pd111_slab
 
@@ -20,6 +20,15 @@ def test_grafting_density_selects_expected_site_count() -> None:
 
     assert plan.selected_sites_per_side == 4
     assert len(plan.placements) == 8
+
+
+def test_grafting_density_uses_half_up_rounding() -> None:
+    """Round .5 target grafting counts up instead of using banker rounding."""
+
+    plan = plan_sam_placements(SAMConfig(), _binding_sites(), lateral_area_nm2=1.125, seed=7)
+
+    assert plan.selected_sites_per_side == 5
+    assert len(plan.placements) == 10
 
 
 def test_fraction_mode_assignment_sums_exactly_and_is_seeded() -> None:
@@ -83,3 +92,12 @@ def test_top_and_bottom_surfaces_are_both_planned() -> None:
     assert {placement.normal for placement in plan.placements if placement.side == "bottom"} == {
         (0.0, 0.0, -1.0)
     }
+
+
+def test_anchor_site_mismatch_fails_clearly() -> None:
+    """Reject SAM configs that request a site kind absent from supplied sites."""
+
+    sam_config = SAMConfig(anchor=AnchorConfig(site="bridge"))
+
+    with pytest.raises(ValueError, match=r"bridge.*supplied binding sites contain: fcc_hollow"):
+        plan_sam_placements(sam_config, _binding_sites(), lateral_area_nm2=1.0, seed=19)
