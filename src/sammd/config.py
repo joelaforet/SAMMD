@@ -16,6 +16,7 @@ WaterModel = Literal["TIP3P"]
 EXPECTED_GRAFTING_DENSITY_UNIT = "nm^2 / molecule"
 EXPECTED_PD_RESTRAINT_UNIT = "kJ mol^-1 nm^-2"
 KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL = {"ethanol": 46.06844}
+VOLUME_FRACTION_TOLERANCE = 1.0e-6
 
 
 class SAMMDBaseModel(BaseModel):
@@ -182,7 +183,7 @@ class SolventConfig(SAMMDBaseModel):
         """Require solvent volume fractions to form one bulk phase."""
 
         total = sum(component.volume_fraction for component in self.components)
-        if abs(total - 1.0) > 1e-6:
+        if abs(total - 1.0) > VOLUME_FRACTION_TOLERANCE:
             msg = "solvent component volume fractions must sum to 1.0"
             raise ValueError(msg)
         for component in self.components:

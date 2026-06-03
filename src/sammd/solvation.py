@@ -6,12 +6,15 @@ from dataclasses import dataclass, field
 from math import floor, isfinite
 from typing import Any
 
-from sammd.config import KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL, SAMMDConfig
+from sammd.config import (
+    KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL,
+    VOLUME_FRACTION_TOLERANCE,
+    SAMMDConfig,
+)
 
 AVOGADRO_CONSTANT_MOL_INV = 6.02214076e23
 NM3_TO_L = 1.0e-24
 L_TO_ML = 1000.0
-VOLUME_FRACTION_TOLERANCE = 1.0e-12
 
 DEFAULT_WATER_DENSITY_G_ML = 0.997
 DEFAULT_WATER_MOLAR_MASS_G_MOL = 18.01528
