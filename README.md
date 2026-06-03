@@ -17,6 +17,12 @@ DCD trajectory, and OpenMM thermodynamics CSV artifact paths. A lightweight
 mmCIF writer can emit planned scaffold atoms for PyMOL inspection, while full
 trajectory production still awaits OpenMM builder integration.
 
+Lightweight orientation analysis primitives are available in `sammd.analysis` for
+future trajectory observables. They calculate reactant centers of mass, target
+atoms or midpoint/centroid selections, COM-to-target orientation vectors, and
+angles relative to top (+z), bottom (-z), or explicit surface normals without
+requiring MDAnalysis, OpenMM, OpenFF, or RDKit.
+
 `build_system()` currently returns a lightweight plan rather than OpenFF/OpenMM
 objects. The plan contains the validated config, a centered double-sided
 commensurate Pd(111) slab, fcc/hcp hollow binding sites, seeded top/bottom SAM
