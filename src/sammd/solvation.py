@@ -8,8 +8,8 @@ from typing import Any
 
 from sammd.config import (
     KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL,
-    SAMMDConfig,
     VOLUME_FRACTION_TOLERANCE,
+    SAMMDConfig,
 )
 
 AVOGADRO_CONSTANT_MOL_INV = 6.02214076e23
