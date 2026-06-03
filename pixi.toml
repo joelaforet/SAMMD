@@ -23,7 +23,7 @@ rdkit = "*"
 mbuild = "*"
 openff-toolkit = "*"
 openff-interchange = "*"
-openff-packmol = "*"
+packmol = "*"
 
 [environments]
 default = ["dev"]

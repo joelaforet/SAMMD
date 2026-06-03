@@ -137,6 +137,13 @@ def test_slab_thickness_validation() -> None:
     with pytest.raises(ValidationError, match="slab thickness must exceed"):
         load_config_dict(data)
 
+    data = _template_data()
+    data["surface"]["slab"]["layers"] = 7
+    data["simulation"]["nonbonded_cutoff_nm"] = 1.0
+    data["simulation"]["slab_cutoff_buffer_nm"] = 0.5
+    with pytest.raises(ValidationError, match=r"got 1\.348 nm and require more than 1\.500 nm"):
+        load_config_dict(data)
+
 
 def test_expected_unit_validation() -> None:
     """Reject arbitrary unit strings for known physical defaults."""

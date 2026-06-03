@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from math import sqrt
 from pathlib import Path
 from typing import Any, Literal
 
@@ -14,7 +13,6 @@ AnchorSite = Literal["fcc_hollow", "hcp_hollow", "bridge", "atop"]
 Facet = Literal["111"]
 Metal = Literal["Pd"]
 WaterModel = Literal["TIP3P"]
-PD_LATTICE_CONSTANT_NM = 0.389
 EXPECTED_GRAFTING_DENSITY_UNIT = "nm^2 / molecule"
 EXPECTED_PD_RESTRAINT_UNIT = "kJ mol^-1 nm^-2"
 
@@ -290,7 +288,10 @@ class SAMMDConfig(SAMMDBaseModel):
     def _validate_slab_thickness(self) -> SAMMDConfig:
         """Require the Pd(111) slab to exceed the cutoff plus buffer."""
 
-        thickness_nm = self.surface.slab.layers * PD_LATTICE_CONSTANT_NM / sqrt(3)
+        from sammd.surfaces import get_fcc_surface_metadata
+
+        surface_metadata = get_fcc_surface_metadata(self.surface.metal, self.surface.facet)
+        thickness_nm = surface_metadata.slab_thickness_nm(self.surface.slab.layers)
         minimum_thickness_nm = (
             self.simulation.nonbonded_cutoff_nm + self.simulation.slab_cutoff_buffer_nm
         )
