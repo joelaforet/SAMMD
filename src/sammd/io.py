@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 from dataclasses import dataclass
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
@@ -139,10 +140,16 @@ def format_mmcif(
         mmCIF text with ``_atom_site`` rows and Angstrom coordinates.
     """
 
-    if not atom_records:
+    validated_data_name = _validate_data_name(data_name)
+    validated_records = _validate_atom_records(atom_records)
+    if not validated_records:
         msg = "at least one atom record is required"
         raise ValueError(msg)
-    lines = [f"data_{data_name}", "#"]
+    if cell_lengths_nm is not None:
+        _validate_cell_lengths(cell_lengths_nm)
+
+    entity_ids = _build_entity_ids(validated_records)
+    lines = [f"data_{validated_data_name}", "#"]
     if cell_lengths_nm is not None:
         lines.extend(
             [
@@ -158,6 +165,29 @@ def format_mmcif(
     lines.extend(
         [
             "loop_",
+            "_entity.id",
+            "_entity.type",
+            "_entity.pdbx_description",
+        ]
+    )
+    for component_label, entity_id in entity_ids.items():
+        lines.append(
+            " ".join([str(entity_id), "non-polymer", _quote_cif_value(component_label)])
+        )
+    lines.extend(
+        [
+            "#",
+            "loop_",
+            "_sammd_entity.id",
+            "_sammd_entity.component_label",
+        ]
+    )
+    for component_label, entity_id in entity_ids.items():
+        lines.append(" ".join([str(entity_id), _quote_cif_value(component_label)]))
+    lines.append("#")
+    lines.extend(
+        [
+            "loop_",
             "_atom_site.group_PDB",
             "_atom_site.id",
             "_atom_site.type_symbol",
@@ -169,10 +199,12 @@ def format_mmcif(
             "_atom_site.Cartn_x",
             "_atom_site.Cartn_y",
             "_atom_site.Cartn_z",
+            "_atom_site.occupancy",
+            "_atom_site.B_iso_or_equiv",
             "_atom_site.pdbx_PDB_model_num",
         ]
     )
-    for record in atom_records:
+    for record in validated_records:
         x_angstrom, y_angstrom, z_angstrom = (
             coordinate * 10.0 for coordinate in record.coordinates_nm
         )
@@ -185,11 +217,13 @@ def format_mmcif(
                     _quote_cif_value(record.atom_name),
                     _quote_cif_value(record.residue_name),
                     _quote_cif_value(record.chain_id),
-                    _quote_cif_value(record.component_label),
+                    str(entity_ids[record.component_label]),
                     str(record.residue_id),
                     _format_float(x_angstrom),
                     _format_float(y_angstrom),
                     _format_float(z_angstrom),
+                    "1.00",
+                    "0.00",
                     "1",
                 ]
             )
@@ -299,10 +333,96 @@ def _format_float(value: float) -> str:
     return f"{value:.6f}"
 
 
+def _validate_data_name(data_name: str) -> str:
+    """Validate an mmCIF data block name without surprising renames."""
+
+    if not data_name:
+        msg = "mmCIF data_name must not be empty"
+        raise ValueError(msg)
+    if any(character.isspace() or character in "'\"" for character in data_name):
+        msg = "mmCIF data_name must not contain whitespace or quotes"
+        raise ValueError(msg)
+    if any(ord(character) < 32 or ord(character) == 127 for character in data_name):
+        msg = "mmCIF data_name must not contain control characters"
+        raise ValueError(msg)
+    return data_name
+
+
+def _validate_atom_records(
+    atom_records: tuple[AtomRecord, ...] | list[AtomRecord],
+) -> tuple[AtomRecord, ...]:
+    """Validate atom records before writing mmCIF rows."""
+
+    validated_records = tuple(atom_records)
+    for record in validated_records:
+        if record.serial <= 0:
+            msg = "atom record serial must be positive"
+            raise ValueError(msg)
+        if record.residue_id <= 0:
+            msg = "atom record residue_id must be positive"
+            raise ValueError(msg)
+        for field_name in (
+            "atom_name",
+            "element",
+            "residue_name",
+            "chain_id",
+            "component_label",
+        ):
+            _validate_cif_text_value(getattr(record, field_name), field_name)
+        if len(record.coordinates_nm) != 3:
+            msg = "atom record coordinates_nm must contain exactly three values"
+            raise ValueError(msg)
+        if not all(
+            isinstance(coordinate, int | float) and isfinite(coordinate)
+            for coordinate in record.coordinates_nm
+        ):
+            msg = "atom record coordinates_nm values must be finite numbers"
+            raise ValueError(msg)
+    return validated_records
+
+
+def _validate_cell_lengths(cell_lengths_nm: Vector3) -> None:
+    """Validate optional periodic cell lengths."""
+
+    if len(cell_lengths_nm) != 3:
+        msg = "cell_lengths_nm must contain exactly three values"
+        raise ValueError(msg)
+    if not all(
+        isinstance(length, int | float) and isfinite(length) and length > 0
+        for length in cell_lengths_nm
+    ):
+        msg = "cell_lengths_nm values must be finite positive numbers"
+        raise ValueError(msg)
+
+
+def _validate_cif_text_value(value: str, field_name: str) -> None:
+    """Validate lightweight mmCIF string values before quoting."""
+
+    if not isinstance(value, str) or not value:
+        msg = f"atom record {field_name} must be a non-empty string"
+        raise ValueError(msg)
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        msg = f"atom record {field_name} must not contain control characters"
+        raise ValueError(msg)
+
+
+def _build_entity_ids(atom_records: tuple[AtomRecord, ...]) -> dict[str, int]:
+    """Assign stable numeric entity IDs for unique component labels."""
+
+    entity_ids: dict[str, int] = {}
+    for record in atom_records:
+        if record.component_label not in entity_ids:
+            entity_ids[record.component_label] = len(entity_ids) + 1
+    return entity_ids
+
+
 def _quote_cif_value(value: str) -> str:
     """Quote mmCIF values only when required."""
 
-    if value and all(character not in value for character in " \t\n'\""):
+    reserved_prefixes = ("_", "#", ";", "data_", "loop_", "save_", "stop_")
+    if value and all(character not in value for character in " \t\n'\"") and not value.startswith(
+        reserved_prefixes
+    ):
         return value
     return "'" + value.replace("'", "''") + "'"
 

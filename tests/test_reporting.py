@@ -98,8 +98,8 @@ def test_openmm_reporter_runtime_helper_errors_when_unavailable(monkeypatch, tmp
     monkeypatch.setattr(builtins, "__import__", fake_import)
     output_paths = OutputPaths(
         topology=tmp_path / "topology.cif",
-        trajectory=tmp_path / "trajectory.dcd",
-        thermodynamics=tmp_path / "thermodynamics.csv",
+        trajectory=tmp_path / "traj/run.dcd",
+        thermodynamics=tmp_path / "reports/state.csv",
     )
 
     with pytest.raises(ImportError, match="OpenMM is required to construct runtime reporters"):
@@ -129,8 +129,8 @@ def test_openmm_reporter_runtime_helper_uses_expected_reporter_arguments(tmp_pat
 
     output_paths = OutputPaths(
         topology=tmp_path / "topology.cif",
-        trajectory=tmp_path / "trajectory.dcd",
-        thermodynamics=tmp_path / "thermodynamics.csv",
+        trajectory=tmp_path / "traj/run.dcd",
+        thermodynamics=tmp_path / "reports/state.csv",
     )
     config = ReporterConfig(interval_steps=250, fields=["step", "temperature", "progress"])
 
@@ -141,9 +141,11 @@ def test_openmm_reporter_runtime_helper_uses_expected_reporter_arguments(tmp_pat
         app_module=FakeApp,
     )
 
-    assert reporters[0].file == str(tmp_path / "trajectory.dcd")
+    assert (tmp_path / "traj").is_dir()
+    assert (tmp_path / "reports").is_dir()
+    assert reporters[0].file == str(tmp_path / "traj/run.dcd")
     assert reporters[0].report_interval == 250
-    assert reporters[1].file == str(tmp_path / "thermodynamics.csv")
+    assert reporters[1].file == str(tmp_path / "reports/state.csv")
     assert reporters[1].report_interval == 250
     assert reporters[1].kwargs == {
         "step": True,

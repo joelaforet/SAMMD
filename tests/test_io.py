@@ -1,6 +1,7 @@
 """Tests for output planning and mmCIF scaffolds."""
 
 import shlex
+from math import inf, nan
 
 import pytest
 
@@ -13,6 +14,23 @@ from sammd.io import (
     slab_to_atom_records,
 )
 from sammd.surfaces import plan_pd111_slab
+
+
+def _base_atom_record(**overrides) -> AtomRecord:
+    """Create a valid atom record with focused test overrides."""
+
+    values = {
+        "serial": 1,
+        "atom_name": "Pd1",
+        "element": "Pd",
+        "residue_name": "PDT",
+        "residue_id": 1,
+        "chain_id": "M",
+        "component_label": "metal_top_layer",
+        "coordinates_nm": (0.1, -0.2, 0.3),
+    }
+    values.update(overrides)
+    return AtomRecord(**values)
 
 
 def test_output_paths_default_under_base_directory(tmp_path) -> None:
@@ -85,28 +103,98 @@ def test_mmcif_writer_formats_required_atom_site_fields_and_angstrom_coordinates
 
     text = format_mmcif(
         (
-            AtomRecord(
-                serial=1,
-                atom_name="Pd1",
-                element="Pd",
-                residue_name="PDT",
-                residue_id=1,
-                chain_id="M",
-                component_label="metal_top_layer",
-                coordinates_nm=(0.1, -0.2, 0.3),
-            ),
+            _base_atom_record(),
         ),
         cell_lengths_nm=(1.0, 2.0, 3.0),
     )
 
     assert "_cell.length_a 10.000000" in text
+    assert "_entity.id" in text
+    assert "_sammd_entity.component_label" in text
     assert "_atom_site.Cartn_x" in text
     assert "_atom_site.Cartn_y" in text
     assert "_atom_site.Cartn_z" in text
+    assert "_atom_site.occupancy" in text
+    assert "_atom_site.B_iso_or_equiv" in text
     atom_line = next(line for line in text.splitlines() if line.startswith("HETATM"))
     tokens = shlex.split(atom_line)
-    assert tokens[:8] == ["HETATM", "1", "Pd", "Pd1", "PDT", "M", "metal_top_layer", "1"]
+    assert tokens[:8] == ["HETATM", "1", "Pd", "Pd1", "PDT", "M", "1", "1"]
     assert tokens[8:11] == ["1.000000", "-2.000000", "3.000000"]
+    assert tokens[11:13] == ["1.00", "0.00"]
+
+
+@pytest.mark.parametrize("data_name", ["", "bad name", "bad'name", 'bad"name', "bad\nname"])
+def test_mmcif_writer_rejects_invalid_data_names(data_name) -> None:
+    """Reject unsafe mmCIF data block names before writing text."""
+
+    with pytest.raises(ValueError, match="data_name"):
+        format_mmcif((_base_atom_record(),), data_name=data_name)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"serial": 0}, "serial must be positive"),
+        ({"residue_id": 0}, "residue_id must be positive"),
+        ({"atom_name": ""}, "atom_name must be a non-empty string"),
+        ({"element": ""}, "element must be a non-empty string"),
+        ({"residue_name": ""}, "residue_name must be a non-empty string"),
+        ({"chain_id": ""}, "chain_id must be a non-empty string"),
+        ({"component_label": ""}, "component_label must be a non-empty string"),
+        ({"atom_name": "Pd\n1"}, "atom_name must not contain control characters"),
+        ({"coordinates_nm": (0.0, 1.0)}, "coordinates_nm must contain exactly three"),
+        ({"coordinates_nm": (0.0, 1.0, nan)}, "coordinates_nm values must be finite"),
+        ({"coordinates_nm": (0.0, 1.0, inf)}, "coordinates_nm values must be finite"),
+    ],
+)
+def test_mmcif_writer_rejects_invalid_atom_records(overrides, message) -> None:
+    """Validate atom records before emitting potentially invalid mmCIF text."""
+
+    with pytest.raises(ValueError, match=message):
+        format_mmcif((_base_atom_record(**overrides),))
+
+
+def test_mmcif_writer_quotes_safe_strings_and_uses_numeric_entity_ids() -> None:
+    """Quote string values while keeping atom-site entity IDs internally consistent."""
+
+    records = (
+        _base_atom_record(
+            atom_name="Pd top",
+            residue_name="Pd's",
+            component_label="metal top layer",
+        ),
+        _base_atom_record(
+            serial=2,
+            atom_name="#Pd2",
+            residue_id=2,
+            component_label="metal slab",
+            coordinates_nm=(0.2, 0.0, 0.0),
+        ),
+        _base_atom_record(
+            serial=3,
+            atom_name="Pd3",
+            residue_id=3,
+            component_label="metal top layer",
+            coordinates_nm=(0.3, 0.0, 0.0),
+        ),
+    )
+
+    text = format_mmcif(records)
+    lines = text.splitlines()
+    entity_rows = _loop_rows(lines, "_entity.id")
+    sammd_entity_rows = _loop_rows(lines, "_sammd_entity.id")
+    atom_rows = [shlex.split(line) for line in lines if line.startswith("HETATM")]
+
+    assert entity_rows == [
+        ["1", "non-polymer", "metal top layer"],
+        ["2", "non-polymer", "metal slab"],
+    ]
+    assert sammd_entity_rows == [["1", "metal top layer"], ["2", "metal slab"]]
+    assert [row[6] for row in atom_rows] == ["1", "2", "1"]
+    assert atom_rows[0][3] == "Pd top"
+    assert atom_rows[0][4] == "Pds"
+    assert atom_rows[1][3] == "#Pd2"
+    assert "metal top layer" not in {row[6] for row in atom_rows}
 
 
 def test_slab_to_atom_records_gives_deterministic_pd_layer_labels() -> None:
@@ -124,3 +212,17 @@ def test_slab_to_atom_records_gives_deterministic_pd_layer_labels() -> None:
     assert records[-1].residue_name == "PDT"
     assert records[-1].component_label == "metal_top_layer"
     assert any(record.component_label == "metal_slab" for record in records)
+
+
+def _loop_rows(lines: list[str], first_field: str) -> list[list[str]]:
+    """Collect rows for the loop identified by its first field."""
+
+    start = lines.index(first_field)
+    index = start
+    while index < len(lines) and lines[index].startswith("_"):
+        index += 1
+    rows: list[list[str]] = []
+    while index < len(lines) and lines[index] != "#":
+        rows.append(shlex.split(lines[index]))
+        index += 1
+    return rows

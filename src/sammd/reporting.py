@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 THERMODYNAMIC_FIELD_TO_OPENMM: dict[str, str] = {
@@ -138,6 +139,7 @@ def create_openmm_reporters(
 
     app = app_module if app_module is not None else _import_openmm_app()
     interval_steps = reporting_config.interval_steps
+    _prepare_reporter_output_directories(output_paths)
     state_data_config = build_state_data_reporter_config(
         str(output_paths.thermodynamics),
         interval_steps=interval_steps,
@@ -153,6 +155,13 @@ def create_openmm_reporters(
         **state_data_config.kwargs,
     )
     return [dcd_reporter, state_data_reporter]
+
+
+def _prepare_reporter_output_directories(output_paths: Any) -> None:
+    """Create runtime reporter output directories before OpenMM opens files."""
+
+    for path in (output_paths.trajectory, output_paths.thermodynamics):
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
 
 
 def _import_openmm_app() -> Any:
