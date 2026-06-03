@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <SMIRNOFF version="0.3" aromaticity_model="OEAroModel_MDL">
   <!-- Generated from CHARMM-INTERFACE Fcc metal Lennard-Jones parameters. -->
-  <!-- Provenance: Heinz et al.; CHARMM-INTERFACE; https://github.com/CHARMM-INTERFACE/ -->
+  <!-- Provenance: Heinz et al.; CHARMM-INTERFACE; https://github.com/hendrikheinz/INTERFACE-force-field-and-surface-models/blob/master/charmm27_interface_v1_5.prm -->
+  <!-- Nonbonded settings are SAMMD SMIRNOFF export defaults for OpenFF compatibility. -->
   <Author>SAMMD contributors</Author>
   <Date>2026-06-03</Date>
   <vdW version="0.4" potential="Lennard-Jones-12-6" combining_rules="Lorentz-Berthelot" scale12="0.0" scale13="0.0" scale14="0.5" scale15="1.0" cutoff="9.0 * angstrom" switch_width="1.0 * angstrom" method="cutoff">

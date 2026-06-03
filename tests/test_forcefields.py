@@ -1,6 +1,6 @@
 """Tests for INTERFACE Fcc metal parameters."""
 
-from importlib.resources import files
+from importlib.resources import as_file, files
 from xml.etree import ElementTree
 
 import pytest
@@ -77,6 +77,15 @@ def test_generated_offxml_reproduces_pd_parameters_with_units() -> None:
     assert pd_atom.attrib["rmin_half"] == "1.4095 * angstrom"
 
 
+def test_generated_offxml_includes_precise_source_url() -> None:
+    """Preserve the exact CHARMM-INTERFACE parameter file URL."""
+
+    assert (
+        "https://github.com/hendrikheinz/INTERFACE-force-field-and-surface-models/blob/master/"
+        "charmm27_interface_v1_5.prm"
+    ) in generate_interface_metal_offxml()
+
+
 def test_generated_offxml_matches_packaged_resource() -> None:
     """Keep the packaged resource synchronized with registry output."""
 
@@ -99,6 +108,29 @@ def test_write_helper_writes_deterministic_loadable_xml(tmp_path) -> None:
     assert ElementTree.fromstring(written_text).tag == "SMIRNOFF"
 
 
+def test_write_helper_refuses_existing_file_without_overwrite(tmp_path) -> None:
+    """Avoid silently clobbering an existing user file."""
+
+    output_path = tmp_path / "metals.offxml"
+    output_path.write_text("existing", encoding="utf-8")
+
+    with pytest.raises(FileExistsError):
+        write_interface_metal_offxml(output_path)
+
+    assert output_path.read_text(encoding="utf-8") == "existing"
+
+
+def test_write_helper_overwrites_existing_file_when_requested(tmp_path) -> None:
+    """Allow explicit atomic replacement of an existing user file."""
+
+    output_path = tmp_path / "metals.offxml"
+    output_path.write_text("existing", encoding="utf-8")
+
+    write_interface_metal_offxml(output_path, overwrite=True)
+
+    assert output_path.read_text(encoding="utf-8") == generate_interface_metal_offxml()
+
+
 def test_generated_offxml_excludes_pcff_96_parameters() -> None:
     """Avoid mixing unsupported PCFF 9-6 parameters into the export."""
 
@@ -106,3 +138,13 @@ def test_generated_offxml_excludes_pcff_96_parameters() -> None:
 
     assert "PCFF" not in offxml
     assert "9-6" not in offxml
+
+
+def test_packaged_offxml_loads_with_openff_when_available() -> None:
+    """Optionally validate packaged OFFXML with the OpenFF Toolkit."""
+
+    openff_toolkit = pytest.importorskip("openff.toolkit")
+    resource = files("sammd.data").joinpath("interface_fcc_metals.offxml")
+
+    with as_file(resource) as resource_path:
+        openff_toolkit.ForceField(str(resource_path))
