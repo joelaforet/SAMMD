@@ -313,10 +313,10 @@ def test_lj_scaling_adds_expected_custom_bond_force() -> None:
     assert metadata.force_added is True
     assert metadata.force_index == 1
     assert metadata.sigma_nm == pytest.approx((0.40,))
-    assert metadata.epsilon_delta_kj_mol == pytest.approx((48.0,))
-    assert force.expression == "epsilon_delta*((sigma/r)^12-(sigma/r)^6)"
+    assert metadata.epsilon_delta_kj_mol == pytest.approx((12.0,))
+    assert force.expression == "4*epsilon_delta*((sigma/r)^12-(sigma/r)^6)"
     assert force.uses_pbc is True
-    assert force.bonds == [(0, 1, [0.40, 48.0])]
+    assert force.bonds == [(0, 1, [0.40, 12.0])]
 
 
 def test_create_openmm_simulation_attaches_reporters(tmp_path) -> None:

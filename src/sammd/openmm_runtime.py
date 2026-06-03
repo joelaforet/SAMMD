@@ -10,7 +10,7 @@ from sammd.reporting import create_openmm_reporters
 
 DEFAULT_PD_RESTRAINT_K_KJ_MOL_NM2 = 10000.0
 POSITION_RESTRAINT_EXPRESSION = "0.5*k*((x-x0)^2+(y-y0)^2+(z-z0)^2)"
-LJ_SCALING_EXPRESSION = "epsilon_delta*((sigma/r)^12-(sigma/r)^6)"
+LJ_SCALING_EXPRESSION = "4*epsilon_delta*((sigma/r)^12-(sigma/r)^6)"
 
 
 @dataclass(frozen=True)
@@ -266,7 +266,7 @@ def add_sulfur_metal_lj_scaling(
             _quantity_to_float(sulfur_epsilon, unit.kilojoule_per_mole)
             * _quantity_to_float(metal_epsilon, unit.kilojoule_per_mole)
         )
-        epsilon_delta = (scale_factor - 1.0) * 4.0 * epsilon_kj_mol
+        epsilon_delta = (scale_factor - 1.0) * epsilon_kj_mol
         correction_force.addBond(sulfur_index, metal_index, [sigma_nm, epsilon_delta])
         sigma_values.append(sigma_nm)
         epsilon_delta_values.append(epsilon_delta)
