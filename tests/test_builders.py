@@ -42,6 +42,7 @@ def test_default_build_plan_contains_all_lightweight_artifacts(tmp_path) -> None
     assert plan.solution.solvent_components[0].name == "water"
     assert plan.solution.reactants[0].name == "cinnamaldehyde"
     assert plan.output_paths.topology == tmp_path / "topology.cif"
+    assert plan.planned_slab_mmcif_path == tmp_path / "planned_slab.cif"
     assert not plan.full_construction_available
     with pytest.raises(NotImplementedError, match="OpenFF/OpenMM construction is not implemented"):
         plan.require_full_construction()
@@ -89,7 +90,7 @@ def test_build_plan_writes_planned_slab_mmcif_and_refuses_overwrite(tmp_path) ->
     written_path = plan.write_planned_slab_mmcif()
     text = written_path.read_text(encoding="utf-8")
 
-    assert written_path == tmp_path / "topology.cif"
+    assert written_path == tmp_path / "planned_slab.cif"
     assert text.startswith("data_sammd_planned_slab_only")
     assert "_atom_site.Cartn_x" in text
     assert text.count("HETATM") == len(plan.slab.positions_nm)

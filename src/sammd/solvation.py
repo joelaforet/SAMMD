@@ -155,7 +155,7 @@ def plan_solution_components(
 ) -> SolutionPlan:
     """Plan solution counts from a count-planning volume and component inputs."""
 
-    _validate_box_volume(box_volume_nm3)
+    _validate_count_planning_volume(box_volume_nm3)
     total_volume_fraction = sum(
         float(_get_required(component, "volume_fraction")) for component in solvent_components
     )
@@ -175,12 +175,13 @@ def plan_solution_components(
         if component.count == 0:
             warnings.append(
                 f"{component.role} component '{component.name}' rounded to zero molecules "
-                "for this box"
+                "for this count-planning volume"
             )
     for salt in planned_salts:
         if salt.cation_count == 0 and salt.anion_count == 0:
             warnings.append(
-                f"salt '{salt.cation}/{salt.anion}' rounded to zero ion pairs for this box"
+                f"salt '{salt.cation}/{salt.anion}' rounded to zero ion pairs for this "
+                "count-planning volume"
             )
 
     return SolutionPlan(
@@ -277,11 +278,11 @@ def _plan_reactant(reactant: Any, box_volume_nm3: float) -> PlannedMolecule:
     )
 
 
-def _validate_box_volume(box_volume_nm3: float) -> None:
-    """Validate the simulation box volume used for composition planning."""
+def _validate_count_planning_volume(box_volume_nm3: float) -> None:
+    """Validate the volume used for solution composition count planning."""
 
     if not isfinite(box_volume_nm3) or box_volume_nm3 <= 0:
-        msg = "box_volume_nm3 must be a finite positive value"
+        msg = "count-planning volume must be a finite positive value"
         raise ValueError(msg)
 
 

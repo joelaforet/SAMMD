@@ -73,8 +73,8 @@ class SAMMDBuildPlan:
         Parameters
         ----------
         path
-            Optional destination path. Defaults to the configured topology path, but the
-            emitted artifact is slab-only rather than a complete topology.
+            Optional destination path. Defaults to ``planned_slab.cif`` next to the
+            configured future topology path.
         overwrite
             Whether an existing destination may be replaced.
 
@@ -84,13 +84,19 @@ class SAMMDBuildPlan:
             Written mmCIF path.
         """
 
-        destination = self.output_paths.topology if path is None else Path(path)
+        destination = self.planned_slab_mmcif_path if path is None else Path(path)
         return write_mmcif(
             destination,
             slab_to_atom_records(self.slab),
             data_name="sammd_planned_slab_only",
             overwrite=overwrite,
         )
+
+    @property
+    def planned_slab_mmcif_path(self) -> Path:
+        """Return the default slab-only mmCIF path reserved for plan visualization."""
+
+        return self.output_paths.topology.with_name("planned_slab.cif")
 
     def write_planned_topology(self, *, overwrite: bool = False) -> Path:
         """Raise because full topology writing is not implemented for this plan."""

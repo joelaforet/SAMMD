@@ -210,7 +210,7 @@ def test_volume_fraction_tolerance_matches_config_schema() -> None:
 def test_invalid_box_volume_fails(box_volume_nm3: float) -> None:
     """Reject non-positive box volumes before count planning."""
 
-    with pytest.raises(ValueError, match="box_volume_nm3 must be a finite positive value"):
+    with pytest.raises(ValueError, match="count-planning volume must be a finite positive value"):
         plan_solution_composition(SAMMDConfig(), box_volume_nm3=box_volume_nm3)
 
 

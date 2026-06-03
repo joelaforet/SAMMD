@@ -149,14 +149,31 @@ Initial package modules:
 - `sammd.sam`: RDKit/OpenFF molecule creation, conformer generation, sulfur anchor detection, single- and mixed-component monolayer placement.
 - `sammd.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
 - `sammd.solvation`: solvent mixture, salt, and reactant count calculations from volume fractions and concentrations, followed by OpenFF/PACKMOL packing.
-- `sammd.builders`: high-level system builder that returns structured build artifacts and an OpenFF `Interchange`.
+- `sammd.builders`: high-level builder. Current MVP code returns a lightweight deterministic build plan; future backend integration should add full OpenFF `Interchange` construction.
 - `sammd.simulation`: thin, user-facing OpenMM setup and run helpers for the canonical notebook, not a large production run manager in the MVP.
 - `sammd.io`: mmCIF/PDBx topology writing, DCD trajectory naming conventions, and visualization-oriented metadata helpers.
 - `sammd.reporting`: OpenMM reporter configuration for trajectories and thermodynamic state data.
 - `sammd.analysis`: orientation metrics and later umbrella-sampling support.
 - `sammd.cli`: minimal `init` and maybe `validate` commands.
 
-The public Python API should expose a small workflow surface:
+The current public Python API exposes a lightweight planning workflow that avoids heavy
+OpenFF/OpenMM construction:
+
+```python
+from sammd import load_config, build_system
+
+config = load_config("sammd.yaml")
+plan = build_system(config, output_dir="outputs")
+plan.write_planned_slab_mmcif()  # Writes outputs/planned_slab.cif by default
+```
+
+The returned plan contains validated configuration, a commensurate Pd(111) slab,
+binding sites, seeded SAM placement choices, approximate solution composition counts,
+and planned output paths. It is not a final OpenFF/OpenMM system and does not contain
+complete atomic coordinates for SAM, solvent, salts, or reactants.
+
+The future full-construction workflow should preserve the small API surface while adding
+backend artifacts and simulation helpers, for example:
 
 ```python
 from sammd import load_config, build_system
@@ -192,6 +209,11 @@ Default output artifacts for a built or simulated system should include:
 - `trajectory.dcd`: DCD trajectory from OpenMM.
 - `thermodynamics.csv`: tabular OpenMM state data from a thermodynamic reporter.
 - Optional OpenMM restart/checkpoint artifacts for continuing simulations.
+
+During the current lightweight planning milestone, `topology.cif` remains reserved for
+the future complete topology. The slab-only visualization helper writes
+`planned_slab.cif` by default and should not be interpreted as a complete topology or
+final simulation cell.
 
 mmCIF/PDBx should be preferred over legacy PDB because SAMMD systems may have many atoms, many solvent/reactant molecules, nonstandard residues, and metal particles. Atom names, residue names, chain IDs, molecule labels, and component metadata should be chosen so PyMOL sessions are easy to inspect: metal slab, top SAM, bottom SAM, solvent, salts, and reactants should be distinguishable by selection.
 

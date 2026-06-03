@@ -43,8 +43,9 @@ plan = build_system(config, output_dir="outputs")
 
 print(plan.slab.metal, plan.slab.facet)
 print(plan.solution.molecule_counts)
-plan.write_planned_slab_mmcif()
+plan.write_planned_slab_mmcif()  # Writes outputs/planned_slab.cif by default
 ```
 
 The emitted mmCIF is a slab-only visualization scaffold, not a complete system
-topology or final simulation cell.
+topology or final simulation cell. The configured `topology.cif` path remains
+reserved for the future full topology artifact.
