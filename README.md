@@ -23,6 +23,13 @@ atoms or midpoint/centroid selections, COM-to-target orientation vectors, and
 angles relative to top (+z), bottom (-z), or explicit surface normals without
 requiring MDAnalysis, OpenMM, OpenFF, or RDKit.
 
+Optional OpenFF adapter helpers live in `sammd.openff` for future backend
+parameterization work. They lazily create OpenFF molecules from configured SAM
+components, simple SMILES-bearing solvents, and reactants, and can load base
+OpenFF force fields together with the packaged INTERFACE Fcc metal OFFXML
+resource. These helpers require the SAMMD science/pixi environment and do not
+perform full system construction.
+
 `build_system()` currently returns a lightweight plan rather than OpenFF/OpenMM
 objects. The plan contains the validated config, a centered double-sided
 commensurate Pd(111) slab, fcc/hcp hollow binding sites, seeded top/bottom SAM
