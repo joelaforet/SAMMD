@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import importlib
 import sys
+from types import SimpleNamespace
 
 import pytest
 
-from sammd.config import SAMMDConfig
+from sammd.config import SAMMDConfig, load_config_dict
 
 
 def test_adapter_import_does_not_import_openff_eagerly() -> None:
@@ -62,8 +63,34 @@ def test_molecule_from_smiles_requires_nonnegative_conformer_count() -> None:
         openff_adapter.molecule_from_smiles("CCCS", n_conformers=-1)
 
 
+def test_molecule_from_smiles_disallows_undefined_stereo_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Use the safer OpenFF stereochemistry default unless callers opt in."""
+
+    openff_adapter = importlib.import_module("sammd.openff")
+    captured: dict[str, bool] = {}
+
+    molecule = SimpleNamespace(name="", generate_conformers=lambda n_conformers: None)
+
+    def fake_from_smiles(smiles: str, allow_undefined_stereo: bool, **kwargs):
+        captured["allow_undefined_stereo"] = allow_undefined_stereo
+        return molecule
+
+    fake_molecule_type = type("FakeMolecule", (), {"from_smiles": staticmethod(fake_from_smiles)})
+    monkeypatch.setattr(
+        openff_adapter,
+        "require_openff_toolkit",
+        lambda: SimpleNamespace(Molecule=fake_molecule_type),
+    )
+
+    openff_adapter.molecule_from_smiles("CCCS", n_conformers=0)
+
+    assert captured == {"allow_undefined_stereo": False}
+
+
 def test_molecules_from_config_groups_supported_sections(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Create molecules only for SAMs, explicit solvent SMILES, and reactants."""
+    """Create molecules and report entries that are not OpenFF molecules."""
 
     openff_adapter = importlib.import_module("sammd.openff")
     calls: list[tuple[str, str | None, int, bool]] = []
@@ -72,25 +99,71 @@ def test_molecules_from_config_groups_supported_sections(monkeypatch: pytest.Mon
         smiles: str,
         name: str | None = None,
         n_conformers: int = 1,
-        allow_undefined_stereo: bool = True,
+        allow_undefined_stereo: bool = False,
     ) -> dict[str, str | None]:
         calls.append((smiles, name, n_conformers, allow_undefined_stereo))
         return {"smiles": smiles, "name": name}
 
     monkeypatch.setattr(openff_adapter, "molecule_from_smiles", fake_molecule_from_smiles)
 
-    molecules = openff_adapter.molecules_from_config(SAMMDConfig(), n_conformers=0)
+    result = openff_adapter.molecules_from_config(SAMMDConfig(), n_conformers=0)
 
-    assert molecules["sam"] == [{"smiles": "CCCS", "name": "propanethiol"}]
-    assert molecules["solvent"] == []
-    assert molecules["reactants"] == [
+    assert result.molecules["sam"] == [{"smiles": "CCCS", "name": "propanethiol"}]
+    assert result.molecules["solvent"] == []
+    assert result.molecules["reactants"] == [
         {"smiles": "C1=CC=C(C=C1)/C=C/C=O", "name": "cinnamaldehyde"}
     ]
-    assert molecules["salts"] == []
+    assert result.molecules["salts"] == []
+    assert [(entry.section, entry.name) for entry in result.skipped] == [("solvent", "water")]
+    assert result.unsupported == []
     assert calls == [
-        ("CCCS", "propanethiol", 0, True),
-        ("C1=CC=C(C=C1)/C=C/C=O", "cinnamaldehyde", 0, True),
+        ("CCCS", "propanethiol", 0, False),
+        ("C1=CC=C(C=C1)/C=C/C=O", "cinnamaldehyde", 0, False),
     ]
+
+
+def test_molecules_from_config_reports_solvent_without_smiles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Report non-water solvent entries that lack SMILES instead of dropping them."""
+
+    openff_adapter = importlib.import_module("sammd.openff")
+    monkeypatch.setattr(openff_adapter, "molecule_from_smiles", lambda *args, **kwargs: args[0])
+    config = load_config_dict(
+        {
+            "solvent": {
+                "components": [
+                    {"name": "ethanol", "volume_fraction": 1.0, "density_g_ml": 0.789}
+                ]
+            }
+        }
+    )
+
+    result = openff_adapter.molecules_from_config(config, n_conformers=0)
+
+    assert result.molecules["solvent"] == []
+    assert [(entry.section, entry.name) for entry in result.unsupported] == [
+        ("solvent", "ethanol")
+    ]
+    assert "no SMILES" in result.unsupported[0].reason
+
+
+def test_molecules_from_config_reports_salts_as_unsupported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Report configured salts as unsupported OpenFF molecule inputs."""
+
+    openff_adapter = importlib.import_module("sammd.openff")
+    monkeypatch.setattr(openff_adapter, "molecule_from_smiles", lambda *args, **kwargs: args[0])
+    config = load_config_dict(
+        {"salts": [{"cation": "Na+", "anion": "Cl-", "concentration_molar": 0.15}]}
+    )
+
+    result = openff_adapter.molecules_from_config(config, n_conformers=0)
+
+    assert result.molecules["salts"] == []
+    assert [(entry.section, entry.name) for entry in result.unsupported] == [("salts", "Na+/Cl-")]
+    assert "ion labels" in result.unsupported[0].reason
 
 
 def test_molecule_from_propanethiol_smiles_when_openff_available() -> None:
@@ -115,6 +188,7 @@ def test_molecule_from_cinnamaldehyde_smiles_when_openff_available() -> None:
         "C1=CC=C(C=C1)/C=C/C=O",
         name="cinnamaldehyde",
         n_conformers=0,
+        allow_undefined_stereo=True,
     )
 
     assert molecule.name == "cinnamaldehyde"
@@ -122,11 +196,32 @@ def test_molecule_from_cinnamaldehyde_smiles_when_openff_available() -> None:
 
 
 def test_load_force_field_with_interface_metals_when_openff_available() -> None:
-    """Optionally instantiate an OpenFF force field with packaged metals."""
+    """Optionally verify packaged Pd vdW parameters are loaded."""
 
     pytest.importorskip("openff.toolkit")
     openff_adapter = importlib.import_module("sammd.openff")
 
     force_field = openff_adapter.load_force_field(include_interface_metals=True)
+    vdw_handler = force_field.get_parameter_handler("vdW")
+    pd_parameters = [
+        parameter
+        for parameter in vdw_handler.parameters
+        if getattr(parameter, "smirks", None) == "[#46:1]"
+    ]
 
-    assert force_field is not None
+    assert pd_parameters
+    assert any(getattr(parameter, "id", None) == "Pd" for parameter in pd_parameters)
+    assert any(
+        "6.15" in _quantity_text(getattr(parameter, "epsilon", ""))
+        for parameter in pd_parameters
+    )
+    assert any(
+        "1.4095" in _quantity_text(getattr(parameter, "rmin_half", ""))
+        for parameter in pd_parameters
+    )
+
+
+def _quantity_text(value: object) -> str:
+    """Return robust text for OpenFF quantity-like parameter values."""
+
+    return str(value).replace(" ", "")

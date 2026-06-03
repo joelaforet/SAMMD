@@ -25,9 +25,11 @@ requiring MDAnalysis, OpenMM, OpenFF, or RDKit.
 
 Optional OpenFF adapter helpers live in `sammd.openff` for future backend
 parameterization work. They lazily create OpenFF molecules from configured SAM
-components, simple SMILES-bearing solvents, and reactants, and can load base
-OpenFF force fields together with the packaged INTERFACE Fcc metal OFFXML
-resource. These helpers require the SAMMD science/pixi environment and do not
+components, simple SMILES-bearing solvents, and reactants, report unsupported
+solvent and salt entries that cannot be converted, and can load base OpenFF
+force fields together with the packaged INTERFACE Fcc metal OFFXML resource.
+Undefined stereochemistry follows the safer OpenFF default unless explicitly
+allowed. These helpers require the SAMMD science/pixi environment and do not
 perform full system construction.
 
 `build_system()` currently returns a lightweight plan rather than OpenFF/OpenMM

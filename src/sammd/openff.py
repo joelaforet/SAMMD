@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass, field
 from importlib import import_module, resources
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,26 @@ OPENFF_INSTALL_GUIDANCE = (
     "SAMMD science/pixi environment with OpenFF Toolkit available before calling "
     "OpenFF adapter utilities."
 )
+
+
+@dataclass(frozen=True)
+class OpenFFMoleculePreparationIssue:
+    """Structured report for a config entry not converted to an OpenFF molecule."""
+
+    section: str
+    name: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class OpenFFMoleculePreparationResult:
+    """OpenFF molecule preparation result with unsupported and skipped entries."""
+
+    molecules: dict[str, list[Any]] = field(
+        default_factory=lambda: {"sam": [], "solvent": [], "reactants": [], "salts": []}
+    )
+    skipped: list[OpenFFMoleculePreparationIssue] = field(default_factory=list)
+    unsupported: list[OpenFFMoleculePreparationIssue] = field(default_factory=list)
 
 
 def require_openff_toolkit() -> Any:
@@ -50,7 +71,7 @@ def molecule_from_smiles(
     smiles: str,
     name: str | None = None,
     n_conformers: int = 1,
-    allow_undefined_stereo: bool = True,
+    allow_undefined_stereo: bool = False,
     **from_smiles_kwargs: Any,
 ) -> Any:
     """Create an OpenFF molecule from SMILES with optional conformer generation.
@@ -94,14 +115,15 @@ def molecule_from_smiles(
 def molecules_from_config(
     config: Any,
     n_conformers: int = 1,
-    allow_undefined_stereo: bool = True,
-) -> dict[str, list[Any]]:
+    allow_undefined_stereo: bool = False,
+) -> OpenFFMoleculePreparationResult:
     """Prepare OpenFF molecules for supported molecule-bearing config sections.
 
     SAM components, non-water solvent components with explicit SMILES, and reactants are
-    converted. Water is represented by the configured water model rather than an OpenFF small
-    molecule here, and salt ions are intentionally skipped because the MVP salt config records ion
-    labels rather than chemically complete SMILES.
+    converted. Water is reported as skipped because it is represented by the configured water
+    model rather than an OpenFF small molecule here. Solvent components without SMILES and salts
+    are reported as unsupported because the MVP configs do not contain enough chemistry to build
+    OpenFF molecules for those entries.
 
     Parameters
     ----------
@@ -114,14 +136,14 @@ def molecules_from_config(
 
     Returns
     -------
-    dict[str, list[Any]]
-        Molecules grouped as ``sam``, ``solvent``, ``reactants``, and ``salts``.
+    OpenFFMoleculePreparationResult
+        Generated molecules plus structured skipped and unsupported entries.
     """
 
-    molecules: dict[str, list[Any]] = {"sam": [], "solvent": [], "reactants": [], "salts": []}
+    result = OpenFFMoleculePreparationResult()
 
     for component in _iter_config_items(config.sam, "components"):
-        molecules["sam"].append(
+        result.molecules["sam"].append(
             molecule_from_smiles(
                 component.smiles,
                 name=component.name,
@@ -133,8 +155,26 @@ def molecules_from_config(
     for component in _iter_config_items(config.solvent, "components"):
         smiles = getattr(component, "smiles", None)
         if smiles is None:
+            reason = "water is handled by the configured water model"
+            if component.name.lower() != "water":
+                reason = "solvent component has no SMILES for OpenFF molecule creation"
+                result.unsupported.append(
+                    OpenFFMoleculePreparationIssue(
+                        section="solvent",
+                        name=component.name,
+                        reason=reason,
+                    )
+                )
+                continue
+            result.skipped.append(
+                OpenFFMoleculePreparationIssue(
+                    section="solvent",
+                    name=component.name,
+                    reason=reason,
+                )
+            )
             continue
-        molecules["solvent"].append(
+        result.molecules["solvent"].append(
             molecule_from_smiles(
                 smiles,
                 name=component.name,
@@ -144,7 +184,7 @@ def molecules_from_config(
         )
 
     for reactant in getattr(config, "reactants", []):
-        molecules["reactants"].append(
+        result.molecules["reactants"].append(
             molecule_from_smiles(
                 reactant.smiles,
                 name=reactant.name,
@@ -153,7 +193,16 @@ def molecules_from_config(
             )
         )
 
-    return molecules
+    for salt in getattr(config, "salts", []):
+        result.unsupported.append(
+            OpenFFMoleculePreparationIssue(
+                section="salts",
+                name=f"{salt.cation}/{salt.anion}",
+                reason="salt config uses ion labels, not chemically complete OpenFF SMILES",
+            )
+        )
+
+    return result
 
 
 def load_force_field(
