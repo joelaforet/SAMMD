@@ -148,7 +148,7 @@ Initial package modules:
 - `sammd.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
 - `sammd.solvation`: solvent mixture, salt, and reactant count calculations from volume fractions and concentrations, followed by OpenFF/PACKMOL packing.
 - `sammd.builders`: high-level system builder that returns structured build artifacts and an OpenFF `Interchange`.
-- `sammd.simulation`: thin OpenMM setup helpers, not a large run manager in the MVP.
+- `sammd.simulation`: thin, user-facing OpenMM setup and run helpers for the canonical notebook, not a large production run manager in the MVP.
 - `sammd.analysis`: orientation metrics and later umbrella-sampling support.
 - `sammd.cli`: minimal `init` and maybe `validate` commands.
 
@@ -165,6 +165,19 @@ simulation = system.create_openmm_simulation()
 
 ## Scientific Design Decisions
 
+### Simulation API Abstraction
+
+SAMMD should provide a user-facing simulation interface for the canonical workflow, not require users to write pure OpenMM code for routine runs.
+
+The interface should:
+
+- Accept validated configuration objects and produce build artifacts.
+- Expose simple methods for minimization, equilibration, production, and export in the notebook workflow.
+- Return or expose the underlying OpenFF `Interchange` and OpenMM `System`, `Topology`, positions, and `Simulation` objects for advanced users.
+- Hide implementation details of sulfur-metal anchoring behind configuration fields such as `anchor.mode`, `anchor.site`, and `anchor.nonbonded.scale_factor`.
+
+For the nonbonded anchor proxy, users should only need to set the interaction magnitude, for example 4x or 6x stronger than the baseline sulfur-metal interaction. The implementation may use an OpenMM custom force, pair-specific nonbonded overrides, or another correct backend, but that choice should not leak into the user-facing API.
+
 ### Mixed SAMs
 
 Mixed SAMs are in scope, even if the canonical demo uses a single propanethiol component.
@@ -176,7 +189,7 @@ The configuration should allow a list of SAM components:
 - `fraction` or `count`: surface composition control.
 - Optional per-component anchor settings for future calibration.
 
-The total grafting density applies to all SAM components combined. Placement should select binding sites deterministically from a seed, then assign component identities from fractions or counts. The same composition should decorate both slab faces by default, with a future extension point for side-specific compositions.
+The total grafting density applies to all SAM components combined. The default grafting density is `0.25 nm^2 / molecule`, equivalent to 4 molecules per nm^2. Placement should select binding sites deterministically from a seed, then assign component identities from fractions or counts. The same composition should decorate both slab faces by default, with a future extension point for side-specific compositions.
 
 ### Slab Geometry And PBC
 
@@ -188,7 +201,7 @@ Bulk solvent -> Bottom SAM -> Pd(111) slab -> Top SAM -> Bulk solvent
 
 The bottom SAM should point toward negative `z`; the top SAM should point toward positive `z`. Through PBC, the two bulk solvent regions are one continuous bulk phase.
 
-The Pd slab should be restrained by default. We are not simulating SAM assembly or metal reconstruction; the surface mainly provides geometry and INTERFACE-derived nonbonded parameters. Use positional restraints to keep Pd atoms near ideal lattice coordinates, with a configurable force constant.
+The Pd slab should be restrained by default. We are not simulating SAM assembly or metal reconstruction; the surface mainly provides geometry and INTERFACE-derived nonbonded parameters. Use positional restraints to keep Pd atoms near ideal lattice coordinates. The default positional restraint force constant is `10000 kJ mol^-1 nm^-2`, with the exact units and restraint form documented in the generated YAML template.
 
 The slab must be thick enough that the two decorated interfaces do not see each other through the nonbonded cutoff. With a typical 0.9-1.2 nm cutoff and Pd(111) layer spacing of roughly `a / sqrt(3)`, a safe starting point is 8-10 Pd(111) layers. This should be configurable, validated against the chosen cutoff, and documented with a warning if the requested slab is too thin.
 
@@ -206,7 +219,7 @@ Future explicit anchor mode should be designed as a replaceable strategy:
 - `anchor.mode = "nonbonded"` for MVP.
 - `anchor.mode = "bonded"` later for metal-sulfur bond, angle, and torsion parameters.
 - A future angle target, such as 23 degrees relative to the surface, should not require rewriting the builder API.
-- `anchor.site = "fcc_hollow"` or another configurable site label should control initial sulfur placement.
+- `anchor.site = "fcc_hollow"` should be the Pd(111) default, with other configurable site labels available later.
 
 Solvent and reactant composition should be converted from user-facing units:
 
@@ -214,6 +227,7 @@ Solvent and reactant composition should be converted from user-facing units:
 - Molarity for salts and reactants.
 - Counts derived from simulation box volume, with deterministic rounding and validation warnings.
 - OpenFF should parameterize solvent and reactant molecules where supported, and OpenFF/PACKMOL should place molecules according to target composition.
+- TIP3P should be the default water model.
 
 ### Orientation Analysis
 
@@ -230,6 +244,7 @@ An angle near 90 degrees means the selected reactant vector lies roughly paralle
 High-value unit tests for the first implementation:
 
 - YAML template loads into the Pydantic model.
+- YAML template defaults include `fcc_hollow`, TIP3P, `0.25 nm^2 / molecule`, and `10000 kJ mol^-1 nm^-2` Pd restraints.
 - Invalid metal, facet, grafting density, solvent fraction, or concentration fails clearly.
 - Mixed SAM fractions must sum to one, or explicit counts must match selected grafting sites.
 - INTERFACE Fcc metal registry reproduces the table above.
@@ -263,18 +278,17 @@ The docs should assume undergraduate contributors and make success states explic
 - The MVP slab should be centered and decorated on both faces to use PBC in `z` cleanly.
 - The slab should be thick enough that the two SAM/slab interfaces are separated by more than the nonbonded cutoff plus a buffer.
 - The lateral box dimensions should be user-tunable; the first demo can start near 5 x 5 nm.
-- The default sulfur site for Pd(111) should be three-fold hollow, but site type must be configurable.
-- The sulfur-metal interaction scaling factor must be user-configurable.
+- The default sulfur site for Pd(111) should be `fcc_hollow`, but site type must be configurable.
+- The sulfur-metal interaction scaling factor must be user-configurable and backend details should be hidden behind SAMMD's simulation interface.
+- TIP3P is the default water model.
+- The default Pd positional restraint force constant is `10000 kJ mol^-1 nm^-2`.
+- The default grafting density is `0.25 nm^2 / molecule`.
 - Solvent and reactant placement should use OpenFF/PACKMOL-style packing, with counts derived from target composition.
 - Reactant orientation analysis can begin with a configurable COM-to-selection vector relative to the surface normal.
 
 ## Remaining Open Questions
 
-- Should the first Pd(111) hollow-site default be `fcc_hollow` or `hcp_hollow`?
-- Should the 4x sulfur-metal interaction be implemented with an OpenMM custom nonbonded force, NBFIX-style pair-specific handling, or a SMIRNOFF-compatible parameter workaround?
-- Which OpenFF-supported water representation should be the default for mixed water/ethanol systems?
-- What default positional restraint force constant should be used for Pd atoms?
-- What default grafting density should the canonical propanethiol/Pd(111) notebook use?
+- None at the current scope-planning level. Backend implementation choices remain, but the user-facing behavior is now specified.
 
 ## Links
 
