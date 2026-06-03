@@ -12,6 +12,8 @@ def test_public_imports() -> None:
     assert build_system is not None
     assert load_config is not None
     assert load_config_dict is not None
+    assert "SolutionPlan" not in sammd.__all__
+    assert "plan_solution_composition" not in sammd.__all__
     assert "plan_pd111_slab" not in sammd.__all__
     assert "plan_sam_placements" not in sammd.__all__
 

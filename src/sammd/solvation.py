@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from math import floor, isfinite
 from typing import Any
 
-from sammd.config import SAMMDConfig
+from sammd.config import KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL, SAMMDConfig
 
 AVOGADRO_CONSTANT_MOL_INV = 6.02214076e23
 NM3_TO_L = 1.0e-24
@@ -26,7 +26,7 @@ KNOWN_SOLVENT_PROPERTIES: dict[str, dict[str, float]] = {
         "molar_mass_g_mol": DEFAULT_WATER_MOLAR_MASS_G_MOL,
     },
     "ethanol": {
-        "molar_mass_g_mol": 46.06844,
+        "molar_mass_g_mol": KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL["ethanol"],
     },
 }
 
@@ -155,8 +155,8 @@ def plan_solution_components(
     total_volume_fraction = sum(
         float(_get_required(component, "volume_fraction")) for component in solvent_components
     )
-    if total_volume_fraction > 1.0 + VOLUME_FRACTION_TOLERANCE:
-        msg = "solvent component volume fractions must not exceed 1.0"
+    if abs(total_volume_fraction - 1.0) > VOLUME_FRACTION_TOLERANCE:
+        msg = "solvent component volume fractions must sum to 1.0"
         raise ValueError(msg)
 
     warnings: list[str] = []

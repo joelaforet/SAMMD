@@ -15,6 +15,7 @@ Metal = Literal["Pd"]
 WaterModel = Literal["TIP3P"]
 EXPECTED_GRAFTING_DENSITY_UNIT = "nm^2 / molecule"
 EXPECTED_PD_RESTRAINT_UNIT = "kJ mol^-1 nm^-2"
+KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL = {"ethanol": 46.06844}
 
 
 class SAMMDBaseModel(BaseModel):
@@ -163,6 +164,7 @@ class SolventComponentConfig(SAMMDBaseModel):
     smiles: str | None = None
     volume_fraction: float = Field(gt=0, le=1)
     density_g_ml: float | None = Field(default=None, gt=0)
+    molar_mass_g_mol: float | None = Field(default=None, gt=0)
 
 
 class SolventConfig(SAMMDBaseModel):
@@ -186,6 +188,16 @@ class SolventConfig(SAMMDBaseModel):
         for component in self.components:
             if component.name.lower() != "water" and component.density_g_ml is None:
                 msg = f"co-solvent '{component.name}' must define density_g_ml"
+                raise ValueError(msg)
+            if (
+                component.name.lower() != "water"
+                and component.molar_mass_g_mol is None
+                and component.name.lower() not in KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL
+            ):
+                msg = (
+                    f"co-solvent '{component.name}' must define molar_mass_g_mol or use a "
+                    "supported built-in name"
+                )
                 raise ValueError(msg)
         return self
 

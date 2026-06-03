@@ -126,6 +126,26 @@ def test_cosolvent_density_validation() -> None:
     assert load_config_dict(data).solvent.components[1].density_g_ml == 0.789
 
 
+def test_unknown_cosolvent_requires_molar_mass() -> None:
+    """Require unknown volume-fraction co-solvents to define molar mass."""
+
+    data = _template_data()
+    data["solvent"]["components"] = [
+        {"name": "water", "volume_fraction": 0.5},
+        {
+            "name": "custom-solvent",
+            "smiles": "CO",
+            "volume_fraction": 0.5,
+            "density_g_ml": 0.79,
+        },
+    ]
+    with pytest.raises(ValidationError, match="must define molar_mass_g_mol"):
+        load_config_dict(data)
+
+    data["solvent"]["components"][1]["molar_mass_g_mol"] = 32.04
+    assert load_config_dict(data).solvent.components[1].molar_mass_g_mol == 32.04
+
+
 def test_slab_thickness_validation() -> None:
     """Require Pd(111) slab thickness to exceed cutoff plus buffer."""
 
