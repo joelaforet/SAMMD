@@ -16,7 +16,7 @@ WaterModel = Literal["TIP3P"]
 EXPECTED_GRAFTING_DENSITY_UNIT = "nm^2 / molecule"
 EXPECTED_PD_RESTRAINT_UNIT = "kJ mol^-1 nm^-2"
 KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL = {"ethanol": 46.06844}
-VOLUME_FRACTION_TOLERANCE = 1.0e-6
+MOLE_FRACTION_TOLERANCE = 1.0e-6
 
 
 class SAMMDBaseModel(BaseModel):
@@ -159,11 +159,11 @@ class SAMConfig(SAMMDBaseModel):
 
 
 class SolventComponentConfig(SAMMDBaseModel):
-    """Solvent component specified by volume fraction."""
+    """Solvent component specified by solvent-only mole fraction."""
 
     name: str = Field(min_length=1)
     smiles: str | None = None
-    volume_fraction: float = Field(gt=0, le=1)
+    mole_fraction: float = Field(gt=0, le=1)
     density_g_ml: float | None = Field(default=None, gt=0)
     molar_mass_g_mol: float | None = Field(default=None, gt=0)
 
@@ -174,17 +174,17 @@ class SolventConfig(SAMMDBaseModel):
     water_model: WaterModel = "TIP3P"
     padding_nm: float = Field(default=3.0, gt=0)
     components: list[SolventComponentConfig] = Field(
-        default_factory=lambda: [SolventComponentConfig(name="water", volume_fraction=1.0)],
+        default_factory=lambda: [SolventComponentConfig(name="water", mole_fraction=1.0)],
         min_length=1,
     )
 
     @model_validator(mode="after")
-    def _validate_volume_fractions(self) -> SolventConfig:
-        """Require solvent volume fractions to form one bulk phase."""
+    def _validate_mole_fractions(self) -> SolventConfig:
+        """Require solvent-only mole fractions to form one bulk phase."""
 
-        total = sum(component.volume_fraction for component in self.components)
-        if abs(total - 1.0) > VOLUME_FRACTION_TOLERANCE:
-            msg = "solvent component volume fractions must sum to 1.0"
+        total = sum(component.mole_fraction for component in self.components)
+        if abs(total - 1.0) > MOLE_FRACTION_TOLERANCE:
+            msg = "solvent component mole fractions must sum to 1.0"
             raise ValueError(msg)
         for component in self.components:
             if component.name.lower() != "water" and component.density_g_ml is None:
@@ -217,7 +217,7 @@ class ReactantConfig(SAMMDBaseModel):
 
     name: str = Field(min_length=1)
     smiles: str = Field(min_length=1)
-    concentration_molar: float = Field(gt=0)
+    concentration_millimolar: float = Field(gt=0)
 
 
 class OutputConfig(SAMMDBaseModel):
@@ -291,7 +291,7 @@ class SAMMDConfig(SAMMDBaseModel):
             ReactantConfig(
                 name="cinnamaldehyde",
                 smiles="C1=CC=C(C=C1)/C=C/C=O",
-                concentration_molar=0.05,
+                concentration_millimolar=50.0,
             )
         ]
     )
@@ -353,14 +353,14 @@ solvent:
   padding_nm: 3.0
   components:
     - name: water
-      volume_fraction: 1.0
+      mole_fraction: 1.0
 
 salts: []
 
 reactants:
   - name: cinnamaldehyde
     smiles: C1=CC=C(C=C1)/C=C/C=O
-    concentration_molar: 0.05
+    concentration_millimolar: 50.0
 
 output:
   topology: topology.cif

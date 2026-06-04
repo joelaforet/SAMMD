@@ -8,7 +8,7 @@ from typing import Any
 
 from sammd.config import (
     KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL,
-    VOLUME_FRACTION_TOLERANCE,
+    MOLE_FRACTION_TOLERANCE,
     SAMMDConfig,
 )
 
@@ -39,7 +39,7 @@ class SolventComponentSpec:
     """Simple solvent component input for composition planning."""
 
     name: str
-    volume_fraction: float
+    mole_fraction: float
     smiles: str | None = None
     density_g_ml: float | None = None
     molar_mass_g_mol: float | None = None
@@ -61,7 +61,7 @@ class ReactantSpec:
 
     name: str
     smiles: str
-    concentration_molar: float
+    concentration_millimolar: float
 
 
 @dataclass(frozen=True)
@@ -72,7 +72,8 @@ class PlannedMolecule:
     role: str
     count: int
     smiles: str | None = None
-    volume_fraction: float | None = None
+    mole_fraction: float | None = None
+    concentration_millimolar: float | None = None
     concentration_molar: float | None = None
     density_g_ml: float | None = None
     molar_mass_g_mol: float | None = None
@@ -156,20 +157,19 @@ def plan_solution_components(
     """Plan solution counts from a count-planning volume and component inputs."""
 
     _validate_count_planning_volume(box_volume_nm3)
-    total_volume_fraction = sum(
-        float(_get_required(component, "volume_fraction")) for component in solvent_components
+    total_mole_fraction = sum(
+        float(_get_required(component, "mole_fraction")) for component in solvent_components
     )
-    if abs(total_volume_fraction - 1.0) > VOLUME_FRACTION_TOLERANCE:
-        msg = "solvent component volume fractions must sum to 1.0"
+    if abs(total_mole_fraction - 1.0) > MOLE_FRACTION_TOLERANCE:
+        msg = "solvent component mole fractions must sum to 1.0"
         raise ValueError(msg)
 
     warnings: list[str] = []
-    planned_solvents = tuple(
-        _plan_solvent_component(component, box_volume_nm3, water_model)
-        for component in solvent_components
-    )
+    planned_solvents = _plan_solvent_components(solvent_components, box_volume_nm3, water_model)
     planned_salts = tuple(_plan_salt(salt, box_volume_nm3) for salt in salts)
-    planned_reactants = tuple(_plan_reactant(reactant, box_volume_nm3) for reactant in reactants)
+    planned_reactants = tuple(
+        _plan_reactant(reactant, box_volume_nm3, warnings) for reactant in reactants
+    )
 
     for component in (*planned_solvents, *planned_reactants):
         if component.count == 0:
@@ -193,15 +193,51 @@ def plan_solution_components(
     )
 
 
-def _plan_solvent_component(
-    component: Any, box_volume_nm3: float, water_model: str
-) -> PlannedMolecule:
-    """Plan one volume-fraction solvent component."""
+def _plan_solvent_components(
+    solvent_components: list[Any] | tuple[Any, ...], box_volume_nm3: float, water_model: str
+) -> tuple[PlannedMolecule, ...]:
+    """Plan solvent counts from solvent-only mole fractions.
+
+    The mixture volume is estimated as an ideal sum of pure-component molar volumes,
+    which lets experimental mole fractions produce finite molecule counts for a target
+    planning volume without requiring a mixture-density model.
+    """
+
+    prepared = tuple(
+        _prepare_solvent_component(component, water_model) for component in solvent_components
+    )
+    mixture_molar_volume_ml_mol = sum(
+        component["mole_fraction"] * component["molar_mass_g_mol"] / component["density_g_ml"]
+        for component in prepared
+    )
+    if mixture_molar_volume_ml_mol <= 0:
+        msg = "solvent mixture molar volume must be positive"
+        raise ValueError(msg)
+    total_solvent_moles = box_volume_nm3 * NM3_TO_L * L_TO_ML / mixture_molar_volume_ml_mol
+    total_expected_count = total_solvent_moles * AVOGADRO_CONSTANT_MOL_INV
+
+    return tuple(
+        PlannedMolecule(
+            name=str(component["name"]),
+            role="solvent",
+            count=round_half_up(total_expected_count * component["mole_fraction"]),
+            smiles=component["smiles"],
+            mole_fraction=component["mole_fraction"],
+            density_g_ml=component["density_g_ml"],
+            molar_mass_g_mol=component["molar_mass_g_mol"],
+            metadata=component["metadata"],
+        )
+        for component in prepared
+    )
+
+
+def _prepare_solvent_component(component: Any, water_model: str) -> dict[str, Any]:
+    """Resolve and validate one solvent component before mixture count planning."""
 
     name = str(_get_required(component, "name"))
-    volume_fraction = float(_get_required(component, "volume_fraction"))
-    if volume_fraction < 0:
-        msg = f"solvent component '{name}' volume_fraction must be non-negative"
+    mole_fraction = float(_get_required(component, "mole_fraction"))
+    if mole_fraction < 0:
+        msg = f"solvent component '{name}' mole_fraction must be non-negative"
         raise ValueError(msg)
     density_g_ml = _resolve_float(component, "density_g_ml", name, "density_g_ml")
     molar_mass_g_mol = _resolve_float(component, "molar_mass_g_mol", name, "molar_mass_g_mol")
@@ -210,7 +246,7 @@ def _plan_solvent_component(
         density_g_ml = density_g_ml or DEFAULT_WATER_DENSITY_G_ML
         molar_mass_g_mol = molar_mass_g_mol or DEFAULT_WATER_MOLAR_MASS_G_MOL
     if density_g_ml is None:
-        msg = f"solvent component '{name}' requires density_g_ml for volume-fraction planning"
+        msg = f"solvent component '{name}' requires density_g_ml for mole-fraction planning"
         raise ValueError(msg)
     if molar_mass_g_mol is None:
         msg = f"solvent component '{name}' requires molar_mass_g_mol for count planning"
@@ -219,21 +255,16 @@ def _plan_solvent_component(
         msg = f"solvent component '{name}' density and molar mass must be positive"
         raise ValueError(msg)
 
-    component_volume_l = box_volume_nm3 * NM3_TO_L * volume_fraction
-    moles = density_g_ml * component_volume_l * L_TO_ML / molar_mass_g_mol
-    count = round_half_up(moles * AVOGADRO_CONSTANT_MOL_INV)
     smiles = _get_optional(component, "smiles")
     metadata = {"water_model": water_model} if is_water else {}
-    return PlannedMolecule(
-        name=name,
-        role="solvent",
-        count=count,
-        smiles=smiles,
-        volume_fraction=volume_fraction,
-        density_g_ml=density_g_ml,
-        molar_mass_g_mol=molar_mass_g_mol,
-        metadata=metadata,
-    )
+    return {
+        "name": name,
+        "smiles": smiles,
+        "mole_fraction": mole_fraction,
+        "density_g_ml": density_g_ml,
+        "molar_mass_g_mol": molar_mass_g_mol,
+        "metadata": metadata,
+    }
 
 
 def _plan_salt(salt: Any, box_volume_nm3: float) -> PlannedSalt:
@@ -258,23 +289,41 @@ def _plan_salt(salt: Any, box_volume_nm3: float) -> PlannedSalt:
     )
 
 
-def _plan_reactant(reactant: Any, box_volume_nm3: float) -> PlannedMolecule:
+def _plan_reactant(
+    reactant: Any, box_volume_nm3: float, warnings: list[str]
+) -> PlannedMolecule:
     """Plan one molarity-based reactant count."""
 
     name = str(_get_required(reactant, "name"))
-    concentration_molar = float(_get_required(reactant, "concentration_molar"))
-    if concentration_molar < 0:
-        msg = f"reactant '{name}' concentration_molar must be non-negative"
+    concentration_millimolar = float(_get_required(reactant, "concentration_millimolar"))
+    if concentration_millimolar < 0:
+        msg = f"reactant '{name}' concentration_millimolar must be non-negative"
         raise ValueError(msg)
-    count = round_half_up(
-        concentration_molar * box_volume_nm3 * NM3_TO_L * AVOGADRO_CONSTANT_MOL_INV
+    concentration_molar = concentration_millimolar / 1000.0
+    expected_count = concentration_molar * box_volume_nm3 * NM3_TO_L * AVOGADRO_CONSTANT_MOL_INV
+    count = round_half_up(expected_count)
+    if concentration_millimolar > 0 and count == 0:
+        count = 1
+    if concentration_millimolar > 0 and count == 1:
+        warnings.append(
+            f"SAMMD will only place 1 molecule of reactant '{name}' in this box; "
+            f"requested concentration {concentration_millimolar:g} mM. "
+            "Consider increasing the slab size."
+        )
+    realized_concentration_millimolar = (
+        count / (box_volume_nm3 * NM3_TO_L * AVOGADRO_CONSTANT_MOL_INV) * 1000.0
     )
     return PlannedMolecule(
         name=name,
         role="reactant",
         count=count,
         smiles=str(_get_required(reactant, "smiles")),
+        concentration_millimolar=concentration_millimolar,
         concentration_molar=concentration_molar,
+        metadata={
+            "expected_count": expected_count,
+            "realized_concentration_millimolar": realized_concentration_millimolar,
+        },
     )
 
 

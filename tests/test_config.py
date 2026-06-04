@@ -112,12 +112,12 @@ def test_unknown_nested_keys_are_forbidden() -> None:
 
 
 def test_cosolvent_density_validation() -> None:
-    """Require density for volume-fraction co-solvents."""
+    """Require density for mole-fraction co-solvents."""
 
     data = _template_data()
     data["solvent"]["components"] = [
-        {"name": "water", "volume_fraction": 0.5},
-        {"name": "ethanol", "smiles": "CCO", "volume_fraction": 0.5},
+        {"name": "water", "mole_fraction": 0.5},
+        {"name": "ethanol", "smiles": "CCO", "mole_fraction": 0.5},
     ]
     with pytest.raises(ValidationError, match="co-solvent 'ethanol' must define density_g_ml"):
         load_config_dict(data)
@@ -127,15 +127,15 @@ def test_cosolvent_density_validation() -> None:
 
 
 def test_unknown_cosolvent_requires_molar_mass() -> None:
-    """Require unknown volume-fraction co-solvents to define molar mass."""
+    """Require unknown mole-fraction co-solvents to define molar mass."""
 
     data = _template_data()
     data["solvent"]["components"] = [
-        {"name": "water", "volume_fraction": 0.5},
+        {"name": "water", "mole_fraction": 0.5},
         {
             "name": "custom-solvent",
             "smiles": "CO",
-            "volume_fraction": 0.5,
+            "mole_fraction": 0.5,
             "density_g_ml": 0.79,
         },
     ]
@@ -185,8 +185,8 @@ def test_expected_unit_validation() -> None:
         (("surface", "metal"), "Fe", "Input should be 'Pd'"),
         (("sam", "anchor", "site"), "unknown", "Input should be"),
         (("sam", "grafting_density", "value"), -0.1, "greater than 0"),
-        (("solvent", "components", 0, "volume_fraction"), 0.0, "greater than 0"),
-        (("reactants", 0, "concentration_molar"), -1.0, "greater than 0"),
+        (("solvent", "components", 0, "mole_fraction"), 0.0, "greater than 0"),
+        (("reactants", 0, "concentration_millimolar"), -1.0, "greater than 0"),
         (("reporters", "fields"), ["step", "bad_field"], "unsupported reporter fields"),
     ],
 )

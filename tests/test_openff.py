@@ -133,7 +133,7 @@ def test_molecules_from_config_reports_solvent_without_smiles(
         {
             "solvent": {
                 "components": [
-                    {"name": "ethanol", "volume_fraction": 1.0, "density_g_ml": 0.789}
+                    {"name": "ethanol", "mole_fraction": 1.0, "density_g_ml": 0.789}
                 ]
             }
         }

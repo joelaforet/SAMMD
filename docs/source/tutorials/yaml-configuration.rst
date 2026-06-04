@@ -31,12 +31,14 @@ Important sections
 
 ``solvent``
    Defines water model, padding used for approximate count planning, and solvent
-   volume fractions. Water defaults to TIP3P-like density metadata. Co-solvents
-   need density and molar mass unless a supported built-in value exists.
+   mole fractions normalized over solvent components only. Water defaults to
+   TIP3P-like density metadata. Co-solvents need density and molar mass unless a
+   supported built-in value exists.
 
 ``salts`` and ``reactants``
-   Define molar concentrations. The MVP converts concentrations into molecule or
-   ion counts using an approximate planning volume, not a final packed box.
+   Define ion molarity and reactant millimolar concentrations. The MVP converts
+   concentrations into molecule or ion counts using an approximate planning
+   volume, not a final packed box.
 
 ``output``
    Names future ``topology.cif``, ``trajectory.dcd``, and

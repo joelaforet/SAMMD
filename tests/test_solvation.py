@@ -43,38 +43,33 @@ def test_water_only_default_gives_positive_count() -> None:
     assert plan.solvent_components[0].metadata["water_model"] == "TIP3P"
 
 
-def test_water_ethanol_volume_fraction_counts() -> None:
-    """Plan both water and ethanol counts for a 50/50 liquid mixture."""
+def test_water_ethanol_mole_fraction_counts() -> None:
+    """Plan both water and ethanol counts for a 50/50 solvent mole-fraction mixture."""
 
     box_volume_nm3 = 125.0
-    water_fraction = 0.5
-    ethanol_fraction = 0.5
-    water_expected = round_half_up(
-        0.997
-        * box_volume_nm3
-        * water_fraction
+    water_mole_fraction = 0.5
+    ethanol_mole_fraction = 0.5
+    mixture_molar_volume_ml_mol = (
+        water_mole_fraction * 18.01528 / 0.997
+        + ethanol_mole_fraction * 46.06844 / 0.789
+    )
+    total_expected = (
+        box_volume_nm3
         * NM3_TO_L
         * L_TO_ML
-        / 18.01528
+        / mixture_molar_volume_ml_mol
         * AVOGADRO_CONSTANT_MOL_INV
     )
-    ethanol_expected = round_half_up(
-        0.789
-        * box_volume_nm3
-        * ethanol_fraction
-        * NM3_TO_L
-        * L_TO_ML
-        / 46.06844
-        * AVOGADRO_CONSTANT_MOL_INV
-    )
+    water_expected = round_half_up(total_expected * water_mole_fraction)
+    ethanol_expected = round_half_up(total_expected * ethanol_mole_fraction)
     config = SAMMDConfig(
         solvent=SolventConfig(
             components=[
-                SolventComponentConfig(name="water", volume_fraction=water_fraction),
+                SolventComponentConfig(name="water", mole_fraction=water_mole_fraction),
                 SolventComponentConfig(
                     name="ethanol",
                     smiles="CCO",
-                    volume_fraction=ethanol_fraction,
+                    mole_fraction=ethanol_mole_fraction,
                     density_g_ml=0.789,
                 ),
             ]
@@ -86,16 +81,16 @@ def test_water_ethanol_volume_fraction_counts() -> None:
 
     assert counts["water"] == water_expected
     assert counts["ethanol"] == ethanol_expected
-    assert sum(component.volume_fraction or 0.0 for component in plan.solvent_components) == 1.0
+    assert sum(component.mole_fraction or 0.0 for component in plan.solvent_components) == 1.0
 
 
 def test_missing_cosolvent_density_fails_clearly() -> None:
-    """Reject schema-bypassed volume-fraction co-solvents without density."""
+    """Reject schema-bypassed mole-fraction co-solvents without density."""
 
     with pytest.raises(ValueError, match="requires density_g_ml"):
         plan_solution_components(
             box_volume_nm3=125.0,
-            solvent_components=[SolventComponentSpec(name="methanol", volume_fraction=1.0)],
+            solvent_components=[SolventComponentSpec(name="methanol", mole_fraction=1.0)],
         )
 
 
@@ -121,15 +116,20 @@ def test_cinnamaldehyde_default_count_is_deterministic() -> None:
     """Plan the default cinnamaldehyde reactant with deterministic rounding."""
 
     box_volume_nm3 = 125.0
-    concentration_molar = 0.05
+    concentration_millimolar = 50.0
     expected_count = round_half_up(
-        concentration_molar * box_volume_nm3 * NM3_TO_L * AVOGADRO_CONSTANT_MOL_INV
+        concentration_millimolar
+        / 1000.0
+        * box_volume_nm3
+        * NM3_TO_L
+        * AVOGADRO_CONSTANT_MOL_INV
     )
 
     plan = plan_solution_composition(SAMMDConfig(), box_volume_nm3=box_volume_nm3)
 
     assert plan.reactants[0].name == "cinnamaldehyde"
     assert plan.reactants[0].count == expected_count
+    assert plan.reactants[0].concentration_millimolar == concentration_millimolar
 
 
 @pytest.mark.parametrize(
@@ -151,9 +151,9 @@ def test_zero_concentration_can_produce_zero_count() -> None:
 
     plan = plan_solution_components(
         box_volume_nm3=1.0,
-        solvent_components=[SolventComponentSpec(name="water", volume_fraction=1.0)],
+        solvent_components=[SolventComponentSpec(name="water", mole_fraction=1.0)],
         salts=[SaltSpec(concentration_molar=0.0)],
-        reactants=[ReactantSpec(name="trace", smiles="C", concentration_molar=0.0)],
+        reactants=[ReactantSpec(name="trace", smiles="C", concentration_millimolar=0.0)],
     )
 
     assert plan.salts[0].cation_count == 0
@@ -166,30 +166,38 @@ def test_generic_reactant_formula_count() -> None:
     """Plan an exact generic reactant count for a known box and molarity."""
 
     box_volume_nm3 = 250.0
-    concentration_molar = 0.2
+    concentration_millimolar = 200.0
     expected_count = round_half_up(
-        concentration_molar * box_volume_nm3 * NM3_TO_L * AVOGADRO_CONSTANT_MOL_INV
+        concentration_millimolar
+        / 1000.0
+        * box_volume_nm3
+        * NM3_TO_L
+        * AVOGADRO_CONSTANT_MOL_INV
     )
 
     plan = plan_solution_components(
         box_volume_nm3=box_volume_nm3,
-        solvent_components=[SolventComponentSpec(name="water", volume_fraction=1.0)],
+        solvent_components=[SolventComponentSpec(name="water", mole_fraction=1.0)],
         reactants=[
-            ReactantSpec(name="generic", smiles="C", concentration_molar=concentration_molar)
+            ReactantSpec(
+                name="generic",
+                smiles="C",
+                concentration_millimolar=concentration_millimolar,
+            )
         ],
     )
 
     assert plan.reactants[0].count == expected_count
 
 
-def test_volume_fraction_tolerance_matches_config_schema() -> None:
-    """Accept the same near-one volume-fraction total in config and raw planner."""
+def test_mole_fraction_tolerance_matches_config_schema() -> None:
+    """Accept the same near-one mole-fraction total in config and raw planner."""
 
     components = [
-        SolventComponentConfig(name="water", volume_fraction=0.5),
+        SolventComponentConfig(name="water", mole_fraction=0.5),
         SolventComponentConfig(
             name="ethanol",
-            volume_fraction=0.4999995,
+            mole_fraction=0.4999995,
             density_g_ml=0.789,
         ),
     ]
@@ -202,7 +210,7 @@ def test_volume_fraction_tolerance_matches_config_schema() -> None:
         reactants=config.reactants,
     )
 
-    assert sum(component.volume_fraction or 0.0 for component in plan.solvent_components) < 1.0
+    assert sum(component.mole_fraction or 0.0 for component in plan.solvent_components) < 1.0
     assert raw_plan.molecule_counts == plan.molecule_counts
 
 
@@ -217,24 +225,39 @@ def test_invalid_box_volume_fails(box_volume_nm3: float) -> None:
 @pytest.mark.parametrize(
     "components",
     [
-        [SolventComponentSpec(name="water", volume_fraction=0.75)],
+        [SolventComponentSpec(name="water", mole_fraction=0.75)],
         [
-            SolventComponentSpec(name="water", volume_fraction=0.75),
+            SolventComponentSpec(name="water", mole_fraction=0.75),
             SolventComponentSpec(
                 name="ethanol",
-                volume_fraction=0.5,
+                mole_fraction=0.5,
                 density_g_ml=0.789,
             ),
         ],
     ],
 )
-def test_raw_volume_fractions_must_sum_to_one(
+def test_raw_mole_fractions_must_sum_to_one(
     components: list[SolventComponentSpec],
 ) -> None:
-    """Reject schema-bypassed solvent volume fraction totals not equal to one."""
+    """Reject schema-bypassed solvent mole fraction totals not equal to one."""
 
-    with pytest.raises(ValueError, match=r"volume fractions must sum to 1\.0"):
+    with pytest.raises(ValueError, match=r"mole fractions must sum to 1\.0"):
         plan_solution_components(
             box_volume_nm3=125.0,
             solvent_components=components,
         )
+
+
+def test_nonzero_reactant_concentration_places_one_molecule_and_warns() -> None:
+    """Keep finite-size reactant boxes nonempty and warn when only one is placed."""
+
+    plan = plan_solution_components(
+        box_volume_nm3=1.0,
+        solvent_components=[SolventComponentSpec(name="water", mole_fraction=1.0)],
+        reactants=[ReactantSpec(name="trace", smiles="C", concentration_millimolar=1.0)],
+    )
+
+    assert plan.reactants[0].count == 1
+    assert plan.reactants[0].metadata["expected_count"] < 1.0
+    assert plan.reactants[0].metadata["realized_concentration_millimolar"] > 1.0
+    assert "SAMMD will only place 1 molecule" in plan.warnings[0]

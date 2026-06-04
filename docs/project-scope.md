@@ -124,8 +124,8 @@ SAMMD should own its Pd(111) builder rather than depend on surface_coatings dire
 
 Reusable ideas:
 
-- Compute molecule counts from box volume, target density, volume fractions, and molar concentrations.
-- Require density for volume-fraction co-solvents.
+- Compute molecule counts from box volume, solvent-only mole fractions, pure-component density/molar-volume metadata, and reactant concentrations.
+- Require density for mole-fraction co-solvents.
 - Add salts by concentration and optionally neutralize total system charge.
 - Cache or reuse pre-parameterized solvent molecules so each copy has identical charges and parameters.
 - Pack molecules with PACKMOL through the OpenFF ecosystem, rather than writing custom placement code.
@@ -148,7 +148,7 @@ Initial package modules:
 - `sammd.surfaces`: Fcc slab builders, initially Pd(111), with lattice constants and facet metadata.
 - `sammd.sam`: RDKit/OpenFF molecule creation, conformer generation, sulfur anchor detection, single- and mixed-component monolayer placement.
 - `sammd.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
-- `sammd.solvation`: solvent mixture, salt, and reactant count calculations from volume fractions and concentrations, followed by OpenFF/PACKMOL packing.
+- `sammd.solvation`: solvent mixture, salt, and reactant count calculations from solvent-only mole fractions and concentrations, followed by OpenFF/PACKMOL packing.
 - `sammd.builders`: high-level builder. Current MVP code returns a lightweight deterministic build plan; future backend integration should add full OpenFF `Interchange` construction.
 - `sammd.simulation`: thin, user-facing OpenMM setup and run helpers for the canonical notebook, not a large production run manager in the MVP.
 - `sammd.io`: mmCIF/PDBx topology writing, DCD trajectory naming conventions, and visualization-oriented metadata helpers.
