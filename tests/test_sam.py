@@ -1,5 +1,7 @@
 """Tests for lightweight SAM placement planning."""
 
+from math import dist
+
 import pytest
 
 from sammd.config import AnchorConfig, SAMComponentConfig, SAMConfig
@@ -59,6 +61,28 @@ def test_fraction_mode_assignment_sums_exactly_and_is_seeded() -> None:
         assert side_names.count("a") == 1
         assert side_names.count("b") == 3
         assert len(side_names) == 4
+
+
+def test_site_selection_avoids_nearest_neighbor_clustering() -> None:
+    """Dense smoke systems should not place SAM anchors on adjacent hollow sites."""
+
+    slab = plan_pd111_slab((2.0, 2.0), 5)
+    lateral_area_nm2 = slab.lateral_size_nm[0] * slab.lateral_size_nm[1]
+    plan = plan_sam_placements(
+        SAMConfig(), generate_binding_sites(slab), lateral_area_nm2=lateral_area_nm2, seed=2026
+    )
+
+    for side in ("bottom", "top"):
+        positions = [
+            placement.position_nm for placement in plan.placements if placement.side == side
+        ]
+        min_distance = min(
+            dist(left, right)
+            for index, left in enumerate(positions)
+            for right in positions[index + 1 :]
+        )
+
+        assert min_distance > 0.45
 
 
 def test_count_mode_assignment_validates_total_counts() -> None:

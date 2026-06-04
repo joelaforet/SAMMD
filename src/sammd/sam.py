@@ -104,11 +104,7 @@ def plan_sam_placements(
             )
             raise ValueError(msg)
 
-        shuffled_sites = list(side_sites)
-        rng.shuffle(shuffled_sites)
-        selected_sites = sorted(
-            shuffled_sites[:selected_sites_per_side], key=lambda site: site.position_nm
-        )
+        selected_sites = _select_spaced_sites(side_sites, selected_sites_per_side, rng)
         components = _components_for_selected_sites(sam_config, selected_sites_per_side, rng)
         for site, component in zip(selected_sites, components, strict=True):
             anchor = component.anchor or sam_config.anchor
@@ -154,6 +150,38 @@ def _components_for_selected_sites(
         components.extend([component] * count)
     rng.shuffle(components)
     return tuple(components)
+
+
+def _select_spaced_sites(
+    sites: list[BindingSite],
+    selected_sites: int,
+    rng: Random,
+) -> list[BindingSite]:
+    """Select sites by farthest-point sampling to avoid local SAM clustering."""
+
+    shuffled_sites = list(sites)
+    rng.shuffle(shuffled_sites)
+    chosen = [shuffled_sites[0]]
+    remaining = shuffled_sites[1:]
+    while len(chosen) < selected_sites:
+        next_site = max(
+            remaining,
+            key=lambda site: min(
+                _distance_squared(site.position_nm, other.position_nm) for other in chosen
+            ),
+        )
+        chosen.append(next_site)
+        remaining.remove(next_site)
+    return sorted(chosen, key=lambda site: site.position_nm)
+
+
+def _distance_squared(left: Vector3, right: Vector3) -> float:
+    """Return squared Euclidean distance between two 3D points."""
+
+    return sum(
+        (left_value - right_value) ** 2
+        for left_value, right_value in zip(left, right, strict=True)
+    )
 
 
 def _fraction_counts(
