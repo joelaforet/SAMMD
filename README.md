@@ -36,11 +36,23 @@ perform full system construction.
 
 Optional OpenMM runtime helpers live in `sammd.openmm_runtime`. They lazily
 create Langevin integrators, create/configure a new OpenMM `Simulation` from
-existing topology, system, positions, and reporter settings, add default Pd
-positional restraints, and apply a pair-specific sulfur-metal LJ scaling proxy.
+existing topology, system, positions, and reporter settings, and apply a
+pair-specific sulfur-metal LJ scaling proxy.
 Users must still supply existing OpenMM topology, system, and positions from
 future construction code or their own backend workflow; SAMMD does not yet
 construct complete OpenMM systems.
+
+A development smoke runner is available at `tools/openmm_smoke.py` for testing
+the science environment against a compact real Pd(111)/propanethiolate/
+cinnamaldehyde/ethanol OpenMM system. It is not part of the public package API and
+uses pragmatic direct OpenMM construction for stability testing while full
+backend construction remains a future milestone. Ethanol placement is generated
+by PACKMOL while holding the prebuilt Pd+SAM+cinnamaldehyde coordinates fixed for
+packing only; the OpenMM smoke run uses mobile, unrestrained Pd atoms. Topology
+output uses a PolyzyMD-style repeat-unit residue convention: chain A is the Pd
+slab, chain B contains one propanethiolate residue per SAM molecule, chain C
+contains cinnamaldehyde, and chain D+ contains one ethanol residue per molecule
+with wrapping every 9999 residues.
 
 `build_system()` currently returns a lightweight plan rather than OpenFF/OpenMM
 objects. The plan contains the validated config, a centered double-sided
@@ -94,6 +106,21 @@ With pixi, the same checks are available as:
 ```bash
 pixi run test
 pixi run lint
+```
+
+The optional science environment includes OpenMM, OpenFF, RDKit, mBuild,
+PACKMOL, and `ipykernel`. To run the real-system smoke test from that
+environment:
+
+```bash
+pixi install -e science
+pixi run -e science real-system-smoke
+```
+
+To register the same environment as a Jupyter kernel:
+
+```bash
+pixi run -e science install-science-kernel
 ```
 
 The docs/notebook smoke coverage is included in pytest. To force a Sphinx docs

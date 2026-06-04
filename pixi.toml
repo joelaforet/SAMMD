@@ -23,12 +23,15 @@ sphinx = ">=8"
 myst-parser = ">=4"
 
 [feature.science.dependencies]
+# Keep OpenMM's NVRTC/PTX target no newer than the local NVIDIA driver-supported CUDA line.
+cuda-version = "13.0.*"
 openmm = "*"
 rdkit = "*"
 mbuild = "*"
 openff-toolkit = "*"
 openff-interchange = "*"
 packmol = "*"
+ipykernel = "*"
 
 [environments]
 default = ["dev"]
@@ -38,4 +41,6 @@ science = ["dev", "science"]
 
 [tasks]
 test = "python -m pytest --cov=sammd --cov-report=term-missing"
-lint = "ruff check src/sammd tests"
+lint = "ruff check src/sammd tests tools"
+real-system-smoke = "python tools/openmm_smoke.py --output-dir outputs/openmm_smoke/pd111_propanethiol_cinnamaldehyde --overwrite"
+install-science-kernel = "python -m ipykernel install --user --name sammd-science --display-name 'Python (SAMMD science)'"
