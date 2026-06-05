@@ -23,6 +23,19 @@ import yaml
 from sammd.builders import build_system
 from sammd.config import SAMMDConfig, load_config
 from sammd.forcefields import get_fcc_metal_parameters
+from sammd.geometry import (
+    Vector3,
+    add_vectors,
+    centroid,
+    distance,
+    indexed_displacements,
+    indexed_reference_displacements,
+    matvec,
+    rotate_about_axis,
+    rotation_matrix,
+    scale_vector,
+    subtract_vectors,
+)
 from sammd.io import safe_write_text
 from sammd.openmm_runtime import AnchorScalingMetadata, create_langevin_integrator
 
@@ -55,9 +68,6 @@ CHAIN_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 PASS_MAX_TEMPERATURE_K = 600.0
 PASS_MAX_PD_DISPLACEMENT_NM = 0.15
 PASS_MAX_SULFUR_DISPLACEMENT_NM = 0.70
-
-Vector3 = tuple[float, float, float]
-
 
 @dataclass(frozen=True)
 class BondParameter:
@@ -1813,20 +1823,6 @@ def orient_template_by_anchor(
     )
 
 
-def rotate_about_axis(vector: Vector3, axis: Vector3, angle_rad: float) -> Vector3:
-    """Rotate a vector around an arbitrary axis through the origin."""
-
-    unit_axis = normalize(axis)
-    cosine = math.cos(angle_rad)
-    sine = math.sin(angle_rad)
-    parallel = scale_vector(unit_axis, dot_product(unit_axis, vector) * (1.0 - cosine))
-    cross = cross_product(unit_axis, vector)
-    return add_vectors(
-        add_vectors(scale_vector(vector, cosine), scale_vector(cross, sine)),
-        parallel,
-    )
-
-
 def center_template(template: MoleculeTemplate, center_nm: Vector3) -> tuple[Vector3, ...]:
     """Translate a template so its coordinate centroid is at ``center_nm``."""
 
@@ -1834,55 +1830,6 @@ def center_template(template: MoleculeTemplate, center_nm: Vector3) -> tuple[Vec
     return tuple(
         add_vectors(center_nm, subtract_vectors(position, current_center))
         for position in template.positions_nm
-    )
-
-
-def rotation_matrix(source: Vector3, target: Vector3) -> tuple[Vector3, Vector3, Vector3]:
-    """Return a 3x3 matrix rotating ``source`` onto ``target``."""
-
-    source_unit = normalize(source)
-    target_unit = normalize(target)
-    cross = cross_product(source_unit, target_unit)
-    dot = max(-1.0, min(1.0, dot_product(source_unit, target_unit)))
-    sine = norm(cross)
-    if sine < 1.0e-12:
-        if dot > 0.0:
-            return ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
-        axis_candidate = cross_product(source_unit, (1.0, 0.0, 0.0))
-        if norm(axis_candidate) < 1.0e-12:
-            axis_candidate = cross_product(source_unit, (0.0, 1.0, 0.0))
-        axis = normalize(axis_candidate)
-        return axis_angle_matrix(axis, math.pi)
-    k_matrix = skew_matrix(cross)
-    k_squared = matrix_multiply(k_matrix, k_matrix)
-    scale = (1.0 - dot) / (sine * sine)
-    identity = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
-    return matrix_add(matrix_add(identity, k_matrix), matrix_scale(k_squared, scale))
-
-
-def axis_angle_matrix(axis: Vector3, angle_rad: float) -> tuple[Vector3, Vector3, Vector3]:
-    """Return a 3x3 rotation matrix for an axis-angle rotation."""
-
-    x, y, z = axis
-    cosine = math.cos(angle_rad)
-    sine = math.sin(angle_rad)
-    one_minus_cosine = 1.0 - cosine
-    return (
-        (
-            cosine + x * x * one_minus_cosine,
-            x * y * one_minus_cosine - z * sine,
-            x * z * one_minus_cosine + y * sine,
-        ),
-        (
-            y * x * one_minus_cosine + z * sine,
-            cosine + y * y * one_minus_cosine,
-            y * z * one_minus_cosine - x * sine,
-        ),
-        (
-            z * x * one_minus_cosine - y * sine,
-            z * y * one_minus_cosine + x * sine,
-            cosine + z * z * one_minus_cosine,
-        ),
     )
 
 
@@ -1984,31 +1931,6 @@ def positions_to_nm(modules: Any, positions: Any) -> tuple[Vector3, ...]:
 
     unit = modules.unit
     return tuple(tuple(vector) for vector in positions.value_in_unit(unit.nanometer))
-
-
-def indexed_displacements(
-    final_positions_nm: tuple[Vector3, ...],
-    reference_positions_nm: tuple[Vector3, ...],
-    indices: tuple[int, ...],
-) -> tuple[float, ...]:
-    """Return displacement magnitudes for atom indices against same-index references."""
-
-    return tuple(
-        distance(final_positions_nm[index], reference_positions_nm[index]) for index in indices
-    )
-
-
-def indexed_reference_displacements(
-    final_positions_nm: tuple[Vector3, ...],
-    indices: tuple[int, ...],
-    reference_positions_nm: tuple[Vector3, ...],
-) -> tuple[float, ...]:
-    """Return displacement magnitudes against a compact reference list."""
-
-    return tuple(
-        distance(final_positions_nm[index], reference)
-        for index, reference in zip(indices, reference_positions_nm, strict=True)
-    )
 
 
 def smoke_summary(
@@ -2237,125 +2159,6 @@ def clamp_to_box(position: Vector3, box_dimensions_nm: Vector3) -> Vector3:
         max(margin, min(length - margin, coordinate))
         for coordinate, length in zip(position, box_dimensions_nm, strict=True)
     )
-
-
-def add_vectors(left: Vector3, right: Vector3) -> Vector3:
-    """Add two vectors."""
-
-    return (left[0] + right[0], left[1] + right[1], left[2] + right[2])
-
-
-def subtract_vectors(left: Vector3, right: Vector3) -> Vector3:
-    """Subtract two vectors."""
-
-    return (left[0] - right[0], left[1] - right[1], left[2] - right[2])
-
-
-def scale_vector(vector: Vector3, scale: float) -> Vector3:
-    """Scale a vector."""
-
-    return (vector[0] * scale, vector[1] * scale, vector[2] * scale)
-
-
-def distance(left: Vector3, right: Vector3) -> float:
-    """Return Euclidean distance between vectors."""
-
-    return norm(subtract_vectors(left, right))
-
-
-def norm(vector: Vector3) -> float:
-    """Return Euclidean norm."""
-
-    return math.sqrt(dot_product(vector, vector))
-
-
-def normalize(vector: Vector3) -> Vector3:
-    """Return a unit vector."""
-
-    vector_norm = norm(vector)
-    if vector_norm < 1.0e-15:
-        raise ValueError("cannot normalize a zero vector")
-    return (vector[0] / vector_norm, vector[1] / vector_norm, vector[2] / vector_norm)
-
-
-def dot_product(left: Vector3, right: Vector3) -> float:
-    """Return vector dot product."""
-
-    return left[0] * right[0] + left[1] * right[1] + left[2] * right[2]
-
-
-def cross_product(left: Vector3, right: Vector3) -> Vector3:
-    """Return vector cross product."""
-
-    return (
-        left[1] * right[2] - left[2] * right[1],
-        left[2] * right[0] - left[0] * right[2],
-        left[0] * right[1] - left[1] * right[0],
-    )
-
-
-def centroid(positions: tuple[Vector3, ...]) -> Vector3:
-    """Return coordinate centroid."""
-
-    count = len(positions)
-    return (
-        sum(position[0] for position in positions) / count,
-        sum(position[1] for position in positions) / count,
-        sum(position[2] for position in positions) / count,
-    )
-
-
-def matvec(matrix: tuple[Vector3, Vector3, Vector3], vector: Vector3) -> Vector3:
-    """Multiply a 3x3 matrix by a vector."""
-
-    return tuple(dot_product(row, vector) for row in matrix)  # type: ignore[return-value]
-
-
-def skew_matrix(vector: Vector3) -> tuple[Vector3, Vector3, Vector3]:
-    """Return skew-symmetric matrix for a vector."""
-
-    x, y, z = vector
-    return ((0.0, -z, y), (z, 0.0, -x), (-y, x, 0.0))
-
-
-def matrix_multiply(
-    left: tuple[Vector3, Vector3, Vector3],
-    right: tuple[Vector3, Vector3, Vector3],
-) -> tuple[Vector3, Vector3, Vector3]:
-    """Multiply two 3x3 matrices."""
-
-    columns = tuple((right[0][i], right[1][i], right[2][i]) for i in range(3))
-    return tuple(tuple(dot_product(row, column) for column in columns) for row in left)  # type: ignore[return-value]
-
-
-def matrix_add(
-    left: tuple[Vector3, Vector3, Vector3],
-    right: tuple[Vector3, Vector3, Vector3],
-) -> tuple[Vector3, Vector3, Vector3]:
-    """Add two 3x3 matrices."""
-
-    return tuple(
-        tuple(left[row][column] + right[row][column] for column in range(3))
-        for row in range(3)
-    )  # type: ignore[return-value]
-
-
-def matrix_scale(
-    matrix: tuple[Vector3, Vector3, Vector3],
-    scale: float,
-) -> tuple[Vector3, Vector3, Vector3]:
-    """Scale a 3x3 matrix."""
-
-    return tuple(tuple(value * scale for value in row) for row in matrix)  # type: ignore[return-value]
-
-
-def angle_between_points(first: Vector3, center: Vector3, third: Vector3) -> float:
-    """Return i-j-k angle in radians."""
-
-    left = normalize(subtract_vectors(first, center))
-    right = normalize(subtract_vectors(third, center))
-    cosine = max(-1.0, min(1.0, dot_product(left, right)))
-    return math.acos(cosine)
 
 
 if __name__ == "__main__":

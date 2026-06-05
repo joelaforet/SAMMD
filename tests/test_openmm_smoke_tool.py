@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib.util
-import math
 import sys
 from argparse import Namespace
 from pathlib import Path
@@ -65,19 +64,6 @@ def test_auto_solvent_count_uses_sammd_solution_plan() -> None:
     expected = plan.solution.solvent_components[0].count
 
     assert count == expected
-
-
-def test_rotation_matrix_maps_source_vector_to_target_vector() -> None:
-    """SAM orientation helper should rotate the anchor bond onto the surface normal."""
-
-    smoke = load_smoke_tool()
-    matrix = smoke.rotation_matrix((1.0, 0.0, 0.0), (0.0, 0.0, -1.0))
-    rotated = smoke.matvec(matrix, (1.0, 0.0, 0.0))
-
-    assert rotated[0] == pytest.approx(0.0, abs=1.0e-12)
-    assert rotated[1] == pytest.approx(0.0, abs=1.0e-12)
-    assert rotated[2] == pytest.approx(-1.0, abs=1.0e-12)
-    assert math.isclose(smoke.norm(rotated), 1.0)
 
 
 def test_component_residue_assigner_wraps_after_9999_residues() -> None:
