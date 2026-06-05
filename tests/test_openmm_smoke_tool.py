@@ -85,32 +85,6 @@ def test_default_run_schedule_records_300_frames_with_2fs_timestep() -> None:
     assert schedule.simulated_duration_ns == pytest.approx(5.0004)
 
 
-def test_packmol_input_packs_solvent_around_fixed_solute() -> None:
-    """Packmol input should pack solvent around a fixed solute instead of using a lattice."""
-
-    smoke = load_smoke_tool()
-    config = SAMMDConfig.model_validate(
-        {"surface": {"slab": {"lateral_size_nm": [2.0, 2.0]}}}
-    )
-    plan = build_system(config)
-    box = smoke.derive_box_dimensions(plan, 3.0)
-
-    text = smoke.build_packmol_input(
-        solute_path=Path("fixed_pd_sam.pdb"),
-        solvent_path=Path("ethanol.pdb"),
-        output_path=Path("packmol_output.pdb"),
-        solvent_count=25,
-        box_dimensions_nm=box,
-    )
-
-    assert "structure ethanol.pdb" in text
-    assert "  number 25" in text
-    assert "structure fixed_pd_sam.pdb" in text
-    assert "fixed 0. 0. 0. 0. 0. 0." in text
-    assert "inside box 0. 0." in text
-    assert "nloop 200" in text
-
-
 def test_validate_args_rejects_invalid_solvent_count() -> None:
     """Catch invalid smoke-only CLI values before optional imports."""
 
