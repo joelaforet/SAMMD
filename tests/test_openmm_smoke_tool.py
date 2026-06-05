@@ -66,28 +66,6 @@ def test_auto_solvent_count_uses_sammd_solution_plan() -> None:
     assert count == expected
 
 
-def test_component_residue_assigner_wraps_after_9999_residues() -> None:
-    """Follow PolyzyMD's one-repeat-unit-per-residue chain wrapping convention."""
-
-    smoke = load_smoke_tool()
-    assigner = smoke.ComponentResidueAssigner()
-
-    identities = assigner.allocate("ethanol", "EOH", 10000)
-    next_identity = assigner.allocate("reactant", "CIN", 1)[0]
-
-    assert identities[0] == smoke.ResidueIdentity("A", 1, "EOH")
-    assert identities[9998] == smoke.ResidueIdentity("A", 9999, "EOH")
-    assert identities[9999] == smoke.ResidueIdentity("B", 1, "EOH")
-    assert next_identity == smoke.ResidueIdentity("C", 1, "CIN")
-    assert assigner.component_ranges["ethanol"] == {
-        "residue_name": "EOH",
-        "residue_count": 10000,
-        "first_chain_id": "A",
-        "last_chain_id": "B",
-        "max_residues_per_chain": 9999,
-    }
-
-
 def test_default_run_schedule_records_300_frames_with_2fs_timestep() -> None:
     """Default smoke schedule should prioritize the requested trajectory frame count."""
 

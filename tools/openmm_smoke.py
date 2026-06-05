@@ -38,6 +38,7 @@ from sammd.geometry import (
 )
 from sammd.io import safe_write_text
 from sammd.openmm_runtime import AnchorScalingMetadata, create_langevin_integrator
+from sammd.topology import ComponentResidueAssigner, ResidueIdentity, get_or_add_chain
 
 KCAL_TO_KJ = 4.184
 ETHANOL_MASS_G_MOL = 46.06844
@@ -63,8 +64,6 @@ NAGL_CHARGE_MODEL = "openff-gnn-am1bcc-1.0.0.pt"
 SAM_TAIL_CLEARANCE_NM = 0.95
 PACKMOL_TOLERANCE_ANGSTROM = 1.8
 PACKMOL_NLOOP = 200
-MAX_RESIDUES_PER_CHAIN = 9999
-CHAIN_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 PASS_MAX_TEMPERATURE_K = 600.0
 PASS_MAX_PD_DISPLACEMENT_NM = 0.15
 PASS_MAX_SULFUR_DISPLACEMENT_NM = 0.70
@@ -225,69 +224,10 @@ class RunSchedule:
 
 
 @dataclass(frozen=True)
-class ResidueIdentity:
-    """PDBx identity for one chemically meaningful repeat unit."""
-
-    chain_id: str
-    residue_id: int
-    residue_name: str
-
-
-@dataclass(frozen=True)
 class PackmolSolutionPositions:
     """Packmol-generated positions grouped by molecule type."""
 
     solvent_positions_nm: tuple[tuple[Vector3, ...], ...]
-
-
-class ComponentResidueAssigner:
-    """Assign PolyzyMD-style wrapping chain/residue identifiers by component."""
-
-    def __init__(self) -> None:
-        self._next_chain_index = 0
-        self._component_ranges: dict[str, dict[str, object]] = {}
-
-    @property
-    def component_ranges(self) -> dict[str, dict[str, object]]:
-        """Return serializable chain/residue ranges assigned so far."""
-
-        return dict(self._component_ranges)
-
-    def allocate(
-        self,
-        component_name: str,
-        residue_name: str,
-        residue_count: int,
-    ) -> tuple[ResidueIdentity, ...]:
-        """Allocate one residue per repeat unit, wrapping chains every 9999 residues."""
-
-        if residue_count <= 0:
-            msg = "residue_count must be positive"
-            raise ValueError(msg)
-        chains_needed = math.ceil(residue_count / MAX_RESIDUES_PER_CHAIN)
-        start_chain_index = self._next_chain_index
-        stop_chain_index = start_chain_index + chains_needed - 1
-        if stop_chain_index >= len(CHAIN_LETTERS):
-            msg = "smoke topology exceeded available one-character chain identifiers"
-            raise RuntimeError(msg)
-
-        identities = tuple(
-            ResidueIdentity(
-                chain_id=CHAIN_LETTERS[start_chain_index + index // MAX_RESIDUES_PER_CHAIN],
-                residue_id=index % MAX_RESIDUES_PER_CHAIN + 1,
-                residue_name=residue_name,
-            )
-            for index in range(residue_count)
-        )
-        self._component_ranges[component_name] = {
-            "residue_name": residue_name,
-            "residue_count": residue_count,
-            "first_chain_id": CHAIN_LETTERS[start_chain_index],
-            "last_chain_id": CHAIN_LETTERS[stop_chain_index],
-            "max_residues_per_chain": MAX_RESIDUES_PER_CHAIN,
-        }
-        self._next_chain_index += chains_needed
-        return identities
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1149,14 +1089,6 @@ def add_sulfur_metal_lj_exceptions(
         sigma_nm=tuple(sigmas),
         epsilon_delta_kj_mol=tuple(epsilons),
     )
-
-
-def get_or_add_chain(topology: Any, chain_cache: dict[str, Any], chain_id: str) -> Any:
-    """Return an existing OpenMM chain or create it with a preserved ID."""
-
-    if chain_id not in chain_cache:
-        chain_cache[chain_id] = topology.addChain(chain_id)
-    return chain_cache[chain_id]
 
 
 def pack_solution_with_packmol(
