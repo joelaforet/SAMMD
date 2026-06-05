@@ -11,7 +11,7 @@ Generate a complete template with resolved defaults:
 
 .. code-block:: bash
 
-   sammd init -o sammd.yaml
+   pixi run sammd init -o sammd.yaml
 
 Important sections
 ------------------

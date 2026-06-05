@@ -22,9 +22,12 @@ def test_docs_scaffold_files_exist() -> None:
         "docs/requirements.txt",
         "docs/source/conf.py",
         "docs/source/index.rst",
+        "docs/source/student-start-here.rst",
         "docs/source/tutorials/canonical-workflow.rst",
         "docs/source/tutorials/yaml-configuration.rst",
         "docs/source/contributor/developer-guide.rst",
+        "examples/student_config.yaml",
+        "notebooks/student_openmm_workflow.ipynb",
     ]
     for relative_path in expected_paths:
         assert (PROJECT_ROOT / relative_path).is_file()
@@ -114,3 +117,42 @@ def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:
     assert not plan.full_construction_available
     assert 0.0 <= orientation.angle_degrees <= 180.0
     assert orientation.reactant_label == "toy cinnamaldehyde"
+
+
+def test_student_openmm_notebook_has_expected_sections() -> None:
+    """Validate the student OpenMM notebook scaffold and key headings."""
+
+    notebook_path = PROJECT_ROOT / "notebooks" / "student_openmm_workflow.ipynb"
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    headings = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell.get("cell_type") == "markdown"
+    )
+    expected_headings = [
+        "# SAMMD student OpenMM workflow",
+        "## 1. Choose the configuration and run controls",
+        "## 2. Load and validate the SAMMD YAML",
+        "## 3. Build the deterministic SAMMD plan",
+        "## 5. Build the prototype OpenMM system",
+        "## 7. Run OpenMM",
+        "## 8. Inspect the outputs",
+    ]
+    for heading in expected_headings:
+        assert heading in headings
+    assert notebook["metadata"]["kernelspec"]["language"] == "python"
+
+
+def test_student_config_template_builds_plan(tmp_path: Path) -> None:
+    """Keep the student YAML template aligned with public planning APIs."""
+
+    config = load_config(PROJECT_ROOT / "examples" / "student_config.yaml")
+    plan = build_system(config, output_dir=tmp_path, seed=config.simulation.seed)
+
+    assert config.surface.metal == "Pd"
+    assert config.surface.facet == "111"
+    assert config.solvent.components[0].name == "ethanol"
+    assert config.solvent.components[0].smiles == "CCO"
+    assert config.reactants[0].name == "cinnamaldehyde"
+    assert plan.solution.molecule_counts["ethanol"] > 0
+    assert plan.solution.molecule_counts["cinnamaldehyde"] >= 1

@@ -1,0 +1,75 @@
+# SAMMD student configuration template
+#
+# Edit this file first, then load it from the student OpenMM notebook. The
+# defaults below match the compact Pd(111)/propanethiol/cinnamaldehyde/ethanol
+# demonstration system used for short OpenMM smoke runs.
+surface:
+  metal: Pd
+  facet: "111"
+  slab:
+    layers: 8
+    lateral_size_nm: [2.0, 2.0]
+    centered: true
+    double_sided: true
+    positional_restraint:
+      value: 10000.0
+      unit: kJ mol^-1 nm^-2
+
+sam:
+  grafting_density:
+    value: 0.25
+    unit: nm^2 / molecule
+  anchor:
+    mode: nonbonded
+    site: fcc_hollow
+    nonbonded:
+      scale_factor: 4.0
+  components:
+    - name: propanethiol
+      smiles: CCCS
+      fraction: 1.0
+
+solvent:
+  water_model: TIP3P
+  padding_nm: 3.0
+  components:
+    - name: ethanol
+      smiles: CCO
+      mole_fraction: 1.0
+      density_g_ml: 0.789
+      molar_mass_g_mol: 46.06844
+
+salts: []
+
+reactants:
+  - name: cinnamaldehyde
+    smiles: C1=CC=C(C=C1)/C=C/C=O
+    concentration_millimolar: 50.0
+
+output:
+  topology: topology.cif
+  trajectory: trajectory.dcd
+  thermodynamics: thermodynamics.csv
+
+reporters:
+  interval_steps: 1000
+  test_all_fields: false
+  fields:
+    - step
+    - time
+    - potential_energy
+    - kinetic_energy
+    - total_energy
+    - temperature
+    - volume
+    - density
+    - speed
+    - elapsed_time
+
+simulation:
+  timestep_fs: 2.0
+  temperature_k: 300.0
+  pressure_bar: 1.0
+  nonbonded_cutoff_nm: 1.0
+  slab_cutoff_buffer_nm: 0.5
+  seed: 2026

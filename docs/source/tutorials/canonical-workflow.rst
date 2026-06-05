@@ -8,12 +8,11 @@ current MVP boundary.
 Install for development
 -----------------------
 
-From the repository root, install SAMMD in editable mode with the lightweight
-development dependencies:
+From the repository root, install the default pixi environment:
 
 .. code-block:: bash
 
-   python -m pip install -e ".[dev]"
+   pixi install
 
 Create and validate a configuration
 -----------------------------------
@@ -22,8 +21,8 @@ Start from the template YAML and validate it before building a plan:
 
 .. code-block:: bash
 
-   sammd init -o sammd.yaml
-   sammd validate sammd.yaml
+   pixi run sammd init -o sammd.yaml
+   pixi run sammd validate sammd.yaml
 
 The template follows the defaults summarized in :doc:`yaml-configuration`.
 
@@ -62,17 +61,18 @@ slab-only visualization scaffold for inspection in tools such as PyMOL. It is
 not a complete topology and does not include SAM, solvent, salt, or reactant
 molecules.
 
-Future backend artifacts
-------------------------
+Backend artifacts
+-----------------
 
-The configuration already resolves names for future production artifacts:
+The configuration resolves names for backend artifacts:
 
 * ``topology.cif`` for a full system topology and starting coordinates
 * ``trajectory.dcd`` for OpenMM trajectory frames
 * ``thermodynamics.csv`` for OpenMM reporter output
 
-Those files are not generated yet because full OpenFF/OpenMM construction is
-deferred beyond this milestone.
+The public lightweight workflow does not generate those files. The repository
+also contains ``notebooks/student_openmm_workflow.ipynb`` for a prototype OpenMM
+smoke run that writes these artifacts using private backend modules.
 
 Notebook version
 ----------------

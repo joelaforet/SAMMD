@@ -6,9 +6,10 @@ MD systems. The current milestone validates YAML inputs, creates deterministic
 Pd(111)/SAM/solution build plans, writes a slab-only ``planned_slab.cif`` file,
 and exposes lightweight orientation analysis helpers.
 
-Full OpenFF/OpenMM construction is intentionally deferred. Future milestones are
-expected to produce full ``topology.cif``, ``trajectory.dcd``, and
-``thermodynamics.csv`` artifacts from the same configuration style.
+Public production OpenFF/OpenMM construction is intentionally deferred. The
+repository includes a prototype OpenMM notebook for short smoke-test runs, but it
+still uses private backend modules and should not be interpreted as production
+MD.
 
 New students should begin with :doc:`student-start-here`.
 

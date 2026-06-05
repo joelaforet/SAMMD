@@ -14,36 +14,49 @@ monolayer molecular dynamics systems on metal supports. The stable public API ca
 load and validate YAML, build deterministic Pd(111)/SAM/solution plans, and write
 a slab visualization file for inspection.
 
-The repository also contains an instructor-facing OpenMM workflow prototype for a
-small Pd(111)/propanethiol/cinnamaldehyde/ethanol system. That prototype is useful
-for seeing where SAMMD is going, but it still uses private backend modules and is
-not yet the public student API.
+The repository also contains an OpenMM workflow prototype for a small
+Pd(111)/propanethiol/cinnamaldehyde/ethanol system. That prototype is useful for
+short smoke tests and teaching, but it still uses private backend modules and is
+not yet the public production MD API.
+
+There are two configuration paths:
+
+* Use ``examples/student_config.yaml`` for the OpenMM notebook.
+* Use a generated ``sammd.yaml`` for the lightweight public planning tutorial.
 
 Recommended learning path
 -------------------------
 
-1. Install SAMMD from the repository root:
+1. Install the pixi environments from the repository root:
 
    .. code-block:: bash
 
-      python -m pip install -e ".[dev]"
+      pixi install
+      pixi install -e science
 
-2. Generate and validate a starting configuration:
+2. If your goal is the OpenMM notebook, validate the student configuration:
 
    .. code-block:: bash
 
-      sammd init -o sammd.yaml
-      sammd validate sammd.yaml
+      pixi run sammd validate examples/student_config.yaml
 
-3. Follow the first tutorial:
+3. If your goal is the lightweight public tutorial, generate and validate
+   ``sammd.yaml``:
+
+   .. code-block:: bash
+
+      pixi run sammd init -o sammd.yaml
+      pixi run sammd validate sammd.yaml
+
+4. Follow the first tutorial:
 
    :doc:`tutorials/canonical-workflow`
 
-4. Learn what each YAML section means:
+5. Learn what each YAML section means:
 
    :doc:`tutorials/yaml-configuration`
 
-5. Read the project scope before interpreting results as science:
+6. Read the project scope before interpreting results as science:
 
    :doc:`explanation/project-scope`
 
@@ -78,7 +91,14 @@ editing:
 
 .. code-block:: bash
 
-   sammd validate sammd.yaml
+   pixi run sammd validate sammd.yaml
+
+For the OpenMM notebook, make the same kind of edit in
+``examples/student_config.yaml`` and validate with:
+
+.. code-block:: bash
+
+   pixi run sammd validate examples/student_config.yaml
 
 Change the solvent or reactant concentration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -97,6 +117,46 @@ After editing, rebuild the plan:
    plan = build_system(config, output_dir="outputs")
    print(plan.solution.molecule_counts)
 
+For the OpenMM notebook, use ``examples/student_config.yaml`` instead of
+``sammd.yaml``.
+
+Understand examples/student_config.yaml
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The OpenMM notebook starts from ``examples/student_config.yaml``. The most common
+student-editable fields are:
+
+``surface.metal`` and ``surface.facet``
+   The metal support. SAMMD v0.1.0 supports ``Pd`` and facet ``"111"``.
+
+``surface.slab.lateral_size_nm``
+   Requested x/y slab size in nanometers. SAMMD adjusts this to a commensurate
+   Pd(111) lattice, so the printed plan size may differ slightly.
+
+``sam.grafting_density``
+   Area per SAM molecule. The supported unit is ``nm^2 / molecule``.
+
+``sam.components[].name`` and ``sam.components[].smiles``
+   The SAM molecule identity. Current OpenMM smoke runs expect one thiol/S anchor
+   per SAM molecule.
+
+``solvent.padding_nm``
+   Approximate solvent height used for finite-box molecule count planning.
+
+``solvent.components[].mole_fraction``
+   Solvent-only mole fractions. These must sum to ``1.0`` over solvent
+   components.
+
+``reactants[].concentration_millimolar``
+   Target reactant concentration. SAMMD converts this to a finite molecule count
+   and enforces at least one molecule when the concentration is nonzero.
+
+``simulation.timestep_fs`` and ``simulation.temperature_k``
+   The OpenMM timestep and target temperature used by the notebook run.
+
+``simulation.seed``
+   Controls deterministic finite-system construction and velocity initialization.
+
 Inspect the planned slab
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -114,7 +174,17 @@ Run the instructor-facing OpenMM prototype
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If your instructor has set up the optional science environment, the repository
-contains a notebook-shaped OpenMM prototype:
+contains a student notebook and a notebook-shaped script prototype:
+
+.. code-block:: bash
+
+   pixi run -e science install-science-kernel
+
+Then open ``notebooks/student_openmm_workflow.ipynb`` with the
+``Python (SAMMD science)`` kernel. The notebook starts from
+``examples/student_config.yaml``.
+
+The same workflow is also available as a script:
 
 .. code-block:: bash
 
@@ -122,6 +192,23 @@ contains a notebook-shaped OpenMM prototype:
 
 This is useful for demonstration and smoke validation. Do not treat the output as
 production MD or as evidence of scientific convergence.
+
+Smoke-test checklist
+~~~~~~~~~~~~~~~~~~~~
+
+A successful notebook smoke run should:
+
+* validate the YAML without errors
+* build a SAMMD plan and print finite molecule counts
+* build the prototype OpenMM system without missing-parameter errors
+* minimize without NaNs
+* complete the requested number of steps
+* report a final temperature near the target temperature
+* write ``topology.cif``, ``trajectory.dcd``, ``thermodynamics.csv``,
+  ``system.xml``, and ``smoke_summary.json``
+
+Passing this checklist means the workflow runs. It does not prove equilibration,
+sampling quality, or scientific convergence.
 
 Explanation: concepts worth understanding
 -----------------------------------------
@@ -136,7 +223,7 @@ Important current limitations:
 * Pd(111) is the supported MVP surface facet.
 * The public API produces a build plan, not a complete production simulation.
 * The slab visualization file does not include SAM, reactant, or solvent atoms.
-* The OpenMM example is still a prototype because it imports private backend
+* The OpenMM notebook is still a prototype because it imports private backend
   modules.
 
 Reference: exact API details
@@ -157,7 +244,8 @@ What to ask before changing a science input
 Before changing a SAM, solvent, reactant, or run condition, write down:
 
 * What experimental system am I trying to represent?
-* Which input in ``sammd.yaml`` maps to that experimental condition?
+* Which input in ``examples/student_config.yaml`` or ``sammd.yaml`` maps to that
+  experimental condition?
 * Is this supported by the current SAMMD milestone?
 * Am I looking at a planning artifact, a smoke-test artifact, or a production MD
   result?
