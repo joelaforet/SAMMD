@@ -32,6 +32,24 @@ class LangevinIntegratorConfig:
 
 
 @dataclass(frozen=True)
+class PlatformSelection:
+    """OpenMM simulation selected from platform fallback candidates."""
+
+    simulation: Any
+    platform_name: str
+    errors: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class EnergyRecord:
+    """Potential, kinetic, and temperature values read from an OpenMM context."""
+
+    potential_energy_kj_mol: float
+    kinetic_energy_kj_mol: float | None
+    temperature_k: float | None
+
+
+@dataclass(frozen=True)
 class AnchorScalingMetadata:
     """Summary of sulfur-metal nonbonded proxy force construction."""
 
@@ -190,6 +208,119 @@ def create_openmm_simulation(
         )
     )
     return simulation
+
+
+def create_simulation_with_platform_fallback(
+    topology: Any,
+    system: Any,
+    positions: Any,
+    *,
+    platform_name: str,
+    temperature_k: float,
+    timestep_fs: float,
+    friction_per_ps: float,
+    openmm_module: Any | None = None,
+    app_module: Any | None = None,
+    unit_module: Any | None = None,
+) -> PlatformSelection:
+    """Create an OpenMM Simulation, falling back from accelerated platforms in auto mode."""
+
+    modules = None if openmm_module is not None and app_module is not None else require_openmm()
+    openmm = openmm_module if openmm_module is not None else modules.openmm
+    app = app_module if app_module is not None else modules.app
+    unit = unit_module if unit_module is not None else (
+        modules.unit if modules is not None else None
+    )
+    available = available_platform_names(openmm)
+    candidates = auto_platform_candidates(available) if platform_name == "auto" else [platform_name]
+    errors = []
+    for candidate in candidates:
+        if candidate not in available:
+            errors.append(f"{candidate}: not available")
+            continue
+        try:
+            integrator = create_langevin_integrator(
+                temperature_k,
+                friction_per_ps,
+                timestep_fs,
+                openmm_module=openmm,
+                unit_module=unit,
+            )
+            platform = openmm.Platform.getPlatformByName(candidate)
+            simulation = app.Simulation(topology, system, integrator, platform)
+            simulation.context.setPositions(positions)
+            simulation.context.getState(getEnergy=True)
+        except Exception as error:
+            errors.append(f"{candidate}: {error}")
+            continue
+        return PlatformSelection(
+            simulation=simulation,
+            platform_name=candidate,
+            errors=tuple(errors),
+        )
+    formatted_errors = "\n".join(errors) or "no candidate platforms"
+    msg = f"could not create an OpenMM context:\n{formatted_errors}"
+    raise RuntimeError(msg)
+
+
+def available_platform_names(openmm_module: Any | None = None) -> tuple[str, ...]:
+    """Return installed OpenMM platform names."""
+
+    openmm = openmm_module if openmm_module is not None else require_openmm().openmm
+    return tuple(
+        openmm.Platform.getPlatform(index).getName()
+        for index in range(openmm.Platform.getNumPlatforms())
+    )
+
+
+def auto_platform_candidates(available: tuple[str, ...]) -> list[str]:
+    """Prefer accelerated OpenMM platforms while keeping CPU fallbacks usable."""
+
+    preferred = ["CUDA", "OpenCL", "CPU", "Reference"]
+    return [platform for platform in preferred if platform in available]
+
+
+def read_energy(
+    simulation: Any,
+    *,
+    include_kinetic: bool,
+    unit_module: Any | None = None,
+) -> EnergyRecord:
+    """Extract potential energy and optional instantaneous temperature from a Simulation."""
+
+    unit = unit_module if unit_module is not None else require_openmm().unit
+    state = simulation.context.getState(getEnergy=True)
+    potential = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+    if not include_kinetic:
+        return EnergyRecord(float(potential), None, None)
+    kinetic = state.getKineticEnergy().value_in_unit(unit.kilojoule_per_mole)
+    mobile_particles = tuple(
+        index
+        for index in range(simulation.system.getNumParticles())
+        if simulation.system.getParticleMass(index).value_in_unit(unit.dalton) > 0.0
+    )
+    mobile_particle_set = set(mobile_particles)
+    mobile_constraints = sum(
+        1
+        for index in range(simulation.system.getNumConstraints())
+        if simulation.system.getConstraintParameters(index)[0] in mobile_particle_set
+        and simulation.system.getConstraintParameters(index)[1] in mobile_particle_set
+    )
+    degrees_of_freedom = max(1, 3 * len(mobile_particles) - mobile_constraints - 3)
+    gas_constant = 0.00831446261815324
+    temperature = 2.0 * kinetic / (degrees_of_freedom * gas_constant)
+    return EnergyRecord(float(potential), float(kinetic), float(temperature))
+
+
+def positions_to_nm(
+    positions: Any,
+    *,
+    unit_module: Any | None = None,
+) -> tuple[tuple[float, float, float], ...]:
+    """Convert OpenMM positions to plain nanometer tuples."""
+
+    unit = unit_module if unit_module is not None else require_openmm().unit
+    return tuple(tuple(vector) for vector in positions.value_in_unit(unit.nanometer))
 
 
 def add_position_restraints(

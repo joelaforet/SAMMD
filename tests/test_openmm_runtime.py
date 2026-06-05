@@ -11,8 +11,11 @@ from sammd.io import OutputPaths
 from sammd.openmm_runtime import (
     add_position_restraints,
     add_sulfur_metal_lj_scaling,
+    auto_platform_candidates,
+    available_platform_names,
     create_langevin_integrator,
     create_openmm_simulation,
+    create_simulation_with_platform_fallback,
     require_openmm,
 )
 
@@ -98,6 +101,22 @@ class FakeOpenMM:
     class Platform:
         """Fake platform registry."""
 
+        names = ("Reference", "CPU", "CUDA")
+
+        def __init__(self, name):
+            self.name = name
+
+        def getName(self):  # noqa: N802
+            return self.name
+
+        @classmethod
+        def getNumPlatforms(cls):  # noqa: N802
+            return len(cls.names)
+
+        @classmethod
+        def getPlatform(cls, index):  # noqa: N802
+            return cls(cls.names[index])
+
         @staticmethod
         def getPlatformByName(name):  # noqa: N802
             return f"platform:{name}"
@@ -177,6 +196,10 @@ class FakeContext:
     def setPositions(self, positions):  # noqa: N802
         self.positions = positions
 
+    def getState(self, **kwargs):  # noqa: N802
+        self.state_kwargs = kwargs
+        return object()
+
 
 
 def test_openmm_runtime_module_does_not_import_openmm_at_import_time() -> None:
@@ -237,6 +260,37 @@ def test_create_langevin_integrator_rejects_invalid_values() -> None:
             openmm_module=FakeOpenMM,
             unit_module=FakeUnitModule,
         )
+
+
+def test_platform_helpers_prefer_accelerated_backends() -> None:
+    """Discover available platforms and prefer CUDA before CPU fallbacks."""
+
+    available = available_platform_names(FakeOpenMM)
+
+    assert available == ("Reference", "CPU", "CUDA")
+    assert auto_platform_candidates(available) == ["CUDA", "CPU", "Reference"]
+
+
+def test_create_simulation_with_platform_fallback_uses_first_available_candidate() -> None:
+    """Create a simulation on the preferred available OpenMM platform."""
+
+    selection = create_simulation_with_platform_fallback(
+        "topology",
+        FakeSystem(),
+        "positions",
+        platform_name="auto",
+        temperature_k=300.0,
+        timestep_fs=2.0,
+        friction_per_ps=1.0,
+        openmm_module=FakeOpenMM,
+        app_module=FakeApp,
+        unit_module=FakeUnitModule,
+    )
+
+    assert selection.platform_name == "CUDA"
+    assert selection.errors == ()
+    assert selection.simulation.platform == "platform:CUDA"
+    assert selection.simulation.context.positions == "positions"
 
 
 def test_add_position_restraints_constructs_expected_force() -> None:

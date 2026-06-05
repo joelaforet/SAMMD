@@ -36,7 +36,13 @@ from sammd.geometry import (
     subtract_vectors,
 )
 from sammd.io import safe_write_text
-from sammd.openmm_runtime import AnchorScalingMetadata, create_langevin_integrator
+from sammd.openmm_runtime import (
+    AnchorScalingMetadata,
+    EnergyRecord,
+    create_simulation_with_platform_fallback,
+    positions_to_nm,
+    read_energy,
+)
 from sammd.packmol import pack_solution_with_packmol
 from sammd.topology import ComponentResidueAssigner, ResidueIdentity, get_or_add_chain
 
@@ -192,24 +198,6 @@ class SmokeBuild:
 
 
 @dataclass(frozen=True)
-class PlatformSelection:
-    """OpenMM platform selection result."""
-
-    simulation: Any
-    platform_name: str
-    errors: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class EnergyRecord:
-    """Potential/kinetic/temperature values extracted from an OpenMM State."""
-
-    potential_energy_kj_mol: float
-    kinetic_energy_kj_mol: float | None
-    temperature_k: float | None
-
-
-@dataclass(frozen=True)
 class RunSchedule:
     """Resolved integration and reporting schedule."""
 
@@ -304,12 +292,16 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     selection = create_simulation_with_platform_fallback(
-        modules,
-        smoke_build,
+        smoke_build.topology,
+        smoke_build.system,
+        smoke_build.positions_quantity,
         platform_name=args.platform,
         temperature_k=config.simulation.temperature_k,
         timestep_fs=args.timestep_fs,
         friction_per_ps=args.friction_per_ps,
+        openmm_module=modules.openmm,
+        app_module=modules.app,
+        unit_module=modules.unit,
     )
     simulation = selection.simulation
     simulation.reporters.append(
@@ -336,16 +328,16 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
 
-    initial = read_energy(modules, simulation, include_kinetic=False)
+    initial = read_energy(simulation, include_kinetic=False, unit_module=modules.unit)
     simulation.minimizeEnergy(maxIterations=args.minimize_iterations)
-    minimized = read_energy(modules, simulation, include_kinetic=False)
+    minimized = read_energy(simulation, include_kinetic=False, unit_module=modules.unit)
     minimized_positions = simulation.context.getState(getPositions=True).getPositions()
     write_pdbx(paths.minimized_positions, modules.app, smoke_build.topology, minimized_positions)
 
     simulation.context.setVelocitiesToTemperature(config.simulation.temperature_k, args.seed)
     if schedule.total_steps > 0:
         simulation.step(schedule.total_steps)
-    final = read_energy(modules, simulation, include_kinetic=True)
+    final = read_energy(simulation, include_kinetic=True, unit_module=modules.unit)
     final_state = simulation.context.getState(getPositions=True, getVelocities=True, getEnergy=True)
     final_positions = final_state.getPositions()
     write_pdbx(paths.final_positions, modules.app, smoke_build.topology, final_positions)
@@ -356,7 +348,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     simulation.saveCheckpoint(str(paths.checkpoint))
 
-    final_positions_nm = positions_to_nm(modules, final_positions)
+    final_positions_nm = positions_to_nm(final_positions, unit_module=modules.unit)
     pd_displacements = indexed_displacements(
         final_positions_nm,
         smoke_build.positions_nm,
@@ -1565,106 +1557,6 @@ def center_template(template: MoleculeTemplate, center_nm: Vector3) -> tuple[Vec
         add_vectors(center_nm, subtract_vectors(position, current_center))
         for position in template.positions_nm
     )
-
-
-def create_simulation_with_platform_fallback(
-    modules: Any,
-    smoke_build: SmokeBuild,
-    *,
-    platform_name: str,
-    temperature_k: float,
-    timestep_fs: float,
-    friction_per_ps: float,
-) -> PlatformSelection:
-    """Create an OpenMM Simulation, falling back from CUDA to CPU in auto mode."""
-
-    openmm = modules.openmm
-    app = modules.app
-    unit = modules.unit
-    available = available_platform_names(openmm)
-    candidates = auto_platform_candidates(available) if platform_name == "auto" else [platform_name]
-    errors = []
-    for candidate in candidates:
-        if candidate not in available:
-            errors.append(f"{candidate}: not available")
-            continue
-        try:
-            integrator = create_langevin_integrator(
-                temperature_k,
-                friction_per_ps,
-                timestep_fs,
-                openmm_module=openmm,
-                unit_module=unit,
-            )
-            platform = openmm.Platform.getPlatformByName(candidate)
-            simulation = app.Simulation(
-                smoke_build.topology,
-                smoke_build.system,
-                integrator,
-                platform,
-            )
-            simulation.context.setPositions(smoke_build.positions_quantity)
-            simulation.context.getState(getEnergy=True)
-        except Exception as error:
-            errors.append(f"{candidate}: {error}")
-            continue
-        return PlatformSelection(
-            simulation=simulation,
-            platform_name=candidate,
-            errors=tuple(errors),
-        )
-    formatted_errors = "\n".join(errors) or "no candidate platforms"
-    raise RuntimeError(f"could not create an OpenMM context:\n{formatted_errors}")
-
-
-def available_platform_names(openmm: Any) -> tuple[str, ...]:
-    """Return installed OpenMM platform names."""
-
-    return tuple(
-        openmm.Platform.getPlatform(index).getName()
-        for index in range(openmm.Platform.getNumPlatforms())
-    )
-
-
-def auto_platform_candidates(available: tuple[str, ...]) -> list[str]:
-    """Prefer CUDA for the real smoke, but keep CPU fallback usable."""
-
-    preferred = ["CUDA", "OpenCL", "CPU", "Reference"]
-    return [platform for platform in preferred if platform in available]
-
-
-def read_energy(modules: Any, simulation: Any, *, include_kinetic: bool) -> EnergyRecord:
-    """Extract potential energy and optional temperature from a Simulation."""
-
-    unit = modules.unit
-    state = simulation.context.getState(getEnergy=True)
-    potential = state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
-    if not include_kinetic:
-        return EnergyRecord(float(potential), None, None)
-    kinetic = state.getKineticEnergy().value_in_unit(unit.kilojoule_per_mole)
-    mobile_particles = tuple(
-        index
-        for index in range(simulation.system.getNumParticles())
-        if simulation.system.getParticleMass(index).value_in_unit(unit.dalton) > 0.0
-    )
-    mobile_particle_set = set(mobile_particles)
-    mobile_constraints = sum(
-        1
-        for index in range(simulation.system.getNumConstraints())
-        if simulation.system.getConstraintParameters(index)[0] in mobile_particle_set
-        and simulation.system.getConstraintParameters(index)[1] in mobile_particle_set
-    )
-    degrees_of_freedom = max(1, 3 * len(mobile_particles) - mobile_constraints - 3)
-    gas_constant = 0.00831446261815324
-    temperature = 2.0 * kinetic / (degrees_of_freedom * gas_constant)
-    return EnergyRecord(float(potential), float(kinetic), float(temperature))
-
-
-def positions_to_nm(modules: Any, positions: Any) -> tuple[Vector3, ...]:
-    """Convert OpenMM positions to plain nanometer tuples."""
-
-    unit = modules.unit
-    return tuple(tuple(vector) for vector in positions.value_in_unit(unit.nanometer))
 
 
 def smoke_summary(
