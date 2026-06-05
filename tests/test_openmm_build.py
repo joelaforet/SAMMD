@@ -40,6 +40,59 @@ def test_openmm_build_import_does_not_import_heavy_science_modules() -> None:
     assert "openff" not in sys.modules
 
 
+@pytest.mark.parametrize(
+    "module_name",
+    ["sammd._openmm_templates", "sammd._openmm_backend"],
+)
+def test_private_backend_imports_do_not_import_heavy_science_modules(module_name: str) -> None:
+    """Importing private OpenMM backend modules should keep science imports lazy."""
+
+    for name in ("openmm", "openff", "rdkit", "nagl"):
+        sys.modules.pop(name, None)
+
+    __import__(module_name)
+
+    assert "openmm" not in sys.modules
+    assert "openff" not in sys.modules
+    assert "rdkit" not in sys.modules
+    assert "nagl" not in sys.modules
+
+
+def test_moved_template_dataclasses_are_private_and_not_public_api() -> None:
+    """OpenFF-derived template dataclasses should stay private implementation details."""
+
+    import sammd
+    from sammd import _openmm_templates
+
+    template_dataclasses = [
+        "_AtomTemplate",
+        "_MoleculeTemplate",
+        "_BondParameter",
+        "_AngleParameter",
+        "_TorsionParameter",
+        "_ConstraintParameter",
+        "_ExceptionParameter",
+    ]
+
+    for name in template_dataclasses:
+        assert hasattr(_openmm_templates, name)
+        assert name.startswith("_")
+        assert name not in sammd.__all__
+        assert not hasattr(sammd, name)
+
+    for public_name in (
+        "AtomTemplate",
+        "MoleculeTemplate",
+        "BondParameter",
+        "AngleParameter",
+        "TorsionParameter",
+        "ConstraintParameter",
+        "ExceptionParameter",
+    ):
+        assert not hasattr(_openmm_templates, public_name)
+        assert public_name not in sammd.__all__
+
+
 def test_builder_rejects_sam_before_surface() -> None:
     """SAM declaration should require the surface stage first."""
 
