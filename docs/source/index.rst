@@ -10,6 +10,14 @@ Full OpenFF/OpenMM construction is intentionally deferred. Future milestones are
 expected to produce full ``topology.cif``, ``trajectory.dcd``, and
 ``thermodynamics.csv`` artifacts from the same configuration style.
 
+New students should begin with :doc:`student-start-here`.
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Start here
+
+   student-start-here
+
 .. toctree::
    :maxdepth: 2
    :caption: Tutorials
