@@ -98,7 +98,7 @@ def build_openmm_smoke_system(
     pd_s_sigma_nm: float,
     pd_s_epsilon_kcal_mol: float,
     solvent_placement_fn: _SolventPlacementFn | None = None,
-) -> _SmokeBuild:  # pragma: no cover
+) -> _SmokeBuild:
     """Build the direct OpenMM topology/system/positions for the smoke run."""
 
     openmm = modules.openmm
@@ -334,7 +334,7 @@ def place_solvent_with_packmol(
     return packed_solution.solvent_positions_nm
 
 
-def set_periodic_box(  # pragma: no cover
+def set_periodic_box(
     modules: Any,
     topology: Any,
     system: Any,
@@ -400,7 +400,7 @@ def add_pd_slab(
     plan: Any,
     shift_nm: Vector3,
     residue_identities: tuple[ResidueIdentity, ...],
-) -> None:  # pragma: no cover
+) -> None:
     """Add Pd atoms with CHARMM-INTERFACE LJ parameters."""
 
     unit = modules.unit
@@ -447,7 +447,7 @@ def add_sam_layer(
     shift_nm: Vector3,
     sulfur_height_nm: float,
     residue_identities: tuple[ResidueIdentity, ...],
-) -> None:  # pragma: no cover
+) -> None:
     """Add all planned propanethiol SAM molecules."""
 
     sulfur_index = sulfur_atom_index(template)
@@ -521,7 +521,7 @@ def add_reactants(
     template: _MoleculeTemplate,
     molecule_positions_nm: tuple[tuple[Vector3, ...], ...],
     residue_identities: tuple[ResidueIdentity, ...],
-) -> None:  # pragma: no cover
+) -> None:
     """Add Packmol-placed cinnamaldehyde molecule(s)."""
 
     for transformed, residue_identity in zip(
@@ -598,7 +598,7 @@ def add_solvent_molecules(
     template: _MoleculeTemplate,
     molecule_positions_nm: tuple[tuple[Vector3, ...], ...],
     residue_identities: tuple[ResidueIdentity, ...],
-) -> int:  # pragma: no cover
+) -> int:
     """Add Packmol-placed OpenFF solvent molecules."""
 
     for solvent_positions, residue_identity in zip(
@@ -640,7 +640,7 @@ def add_template_molecule(
     template: _MoleculeTemplate,
     transformed_positions_nm: tuple[Vector3, ...],
     residue_identity: ResidueIdentity,
-) -> tuple[int, ...]:  # pragma: no cover
+) -> tuple[int, ...]:
     """Add one RDKit-derived molecule template to topology and system."""
 
     unit = modules.unit
@@ -713,7 +713,7 @@ def add_template_molecule(
     return tuple(global_indices)
 
 
-def element_by_symbol(modules: Any, symbol: str) -> Any:  # pragma: no cover
+def element_by_symbol(modules: Any, symbol: str) -> Any:
     """Return an OpenMM app Element by symbol."""
 
     return modules.app.Element.getBySymbol(symbol)

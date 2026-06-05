@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import inspect
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -28,6 +29,16 @@ class FakeQuantity:
 
         return self.value
 
+    def __mul__(self, other: object) -> FakeQuantity:
+        """Return this quantity for fake unit multiplication."""
+
+        return self
+
+    def __truediv__(self, other: object) -> FakeQuantity:
+        """Return this quantity for fake unit division."""
+
+        return self
+
 
 class FakeUnitValue:
     """Minimal fake unit supporting powers and division."""
@@ -42,6 +53,11 @@ class FakeUnitValue:
 
         return self
 
+    def __rmul__(self, other: object) -> FakeQuantity:
+        """Return a fake quantity when multiplied by a scalar."""
+
+        return FakeQuantity(float(other)) if isinstance(other, int | float) else FakeQuantity(0.0)
+
 
 class FakeUnit:
     """Minimal unit object supporting arithmetic used by extractors."""
@@ -51,24 +67,197 @@ class FakeUnit:
     kilojoule_per_mole = FakeUnitValue()
     radian = FakeUnitValue()
 
+    def Quantity(self, values: object, unit: object) -> object:
+        """Return raw values for fake OpenMM quantity construction."""
+
+        return values
+
+
+class FakeVec3(tuple):
+    """Tuple-like fake OpenMM Vec3."""
+
+    def __new__(cls, x: float, y: float, z: float) -> FakeVec3:
+        """Create a fake vector tuple."""
+
+        return super().__new__(cls, (x, y, z))
+
+    def __mul__(self, other: object) -> FakeVec3:
+        """Return this vector for fake unit multiplication."""
+
+        return self
+
+
+class FakeElement:
+    """Fake OpenMM element with symbol and mass."""
+
+    def __init__(self, symbol: str) -> None:
+        """Store a fake element symbol and mass."""
+
+        self.symbol = symbol
+        self.mass = FakeQuantity(1.0)
+
+    @staticmethod
+    def getBySymbol(symbol: str) -> FakeElement:
+        """Return a fake element for any requested symbol."""
+
+        return FakeElement(symbol)
+
+
+@dataclass
+class FakeChain:
+    """Fake topology chain."""
+
+    id: str
+
+
+@dataclass
+class FakeResidue:
+    """Fake topology residue."""
+
+    name: str
+    chain: FakeChain
+    id: str
+
+
+@dataclass
+class FakeAtomHandle:
+    """Fake topology atom handle."""
+
+    name: str
+    element: FakeElement
+    residue: FakeResidue
+
+
+class FakeTopology:
+    """Fake OpenMM topology with chains, residues, atoms, and bonds."""
+
+    def __init__(self) -> None:
+        """Create empty fake topology records."""
+
+        self.chains: list[FakeChain] = []
+        self.residues: list[FakeResidue] = []
+        self.atoms_: list[FakeAtomHandle] = []
+        self.bonds: list[tuple[FakeAtomHandle, FakeAtomHandle]] = []
+        self.box_vectors: tuple[object, ...] | None = None
+
+    def addChain(self, chain_id: str) -> FakeChain:
+        """Add and return a fake chain."""
+
+        chain = FakeChain(chain_id)
+        self.chains.append(chain)
+        return chain
+
+    def addResidue(self, name: str, chain: FakeChain, id: str) -> FakeResidue:
+        """Add and return a fake residue."""
+
+        residue = FakeResidue(name, chain, id)
+        self.residues.append(residue)
+        return residue
+
+    def addAtom(self, name: str, element: FakeElement, residue: FakeResidue) -> FakeAtomHandle:
+        """Add and return a fake atom."""
+
+        atom = FakeAtomHandle(name, element, residue)
+        self.atoms_.append(atom)
+        return atom
+
+    def addBond(self, atom1: FakeAtomHandle, atom2: FakeAtomHandle) -> None:
+        """Add a fake topology bond."""
+
+        self.bonds.append((atom1, atom2))
+
+    def setPeriodicBoxVectors(self, vectors: tuple[object, ...]) -> None:
+        """Record fake periodic box vectors."""
+
+        self.box_vectors = vectors
+
+    def atoms(self) -> tuple[FakeAtomHandle, ...]:
+        """Return fake atoms."""
+
+        return tuple(self.atoms_)
+
+
+class FakeCMMotionRemover:
+    """Fake center-of-mass motion remover force."""
+
 
 class FakeNonbondedForce:
     """Fake NonbondedForce with particles and one exception."""
 
+    PME = "PME"
+
+    def __init__(self) -> None:
+        """Create empty particle and exception records."""
+
+        self.method = None
+        self.cutoff = None
+        self.switching = False
+        self.switching_distance = None
+        self.dispersion = False
+        self.particles: list[tuple[object, object, object]] = []
+        self.exceptions: list[tuple[int, int, object, object, object, bool]] = []
+
+    def setNonbondedMethod(self, method: object) -> None:
+        """Record the fake nonbonded method."""
+
+        self.method = method
+
+    def setCutoffDistance(self, cutoff: object) -> None:
+        """Record the fake cutoff distance."""
+
+        self.cutoff = cutoff
+
+    def setUseSwitchingFunction(self, switching: bool) -> None:
+        """Record whether switching is enabled."""
+
+        self.switching = switching
+
+    def setSwitchingDistance(self, switching_distance: object) -> None:
+        """Record the fake switching distance."""
+
+        self.switching_distance = switching_distance
+
+    def setUseDispersionCorrection(self, dispersion: bool) -> None:
+        """Record whether dispersion correction is enabled."""
+
+        self.dispersion = dispersion
+
+    def addParticle(self, charge: object, sigma: object, epsilon: object) -> int:
+        """Add a fake nonbonded particle."""
+
+        self.particles.append((charge, sigma, epsilon))
+        return len(self.particles) - 1
+
+    def addException(
+        self,
+        atom1: int,
+        atom2: int,
+        chargeprod: object,
+        sigma: object,
+        epsilon: object,
+        replace: bool = False,
+    ) -> int:
+        """Add a fake nonbonded exception."""
+
+        self.exceptions.append((atom1, atom2, chargeprod, sigma, epsilon, replace))
+        return len(self.exceptions) - 1
+
     def getNumParticles(self) -> int:
         """Return fake particle count."""
 
-        return 2
+        return len(self.particles) if self.particles else 2
 
     def getParticleParameters(self, index: int) -> tuple[FakeQuantity, FakeQuantity, FakeQuantity]:
         """Return deterministic nonbonded parameters."""
 
+        if self.particles:
+            return self.particles[index]  # type: ignore[return-value]
         return FakeQuantity(0.1 + index), FakeQuantity(0.2 + index), FakeQuantity(0.3 + index)
 
     def getNumExceptions(self) -> int:
         """Return fake exception count."""
 
-        return 1
+        return len(self.exceptions) if self.exceptions else 1
 
     def getExceptionParameters(
         self,
@@ -76,11 +265,25 @@ class FakeNonbondedForce:
     ) -> tuple[int, int, FakeQuantity, FakeQuantity, FakeQuantity]:
         """Return deterministic exception parameters."""
 
+        if self.exceptions:
+            atom1, atom2, chargeprod, sigma, epsilon, _replace = self.exceptions[index]
+            return atom1, atom2, chargeprod, sigma, epsilon  # type: ignore[return-value]
         return 0, 1, FakeQuantity(0.4), FakeQuantity(0.5), FakeQuantity(0.6)
 
 
 class FakeBondForce:
     """Fake harmonic bond force."""
+
+    def __init__(self) -> None:
+        """Create empty fake bond records."""
+
+        self.bonds: list[tuple[object, ...]] = []
+
+    def addBond(self, *parameters: object) -> int:
+        """Add a fake harmonic bond."""
+
+        self.bonds.append(parameters)
+        return len(self.bonds) - 1
 
     def getNumBonds(self) -> int:
         """Return fake bond count."""
@@ -95,6 +298,17 @@ class FakeBondForce:
 
 class FakeAngleForce:
     """Fake harmonic angle force."""
+
+    def __init__(self) -> None:
+        """Create empty fake angle records."""
+
+        self.angles: list[tuple[object, ...]] = []
+
+    def addAngle(self, *parameters: object) -> int:
+        """Add a fake harmonic angle."""
+
+        self.angles.append(parameters)
+        return len(self.angles) - 1
 
     def getNumAngles(self) -> int:
         """Return fake angle count."""
@@ -112,6 +326,17 @@ class FakeAngleForce:
 
 class FakeTorsionForce:
     """Fake periodic torsion force."""
+
+    def __init__(self) -> None:
+        """Create empty fake torsion records."""
+
+        self.torsions: list[tuple[object, ...]] = []
+
+    def addTorsion(self, *parameters: object) -> int:
+        """Add a fake periodic torsion."""
+
+        self.torsions.append(parameters)
+        return len(self.torsions) - 1
 
     def getNumTorsions(self) -> int:
         """Return fake torsion count."""
@@ -139,6 +364,33 @@ class FakeSystem:
             FakeAngleForce(),
             FakeTorsionForce(),
         )
+        self.particles: list[object] = []
+        self.added_forces: list[object] = []
+        self.constraints: list[tuple[int, int, object]] = []
+        self.box_vectors: tuple[object, object, object] | None = None
+
+    def addParticle(self, mass: object) -> int:
+        """Add a fake system particle."""
+
+        self.particles.append(mass)
+        return len(self.particles) - 1
+
+    def addForce(self, force: object) -> int:
+        """Add a fake force to the system."""
+
+        self.added_forces.append(force)
+        return len(self.added_forces) - 1
+
+    def addConstraint(self, atom1: int, atom2: int, distance: object) -> int:
+        """Add a fake distance constraint."""
+
+        self.constraints.append((atom1, atom2, distance))
+        return len(self.constraints) - 1
+
+    def setDefaultPeriodicBoxVectors(self, *vectors: object) -> None:
+        """Record fake periodic box vectors."""
+
+        self.box_vectors = vectors  # type: ignore[assignment]
 
     def getNumForces(self) -> int:
         """Return fake force count."""
@@ -267,6 +519,59 @@ def test_solvent_position_boundary_rejects_wrong_count() -> None:
         )
 
 
+def test_build_openmm_smoke_system_uses_injected_solvent_positions() -> None:
+    """Full backend construction should be testable without invoking Packmol."""
+
+    placement_requests = []
+
+    def placement_fn(
+        request: backend._SolventPlacementRequest,
+    ) -> tuple[tuple[backend.Vector3, ...], ...]:
+        """Return one precomputed solvent position for the fake build."""
+
+        placement_requests.append(request)
+        return (((1.1, 1.2, 1.3),),)
+
+    modules = fake_modules()
+    plan = fake_plan()
+    build = backend.build_openmm_smoke_system(
+        modules,
+        plan,
+        rich_template(name="sam", smiles="CS"),
+        minimal_template(name="reactant", smiles="C"),
+        minimal_template(name="solvent", smiles="O"),
+        solvent_count=1,
+        reactant_count=1,
+        sulfur_height_nm=0.18,
+        solvent_padding_nm=3.0,
+        packmol_working_dir=Path("packmol"),
+        pressure_bar=1.0,
+        temperature_k=300.0,
+        pd_s_sigma_nm=0.22,
+        pd_s_epsilon_kcal_mol=2.0,
+        solvent_placement_fn=placement_fn,
+    )
+
+    assert isinstance(build, backend._SmokeBuild)
+    assert build.solvent_count == 1
+    assert build.reactant_count == 1
+    assert build.sam_count == 1
+    assert build.pd_indices == (0,)
+    assert build.sulfur_indices == (1,)
+    assert build.anchor_pairs == ((1, 0),)
+    assert build.anchor_scaling.pairs_added == 1
+    assert build.platform_dimensions_nm == pytest.approx((2.0, 2.0, 8.9))
+    assert build.component_chain_ranges["ethanol"]["residue_name"] == backend.SOLVENT_RESIDUE_NAME
+    assert len(build.positions_nm) == build.system.added_forces[0].getNumParticles()
+    assert len(build.system.particles) == len(build.positions_nm)
+    assert len(build.topology.atoms()) == len(build.positions_nm)
+    assert placement_requests[0].solvent_count == 1
+    assert placement_requests[0].solute_positions_nm == tuple(build.positions_nm[:-1])
+    assert build.positions_quantity == [
+        modules.openmm.Vec3(*position) for position in build.positions_nm
+    ]
+
+
 def test_backend_named_constants_drive_pure_placement_helpers() -> None:
     """Pure placement helpers should expose former magic constants by name."""
 
@@ -341,11 +646,15 @@ def fake_modules() -> SimpleNamespace:
 
     return SimpleNamespace(
         openmm=SimpleNamespace(
+            System=FakeSystem,
             NonbondedForce=FakeNonbondedForce,
             HarmonicBondForce=FakeBondForce,
             HarmonicAngleForce=FakeAngleForce,
             PeriodicTorsionForce=FakeTorsionForce,
+            CMMotionRemover=FakeCMMotionRemover,
+            Vec3=FakeVec3,
         ),
+        app=SimpleNamespace(Topology=FakeTopology, Element=FakeElement),
         unit=FakeUnit(),
     )
 
@@ -437,6 +746,8 @@ def fake_openff_modules() -> SimpleNamespace:
 
 def minimal_template(
     *,
+    name: str = "template",
+    smiles: str = "C",
     atoms: tuple[templates._AtomTemplate, ...] | None = None,
     positions: tuple[backend.Vector3, ...] | None = None,
 ) -> templates._MoleculeTemplate:
@@ -445,8 +756,8 @@ def minimal_template(
     atoms = atoms or (templates._AtomTemplate("C1", "C", 0.0, 0.1, 0.2),)
     positions = positions or ((0.0, 0.0, 0.0),)
     return templates._MoleculeTemplate(
-        name="template",
-        smiles="C",
+        name=name,
+        smiles=smiles,
         atoms=atoms,
         bonds=(),
         bond_parameters=(),
@@ -457,4 +768,52 @@ def minimal_template(
         positions_nm=positions,
         charge_model=templates._NAGL_CHARGE_MODEL,
         force_field=templates._OPENFF_FORCE_FIELD,
+    )
+
+
+def rich_template(*, name: str, smiles: str) -> templates._MoleculeTemplate:
+    """Return a private template with all supported parameter types."""
+
+    return templates._MoleculeTemplate(
+        name=name,
+        smiles=smiles,
+        atoms=(
+            templates._AtomTemplate("S1", "S", 0.0, 0.1, 0.2),
+            templates._AtomTemplate("C1", "C", 0.0, 0.1, 0.2),
+            templates._AtomTemplate("H1", "H", 0.0, 0.1, 0.2),
+            templates._AtomTemplate("H2", "H", 0.0, 0.1, 0.2),
+        ),
+        bonds=((0, 1), (1, 2), (1, 3)),
+        bond_parameters=(templates._BondParameter(0, 1, 0.15, 100.0),),
+        angle_parameters=(templates._AngleParameter(0, 1, 2, 1.5, 50.0),),
+        torsion_parameters=(templates._TorsionParameter(0, 1, 2, 3, 3, 0.0, 2.0),),
+        constraints=(templates._ConstraintParameter(1, 3, 0.11),),
+        exception_parameters=(templates._ExceptionParameter(0, 1, 0.0, 0.1, 0.2),),
+        positions_nm=((0.0, 0.0, 0.0), (0.0, 0.0, 0.2), (0.1, 0.0, 0.3), (-0.1, 0.0, 0.3)),
+        charge_model=templates._NAGL_CHARGE_MODEL,
+        force_field=templates._OPENFF_FORCE_FIELD,
+    )
+
+
+def fake_plan() -> SimpleNamespace:
+    """Return a minimal fake SAMMD plan for direct backend construction."""
+
+    return SimpleNamespace(
+        config=SimpleNamespace(simulation=SimpleNamespace(nonbonded_cutoff_nm=1.0)),
+        slab=SimpleNamespace(
+            positions_nm=((0.0, 0.0, 0.0),),
+            lateral_size_nm=(2.0, 2.0),
+            slab_extent_nm=(2.0, 2.0, 1.0),
+            top_z_nm=0.5,
+        ),
+        sam_placements=SimpleNamespace(
+            placements=(
+                SimpleNamespace(
+                    position_nm=(0.0, 0.0, 0.5),
+                    normal=(0.0, 0.0, 1.0),
+                    side="top",
+                    anchor_metadata={"nearest_metal_atom_indices": (0,)},
+                ),
+            ),
+        ),
     )
