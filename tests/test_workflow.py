@@ -140,3 +140,31 @@ def test_run_schedule_supports_explicit_steps_and_report_interval() -> None:
     assert interval_schedule.simulated_duration_ns == pytest.approx(0.002)
     assert steps_schedule.report_interval == 17
     assert steps_schedule.frames == 58
+
+
+@pytest.mark.parametrize(
+    ("overrides", "match"),
+    [
+        ({"duration_ns": 0.0}, "duration_ns"),
+        ({"duration_ns": float("inf")}, "duration_ns"),
+        ({"timestep_fs": 0.0}, "timestep_fs"),
+        ({"timestep_fs": float("nan")}, "timestep_fs"),
+        ({"frames": 0}, "frames"),
+        ({"steps": 0}, "steps"),
+        ({"report_interval": 0}, "report_interval"),
+    ],
+)
+def test_run_schedule_rejects_invalid_inputs(overrides: dict[str, object], match: str) -> None:
+    """Reject invalid schedule inputs before deriving step counts."""
+
+    kwargs = {
+        "duration_ns": 1.0,
+        "timestep_fs": 2.0,
+        "steps": None,
+        "frames": 60,
+        "report_interval": None,
+    }
+    kwargs.update(overrides)
+
+    with pytest.raises(ValueError, match=match):
+        resolve_run_schedule(**kwargs)

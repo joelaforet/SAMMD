@@ -235,7 +235,23 @@ def resolve_run_schedule(
     -------
     RunSchedule
         Resolved step and reporter schedule.
+
+    Raises
+    ------
+    ValueError
+        If any duration, timestep, step, frame, or reporter interval input is invalid.
     """
+
+    if not math.isfinite(duration_ns) or duration_ns <= 0:
+        raise ValueError("duration_ns must be positive and finite")
+    if not math.isfinite(timestep_fs) or timestep_fs <= 0:
+        raise ValueError("timestep_fs must be positive and finite")
+    if frames <= 0:
+        raise ValueError("frames must be positive")
+    if steps is not None and steps <= 0:
+        raise ValueError("steps must be positive when provided")
+    if report_interval is not None and report_interval <= 0:
+        raise ValueError("report_interval must be positive when provided")
 
     if report_interval is not None:
         total_steps = (

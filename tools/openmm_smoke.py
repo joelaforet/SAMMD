@@ -433,8 +433,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--sulfur-height-nm must be non-negative and finite")
     if args.seed < 0:
         raise SystemExit("--seed must be non-negative")
-    if args.steps is not None and args.steps < 0:
-        raise SystemExit("--steps must be non-negative")
+    if args.steps is not None and args.steps <= 0:
+        raise SystemExit("--steps must be positive")
     if args.minimize_iterations < 0:
         raise SystemExit("--minimize-iterations must be non-negative")
     if args.frames <= 0:

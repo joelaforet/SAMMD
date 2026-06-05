@@ -110,3 +110,30 @@ def test_validate_args_rejects_invalid_solvent_count() -> None:
 
     with pytest.raises(SystemExit, match="--solvent-count"):
         smoke.validate_args(args)
+
+
+def test_validate_args_rejects_zero_steps() -> None:
+    """Require explicit smoke step overrides to run at least one step."""
+
+    smoke = load_smoke_tool()
+    args = Namespace(
+        lateral_size_nm=2.0,
+        solvent_padding_nm=3.0,
+        timestep_fs=0.5,
+        friction_per_ps=1.0,
+        pd_s_sigma_angstrom=2.2,
+        pd_s_epsilon_kcal_mol=1.0,
+        duration_ns=5.0,
+        sulfur_height_nm=0.0,
+        seed=1,
+        steps=0,
+        frames=300,
+        minimize_iterations=1,
+        report_interval=1,
+        reactant_count=None,
+        solvent_count="auto",
+        water_count=None,
+    )
+
+    with pytest.raises(SystemExit, match="--steps must be positive"):
+        smoke.validate_args(args)
