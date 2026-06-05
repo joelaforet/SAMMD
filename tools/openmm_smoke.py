@@ -116,21 +116,18 @@ def main(argv: list[str] | None = None) -> int:
         openff_modules,
         config.sam.components[0].smiles,
         config.sam.components[0].name,
-        args.seed,
     )
     reactant_template = molecule_template_from_smiles(
         modules,
         openff_modules,
         reactant.smiles,
         reactant.name,
-        args.seed + 17,
     )
     solvent_template = molecule_template_from_smiles(
         modules,
         openff_modules,
         solvent_component.smiles or SOLVENT_SMILES,
         solvent_component.name,
-        args.seed + 31,
     )
 
     smoke_build = (
@@ -355,8 +352,6 @@ def validate_args(args: argparse.Namespace) -> None:
             raise SystemExit("--solvent-count must be 'auto' or a positive integer")
 
 
-
-
 def resolve_solvent_count(solvent_count: str, plan: Any, solvent_name: str) -> int:
     """Resolve explicit or plan-derived solvent count."""
 
@@ -377,7 +372,6 @@ def resolve_reactant_count(reactant_count: int | None, plan: Any, reactant_name:
         if reactant.name == reactant_name:
             return max(1, reactant.count)
     raise ValueError(f"reactant {reactant_name!r} was not planned")
-
 
 
 def smoke_summary(
@@ -603,8 +597,6 @@ def write_pdbx(path: Path, app: Any, topology: Any, positions: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         app.PDBxFile.writeFile(topology, positions, handle, keepIds=True)
-
-
 
 
 if __name__ == "__main__":

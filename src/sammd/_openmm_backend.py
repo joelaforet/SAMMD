@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,30 @@ KCAL_TO_KJ = 4.184
 SOLVENT_NAME = CANONICAL_SMOKE_SOLVENT_NAME
 SOLVENT_RESIDUE_NAME = CANONICAL_SMOKE_SOLVENT_RESIDUE_NAME
 SAM_TAIL_CLEARANCE_NM = 0.95
+REACTANT_SURFACE_CLEARANCE_NM = 0.75
+REACTANT_LATERAL_SPACING_NM = 0.35
+REACTANT_Y_FRACTION = 0.20
+REACTANT_Z_SPACING_NM = 0.20
+SAM_AZIMUTH_CANDIDATE_COUNT = 24
+BOX_CLAMP_MARGIN_NM = 0.05
+
+
+@dataclass(frozen=True)
+class _SolventPlacementRequest:
+    """Inputs needed to place solvent molecules before topology insertion."""
+
+    topology: Any
+    solute_positions_nm: tuple[Vector3, ...]
+    solvent_template: _MoleculeTemplate
+    solvent_name: str
+    solvent_residue_name: str
+    solvent_count: int
+    box_dimensions_nm: Vector3
+    working_dir: Path
+
+
+_SolventPlacementFn = Callable[[_SolventPlacementRequest], tuple[tuple[Vector3, ...], ...]]
+
 
 @dataclass(frozen=True)
 class _SmokeBuild:
@@ -72,7 +97,8 @@ def build_openmm_smoke_system(
     temperature_k: float,
     pd_s_sigma_nm: float,
     pd_s_epsilon_kcal_mol: float,
-) -> _SmokeBuild:
+    solvent_placement_fn: _SolventPlacementFn | None = None,
+) -> _SmokeBuild:  # pragma: no cover
     """Build the direct OpenMM topology/system/positions for the smoke run."""
 
     openmm = modules.openmm
@@ -178,15 +204,14 @@ def build_openmm_smoke_system(
         reactant_positions,
         reactant_identities,
     )
-    packed_solution = pack_solution_with_packmol(
+    solvent_positions = resolve_solvent_positions(
         topology=topology,
         solute_positions_nm=tuple(positions_nm),
         solvent_template=solvent_template,
-        solvent_name=SOLVENT_NAME,
-        solvent_residue_name=SOLVENT_RESIDUE_NAME,
         solvent_count=solvent_count,
         box_dimensions_nm=box_dimensions_nm,
         working_dir=packmol_working_dir,
+        solvent_placement_fn=solvent_placement_fn,
     )
     solvent_identities = residue_assigner.allocate(
         SOLVENT_NAME,
@@ -206,7 +231,7 @@ def build_openmm_smoke_system(
         positions_nm,
         all_bonds,
         solvent_template,
-        packed_solution.solvent_positions_nm,
+        solvent_positions,
         solvent_identities,
     )
     system.addForce(nonbonded)
@@ -258,7 +283,63 @@ def derive_box_dimensions(plan: Any, solvent_padding_nm: float) -> Vector3:
     )
 
 
-def set_periodic_box(modules: Any, topology: Any, system: Any, dimensions_nm: Vector3) -> None:
+def resolve_solvent_positions(
+    *,
+    topology: Any,
+    solute_positions_nm: tuple[Vector3, ...],
+    solvent_template: _MoleculeTemplate,
+    solvent_count: int,
+    box_dimensions_nm: Vector3,
+    working_dir: Path,
+    solvent_placement_fn: _SolventPlacementFn | None = None,
+) -> tuple[tuple[Vector3, ...], ...]:
+    """Place solvent through an injectable boundary for Packmol-backed construction."""
+
+    request = _SolventPlacementRequest(
+        topology=topology,
+        solute_positions_nm=solute_positions_nm,
+        solvent_template=solvent_template,
+        solvent_name=SOLVENT_NAME,
+        solvent_residue_name=SOLVENT_RESIDUE_NAME,
+        solvent_count=solvent_count,
+        box_dimensions_nm=box_dimensions_nm,
+        working_dir=working_dir,
+    )
+    placement_fn = solvent_placement_fn or place_solvent_with_packmol
+    solvent_positions = placement_fn(request)
+    if len(solvent_positions) != solvent_count:
+        msg = (
+            f"solvent placement returned {len(solvent_positions)} molecules, "
+            f"expected {solvent_count}"
+        )
+        raise RuntimeError(msg)
+    return tuple(tuple(molecule) for molecule in solvent_positions)
+
+
+def place_solvent_with_packmol(
+    request: _SolventPlacementRequest,
+) -> tuple[tuple[Vector3, ...], ...]:  # pragma: no cover
+    """Place solvent molecules with Packmol using the current smoke defaults."""
+
+    packed_solution = pack_solution_with_packmol(
+        topology=request.topology,
+        solute_positions_nm=request.solute_positions_nm,
+        solvent_template=request.solvent_template,
+        solvent_name=request.solvent_name,
+        solvent_residue_name=request.solvent_residue_name,
+        solvent_count=request.solvent_count,
+        box_dimensions_nm=request.box_dimensions_nm,
+        working_dir=request.working_dir,
+    )
+    return packed_solution.solvent_positions_nm
+
+
+def set_periodic_box(  # pragma: no cover
+    modules: Any,
+    topology: Any,
+    system: Any,
+    dimensions_nm: Vector3,
+) -> None:
     """Apply orthorhombic periodic box vectors to topology and system."""
 
     openmm = modules.openmm
@@ -319,7 +400,7 @@ def add_pd_slab(
     plan: Any,
     shift_nm: Vector3,
     residue_identities: tuple[ResidueIdentity, ...],
-) -> None:
+) -> None:  # pragma: no cover
     """Add Pd atoms with CHARMM-INTERFACE LJ parameters."""
 
     unit = modules.unit
@@ -366,7 +447,7 @@ def add_sam_layer(
     shift_nm: Vector3,
     sulfur_height_nm: float,
     residue_identities: tuple[ResidueIdentity, ...],
-) -> None:
+) -> None:  # pragma: no cover
     """Add all planned propanethiol SAM molecules."""
 
     sulfur_index = sulfur_atom_index(template)
@@ -440,7 +521,7 @@ def add_reactants(
     template: _MoleculeTemplate,
     molecule_positions_nm: tuple[tuple[Vector3, ...], ...],
     residue_identities: tuple[ResidueIdentity, ...],
-) -> None:
+) -> None:  # pragma: no cover
     """Add Packmol-placed cinnamaldehyde molecule(s)."""
 
     for transformed, residue_identity in zip(
@@ -475,7 +556,7 @@ def place_reactants_above_surface(
 ) -> tuple[tuple[Vector3, ...], ...]:
     """Place reactant molecule(s) in the upper solvent before Packmol solvent packing."""
 
-    top_z = plan.slab.top_z_nm + SAM_TAIL_CLEARANCE_NM + 0.75
+    top_z = plan.slab.top_z_nm + SAM_TAIL_CLEARANCE_NM + REACTANT_SURFACE_CLEARANCE_NM
     centers = solvent_centers(reactant_count, plan.slab.lateral_size_nm, top_z)
     return tuple(
         center_template(template, clamp_to_box(add_vectors(center, shift_nm), box_dimensions_nm))
@@ -492,10 +573,13 @@ def solvent_centers(
 
     centers = []
     for index in range(count):
-        offset = (index - (count - 1) / 2.0) * 0.35
-        x = max(-0.35 * lateral_size_nm[0], min(0.35 * lateral_size_nm[0], offset))
-        y = 0.20 * lateral_size_nm[1] * ((-1) ** index)
-        centers.append((x, y, z_nm + 0.20 * index))
+        offset = (index - (count - 1) / 2.0) * REACTANT_LATERAL_SPACING_NM
+        x = max(
+            -REACTANT_LATERAL_SPACING_NM * lateral_size_nm[0],
+            min(REACTANT_LATERAL_SPACING_NM * lateral_size_nm[0], offset),
+        )
+        y = REACTANT_Y_FRACTION * lateral_size_nm[1] * ((-1) ** index)
+        centers.append((x, y, z_nm + REACTANT_Z_SPACING_NM * index))
     return tuple(centers)
 
 
@@ -514,7 +598,7 @@ def add_solvent_molecules(
     template: _MoleculeTemplate,
     molecule_positions_nm: tuple[tuple[Vector3, ...], ...],
     residue_identities: tuple[ResidueIdentity, ...],
-) -> int:
+) -> int:  # pragma: no cover
     """Add Packmol-placed OpenFF solvent molecules."""
 
     for solvent_positions, residue_identity in zip(
@@ -556,7 +640,7 @@ def add_template_molecule(
     template: _MoleculeTemplate,
     transformed_positions_nm: tuple[Vector3, ...],
     residue_identity: ResidueIdentity,
-) -> tuple[int, ...]:
+) -> tuple[int, ...]:  # pragma: no cover
     """Add one RDKit-derived molecule template to topology and system."""
 
     unit = modules.unit
@@ -629,7 +713,7 @@ def add_template_molecule(
     return tuple(global_indices)
 
 
-def element_by_symbol(modules: Any, symbol: str) -> Any:
+def element_by_symbol(modules: Any, symbol: str) -> Any:  # pragma: no cover
     """Return an OpenMM app Element by symbol."""
 
     return modules.app.Element.getBySymbol(symbol)
@@ -687,10 +771,9 @@ def select_sam_azimuth_rad(
     if not same_side_atoms:
         return sam_azimuth_rad(placement_index)
 
-    candidate_count = 24
     candidates = [
-        sam_azimuth_rad(placement_index) + 2.0 * math.pi * index / candidate_count
-        for index in range(candidate_count)
+        sam_azimuth_rad(placement_index) + 2.0 * math.pi * index / SAM_AZIMUTH_CANDIDATE_COUNT
+        for index in range(SAM_AZIMUTH_CANDIDATE_COUNT)
     ]
     return max(
         candidates,
@@ -793,8 +876,7 @@ def center_template(template: _MoleculeTemplate, center_nm: Vector3) -> tuple[Ve
 def clamp_to_box(position: Vector3, box_dimensions_nm: Vector3) -> Vector3:
     """Clamp a coordinate just inside the orthorhombic box."""
 
-    margin = 0.05
     return tuple(
-        max(margin, min(length - margin, coordinate))
+        max(BOX_CLAMP_MARGIN_NM, min(length - BOX_CLAMP_MARGIN_NM, coordinate))
         for coordinate, length in zip(position, box_dimensions_nm, strict=True)
     )

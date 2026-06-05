@@ -10,6 +10,7 @@ from sammd.geometry import Vector3
 _OPENFF_FORCE_FIELD = "openff-2.2.1.offxml"
 _NAGL_CHARGE_MODEL = "openff-gnn-am1bcc-1.0.0.pt"
 
+
 @dataclass(frozen=True)
 class _BondParameter:
     """OpenFF-derived harmonic bond parameter."""
@@ -93,7 +94,7 @@ class _MoleculeTemplate:
     force_field: str
 
 
-def require_openmm_modules() -> Any:
+def require_openmm_modules() -> Any:  # pragma: no cover
     """Import OpenMM lazily with guidance for pixi science users."""
 
     try:
@@ -105,7 +106,7 @@ def require_openmm_modules() -> Any:
     return type("OpenMMModules", (), {"openmm": openmm, "app": app, "unit": unit})
 
 
-def require_openff_modules() -> Any:
+def require_openff_modules() -> Any:  # pragma: no cover
     """Import OpenFF Toolkit/NAGL lazily for proper small-molecule parameters."""
 
     try:
@@ -130,12 +131,12 @@ def require_openff_modules() -> Any:
         },
     )
 
+
 def molecule_template_from_smiles(
     modules: Any,
     openff_modules: Any,
     smiles: str,
     name: str,
-    seed: int,
 ) -> _MoleculeTemplate:
     """Build an OpenFF/NAGL-parameterized molecule template."""
 
@@ -169,7 +170,9 @@ def molecule_template_from_smiles(
         _ConstraintParameter(
             atom1=openmm_system.getConstraintParameters(index)[0],
             atom2=openmm_system.getConstraintParameters(index)[1],
-            distance_nm=openmm_system.getConstraintParameters(index)[2].value_in_unit(unit.nanometer),
+            distance_nm=openmm_system.getConstraintParameters(index)[2].value_in_unit(
+                unit.nanometer
+            ),
         )
         for index in range(openmm_system.getNumConstraints())
     )
@@ -250,23 +253,19 @@ def extract_openff_forces(
                     epsilon.value_in_unit(unit.kilojoule_per_mole),
                 )
                 for charge, sigma, epsilon in (
-                    force.getParticleParameters(index)
-                    for index in range(force.getNumParticles())
+                    force.getParticleParameters(index) for index in range(force.getNumParticles())
                 )
             ]
             exceptions = [
                 _ExceptionParameter(
                     atom1=atom1,
                     atom2=atom2,
-                    chargeprod_e2=chargeprod.value_in_unit(
-                        unit.elementary_charge**2
-                    ),
+                    chargeprod_e2=chargeprod.value_in_unit(unit.elementary_charge**2),
                     sigma_nm=sigma.value_in_unit(unit.nanometer),
                     epsilon_kj_mol=epsilon.value_in_unit(unit.kilojoule_per_mole),
                 )
                 for atom1, atom2, chargeprod, sigma, epsilon in (
-                    force.getExceptionParameters(index)
-                    for index in range(force.getNumExceptions())
+                    force.getExceptionParameters(index) for index in range(force.getNumExceptions())
                 )
             ]
         elif isinstance(force, openmm.HarmonicBondForce):
@@ -275,9 +274,7 @@ def extract_openff_forces(
                     atom1=atom1,
                     atom2=atom2,
                     length_nm=length.value_in_unit(unit.nanometer),
-                    k_kj_mol_nm2=k.value_in_unit(
-                        unit.kilojoule_per_mole / unit.nanometer**2
-                    ),
+                    k_kj_mol_nm2=k.value_in_unit(unit.kilojoule_per_mole / unit.nanometer**2),
                 )
                 for atom1, atom2, length, k in (
                     force.getBondParameters(index) for index in range(force.getNumBonds())
@@ -290,9 +287,7 @@ def extract_openff_forces(
                     atom2=atom2,
                     atom3=atom3,
                     angle_rad=angle.value_in_unit(unit.radian),
-                    k_kj_mol_rad2=k.value_in_unit(
-                        unit.kilojoule_per_mole / unit.radian**2
-                    ),
+                    k_kj_mol_rad2=k.value_in_unit(unit.kilojoule_per_mole / unit.radian**2),
                 )
                 for atom1, atom2, atom3, angle, k in (
                     force.getAngleParameters(index) for index in range(force.getNumAngles())
@@ -310,8 +305,7 @@ def extract_openff_forces(
                     k_kj_mol=k.value_in_unit(unit.kilojoule_per_mole),
                 )
                 for atom1, atom2, atom3, atom4, periodicity, phase, k in (
-                    force.getTorsionParameters(index)
-                    for index in range(force.getNumTorsions())
+                    force.getTorsionParameters(index) for index in range(force.getNumTorsions())
                 )
             ]
     if not nonbonded:

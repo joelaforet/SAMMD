@@ -55,8 +55,6 @@ source = ["sammd"]
 omit = [
   "docs/*",
   "notebooks/*",
-  "src/sammd/_openmm_backend.py",
-  "src/sammd/_openmm_templates.py",
   "tests/*",
 ]
 
