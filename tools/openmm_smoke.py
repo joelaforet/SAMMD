@@ -11,7 +11,6 @@ import argparse
 import csv
 import json
 import math
-import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,7 +19,7 @@ from typing import Any
 import yaml
 
 from sammd.builders import build_system
-from sammd.config import SAMMDConfig, load_config
+from sammd.config import SAMMDConfig
 from sammd.forcefields import get_fcc_metal_parameters
 from sammd.geometry import (
     Vector3,
@@ -45,14 +44,32 @@ from sammd.openmm_runtime import (
 )
 from sammd.packmol import pack_solution_with_packmol
 from sammd.topology import ComponentResidueAssigner, ResidueIdentity, get_or_add_chain
+from sammd.workflow import (
+    CANONICAL_SMOKE_SOLVENT_NAME,
+    CANONICAL_SMOKE_SOLVENT_RESIDUE_NAME,
+    CANONICAL_SMOKE_SOLVENT_SMILES,
+    DEFAULT_SMOKE_OUTPUT_DIR,
+    RunSchedule,
+    SmokePaths,
+    load_smoke_config,
+    prepare_outputs,
+    resolve_run_schedule,
+    smoke_paths,
+)
+from sammd.workflow import (
+    ETHANOL_DENSITY_G_ML as WORKFLOW_ETHANOL_DENSITY_G_ML,
+)
+from sammd.workflow import (
+    ETHANOL_MASS_G_MOL as WORKFLOW_ETHANOL_MASS_G_MOL,
+)
 
 KCAL_TO_KJ = 4.184
-ETHANOL_MASS_G_MOL = 46.06844
-ETHANOL_DENSITY_G_ML = 0.789
-SOLVENT_NAME = "ethanol"
-SOLVENT_RESIDUE_NAME = "EOH"
-SOLVENT_SMILES = "CCO"
-DEFAULT_OUTPUT_DIR = "outputs/openmm_smoke/pd111_propanethiol_cinnamaldehyde"
+ETHANOL_MASS_G_MOL = WORKFLOW_ETHANOL_MASS_G_MOL
+ETHANOL_DENSITY_G_ML = WORKFLOW_ETHANOL_DENSITY_G_ML
+SOLVENT_NAME = CANONICAL_SMOKE_SOLVENT_NAME
+SOLVENT_RESIDUE_NAME = CANONICAL_SMOKE_SOLVENT_RESIDUE_NAME
+SOLVENT_SMILES = CANONICAL_SMOKE_SOLVENT_SMILES
+DEFAULT_OUTPUT_DIR = DEFAULT_SMOKE_OUTPUT_DIR
 DEFAULT_LATERAL_SIZE_NM = 2.0
 DEFAULT_SOLVENT_PADDING_NM = 3.0
 DEFAULT_SOLVENT_COUNT = "auto"
@@ -156,25 +173,6 @@ class MoleculeTemplate:
 
 
 @dataclass(frozen=True)
-class SmokePaths:
-    """Resolved files written by the smoke workflow."""
-
-    output_dir: Path
-    build_config: Path
-    topology: Path
-    minimized_positions: Path
-    final_positions: Path
-    trajectory: Path
-    thermodynamics: Path
-    checkpoint: Path
-    state_xml: Path
-    system_xml: Path
-    anchor_metadata: Path
-    summary: Path
-    packmol_dir: Path
-
-
-@dataclass(frozen=True)
 class SmokeBuild:
     """Constructed OpenMM objects plus index metadata for stability checks."""
 
@@ -197,18 +195,6 @@ class SmokeBuild:
     temperature_k: float
 
 
-@dataclass(frozen=True)
-class RunSchedule:
-    """Resolved integration and reporting schedule."""
-
-    requested_duration_ns: float
-    simulated_duration_ns: float
-    total_steps: int
-    report_interval: int
-    frames: int
-    timestep_fs: float
-
-
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point for the real-system smoke workflow."""
 
@@ -218,7 +204,14 @@ def main(argv: list[str] | None = None) -> int:
     paths = smoke_paths(Path(args.output_dir))
     prepare_outputs(paths, overwrite=args.overwrite)
 
-    config = load_smoke_config(args)
+    config = load_smoke_config(
+        args.config,
+        lateral_size_nm=args.lateral_size_nm,
+        solvent_padding_nm=args.solvent_padding_nm,
+        seed=args.seed,
+        timestep_fs=args.timestep_fs,
+        reporter_interval_steps=args.report_interval or 1,
+    )
     plan = build_system(config, output_dir=paths.output_dir, seed=args.seed)
     schedule = resolve_run_schedule(
         duration_ns=args.duration_ns,
@@ -497,80 +490,6 @@ def require_openff_modules() -> Any:
     )
 
 
-def smoke_paths(output_dir: Path) -> SmokePaths:
-    """Resolve deterministic smoke output paths."""
-
-    return SmokePaths(
-        output_dir=output_dir,
-        build_config=output_dir / "build_config.yaml",
-        topology=output_dir / "topology.cif",
-        minimized_positions=output_dir / "minimized_positions.cif",
-        final_positions=output_dir / "final_positions.cif",
-        trajectory=output_dir / "trajectory.dcd",
-        thermodynamics=output_dir / "thermodynamics.csv",
-        checkpoint=output_dir / "checkpoint.chk",
-        state_xml=output_dir / "state.xml",
-        system_xml=output_dir / "system.xml",
-        anchor_metadata=output_dir / "anchor_metadata.json",
-        summary=output_dir / "smoke_summary.json",
-        packmol_dir=output_dir / "packmol",
-    )
-
-
-def prepare_outputs(paths: SmokePaths, *, overwrite: bool) -> None:
-    """Create output directory and enforce safe overwrite semantics."""
-
-    paths.output_dir.mkdir(parents=True, exist_ok=True)
-    for path in paths.__dict__.values():
-        if path == paths.output_dir:
-            continue
-        if path.exists() and not overwrite:
-            raise FileExistsError(f"refusing to overwrite existing smoke output: {path}")
-        if path.exists() and overwrite:
-            if path.is_dir():
-                shutil.rmtree(path)
-            else:
-                path.unlink()
-    metrics_path = paths.output_dir / "smoke_metrics.csv"
-    if metrics_path.exists() and not overwrite:
-        raise FileExistsError(f"refusing to overwrite existing smoke output: {metrics_path}")
-    if metrics_path.exists() and overwrite:
-        metrics_path.unlink()
-
-
-def load_smoke_config(args: argparse.Namespace) -> SAMMDConfig:
-    """Load user config or create a compact default real-system smoke config."""
-
-    if args.config is not None:
-        return load_config(args.config)
-    return SAMMDConfig.model_validate(
-        {
-            "surface": {
-                "slab": {
-                    "lateral_size_nm": [args.lateral_size_nm, args.lateral_size_nm],
-                }
-            },
-            "solvent": {
-                "padding_nm": args.solvent_padding_nm,
-                "components": [
-                    {
-                        "name": SOLVENT_NAME,
-                        "smiles": SOLVENT_SMILES,
-                        "mole_fraction": 1.0,
-                        "density_g_ml": ETHANOL_DENSITY_G_ML,
-                        "molar_mass_g_mol": ETHANOL_MASS_G_MOL,
-                    }
-                ],
-            },
-            "reporters": {"interval_steps": args.report_interval or 1},
-            "simulation": {
-                "seed": args.seed,
-                "timestep_fs": args.timestep_fs,
-            },
-        }
-    )
-
-
 def resolve_solvent_count(solvent_count: str, plan: Any, solvent_name: str) -> int:
     """Resolve explicit or plan-derived solvent count."""
 
@@ -591,49 +510,6 @@ def resolve_reactant_count(reactant_count: int | None, plan: Any, reactant_name:
         if reactant.name == reactant_name:
             return max(1, reactant.count)
     raise ValueError(f"reactant {reactant_name!r} was not planned")
-
-
-def resolve_run_schedule(
-    *,
-    duration_ns: float,
-    timestep_fs: float,
-    steps: int | None,
-    frames: int,
-    report_interval: int | None,
-) -> RunSchedule:
-    """Resolve integer MD steps and reporter cadence for an exact frame count."""
-
-    if report_interval is not None:
-        total_steps = (
-            steps if steps is not None else max(1, round(duration_ns * 1.0e6 / timestep_fs))
-        )
-        resolved_frames = total_steps // report_interval
-        return RunSchedule(
-            requested_duration_ns=duration_ns,
-            simulated_duration_ns=total_steps * timestep_fs / 1.0e6,
-            total_steps=total_steps,
-            report_interval=report_interval,
-            frames=resolved_frames,
-            timestep_fs=timestep_fs,
-        )
-
-    if steps is not None:
-        total_steps = steps
-        report_interval = max(1, round(steps / frames))
-        resolved_frames = total_steps // report_interval
-    else:
-        requested_steps = max(1, round(duration_ns * 1.0e6 / timestep_fs))
-        report_interval = max(1, math.ceil(requested_steps / frames))
-        total_steps = report_interval * frames
-        resolved_frames = frames
-    return RunSchedule(
-        requested_duration_ns=duration_ns,
-        simulated_duration_ns=total_steps * timestep_fs / 1.0e6,
-        total_steps=total_steps,
-        report_interval=report_interval,
-        frames=resolved_frames,
-        timestep_fs=timestep_fs,
-    )
 
 
 def molecule_template_from_smiles(
