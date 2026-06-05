@@ -54,6 +54,12 @@ slab, chain B contains one propanethiolate residue per SAM molecule, chain C
 contains cinnamaldehyde, and chain D+ contains one ethanol residue per molecule
 with wrapping every 9999 residues.
 
+The smoke runner's default `--seed 2026` is the canonical validation contract.
+Changing `--seed` changes finite-system construction, including SAM/site placement,
+and the OpenMM stochastic velocity initialization. Alternate seeds are therefore
+distinct systems for seed-sensitivity exploration and should not be used to replace
+the canonical smoke validation result.
+
 `build_system()` currently returns a lightweight plan rather than OpenFF/OpenMM
 objects. The plan contains the validated config, a centered double-sided
 commensurate Pd(111) slab, fcc/hcp hollow binding sites, seeded top/bottom SAM

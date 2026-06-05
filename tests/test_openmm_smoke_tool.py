@@ -137,3 +137,20 @@ def test_validate_args_rejects_zero_steps() -> None:
 
     with pytest.raises(SystemExit, match="--steps must be positive"):
         smoke.validate_args(args)
+
+
+def test_seed_help_distinguishes_canonical_and_sensitivity_runs(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Document that alternate smoke seeds create distinct validation systems."""
+
+    smoke = load_smoke_tool()
+
+    with pytest.raises(SystemExit) as error:
+        smoke.parse_args(["--help"])
+
+    help_text = capsys.readouterr().out
+    assert error.value.code == 0
+    assert "Finite-system construction and velocity seed" in help_text
+    assert "canonical smoke validation" in help_text
+    assert "seed-sensitivity checks" in help_text
