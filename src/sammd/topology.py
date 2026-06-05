@@ -1,4 +1,9 @@
-"""Topology identity helpers for SAMMD visualization-friendly outputs."""
+"""Topology identity helpers for SAMMD visualization-friendly outputs.
+
+SAMMD surface systems intentionally use A=Pd slab, B=SAM, C=reactant, and D+=solvent.
+This project-specific convention differs from PolyzyMD protein/substrate/polymer chain
+semantics because SAMMD systems do not contain a protein chain.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,12 @@ from typing import Any
 
 MAX_RESIDUES_PER_CHAIN = 9999
 CHAIN_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+SAMMD_CHAIN_CONVENTION = {
+    "A": "Pd slab",
+    "B": "SAM",
+    "C": "reactant",
+    "D+": "solvent",
+}
 
 
 @dataclass(frozen=True)
@@ -20,7 +31,7 @@ class ResidueIdentity:
 
 
 class ComponentResidueAssigner:
-    """Assign PolyzyMD-style wrapping chain/residue identifiers by component."""
+    """Assign SAMMD surface-system wrapping chain/residue identifiers by component."""
 
     def __init__(self) -> None:
         self._next_chain_index = 0

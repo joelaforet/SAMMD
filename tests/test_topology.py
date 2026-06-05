@@ -2,11 +2,16 @@
 
 import pytest
 
-from sammd.topology import ComponentResidueAssigner, ResidueIdentity, get_or_add_chain
+from sammd.topology import (
+    SAMMD_CHAIN_CONVENTION,
+    ComponentResidueAssigner,
+    ResidueIdentity,
+    get_or_add_chain,
+)
 
 
 def test_component_residue_assigner_wraps_after_9999_residues() -> None:
-    """Follow PolyzyMD's one-repeat-unit-per-residue chain wrapping convention."""
+    """Follow SAMMD's one-repeat-unit-per-residue chain wrapping convention."""
 
     assigner = ComponentResidueAssigner()
 
@@ -54,3 +59,14 @@ def test_get_or_add_chain_reuses_existing_chain() -> None:
 
     assert first == second == "chain-A"
     assert topology.added == ["A"]
+
+
+def test_sammd_surface_chain_convention_is_documented() -> None:
+    """Document the SAMMD-specific surface chain convention in metadata."""
+
+    assert SAMMD_CHAIN_CONVENTION == {
+        "A": "Pd slab",
+        "B": "SAM",
+        "C": "reactant",
+        "D+": "solvent",
+    }

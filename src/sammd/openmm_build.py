@@ -84,6 +84,7 @@ class OpenMMSmokeBuilder:
         self._reactant_count: int | None = None
         self._solvent_template: Any | None = None
         self._solvent_count: int | None = None
+        self._finalized = False
 
     @classmethod
     def from_plan(
@@ -219,6 +220,8 @@ class OpenMMSmokeBuilder:
             Concrete smoke build object returned by the injected backend callable.
         """
 
+        if self._finalized:
+            raise RuntimeError("OpenMM smoke builder has already been finalized")
         self._require_stage_present(self._surface_added, self._SURFACE_STAGE, "finalize")
         self._require_stage_present(self._sam_template is not None, self._SAM_STAGE, "finalize")
         self._require_stage_present(
@@ -232,7 +235,7 @@ class OpenMMSmokeBuilder:
             "finalize",
         )
 
-        return self._construction_fn(
+        build = self._construction_fn(
             self._modules,
             self._plan,
             self._sam_template,
@@ -248,6 +251,8 @@ class OpenMMSmokeBuilder:
             pd_s_sigma_nm=options.pd_s_sigma_nm,
             pd_s_epsilon_kcal_mol=options.pd_s_epsilon_kcal_mol,
         )
+        self._finalized = True
+        return build
 
     @staticmethod
     def _require_stage_absent(already_added: bool, stage: str) -> None:
@@ -294,5 +299,5 @@ def _validate_single_sulfur_template(template: Any, label: str) -> None:
 def _validate_positive_count(count: int, label: str) -> None:
     """Validate a positive molecule count for a staged component."""
 
-    if count <= 0:
-        raise ValueError(f"{label} must be positive")
+    if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
+        raise ValueError(f"{label} must be a positive integer")

@@ -118,6 +118,53 @@ def test_builder_finalize_delegates_existing_constructor() -> None:
     assert calls[0]["kwargs"]["solvent_count"] == 3
 
 
+def test_builder_rejects_duplicate_finalize() -> None:
+    """A finalized builder should not invoke backend construction more than once."""
+
+    calls: list[dict[str, Any]] = []
+
+    def construction_fn(*args: Any, **kwargs: Any) -> str:
+        """Record construction inputs and return a sentinel build object."""
+
+        calls.append({"args": args, "kwargs": kwargs})
+        return "built"
+
+    builder = (
+        OpenMMSmokeBuilder.from_plan(
+            modules="modules",
+            plan=make_plan(),
+            construction_fn=construction_fn,
+        )
+        .add_surface()
+        .add_sam_layer(sulfur_template())
+        .add_reactants(carbon_template(), count=1)
+        .add_solvent(carbon_template(), count=1)
+    )
+
+    assert builder.finalize(default_options()) == "built"
+    with pytest.raises(RuntimeError, match="already been finalized"):
+        builder.finalize(default_options())
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("count", [True, False, 1.5, 0, -1])
+def test_builder_rejects_non_positive_integer_counts(count: object) -> None:
+    """Reactant and solvent counts must be positive non-boolean integers."""
+
+    reactant_builder = make_builder().add_surface().add_sam_layer(sulfur_template())
+    with pytest.raises(ValueError, match="reactant count must be a positive integer"):
+        reactant_builder.add_reactants(carbon_template(), count=count)  # type: ignore[arg-type]
+
+    solvent_builder = (
+        make_builder()
+        .add_surface()
+        .add_sam_layer(sulfur_template())
+        .add_reactants(carbon_template(), count=1)
+    )
+    with pytest.raises(ValueError, match="solvent count must be a positive integer"):
+        solvent_builder.add_solvent(carbon_template(), count=count)  # type: ignore[arg-type]
+
+
 def test_builder_rejects_sam_template_without_one_sulfur() -> None:
     """Existing single-sulfur SAM constraint should be preserved at the SAM stage."""
 
