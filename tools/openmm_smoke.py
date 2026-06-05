@@ -35,6 +35,7 @@ from sammd.geometry import (
     subtract_vectors,
 )
 from sammd.io import safe_write_text
+from sammd.openmm_build import OpenMMSmokeBuilder, OpenMMSmokeBuildOptions
 from sammd.openmm_runtime import (
     AnchorScalingMetadata,
     EnergyRecord,
@@ -246,21 +247,27 @@ def main(argv: list[str] | None = None) -> int:
         args.seed + 31,
     )
 
-    smoke_build = build_openmm_smoke_system(
-        modules,
-        plan,
-        sam_template,
-        reactant_template,
-        solvent_template,
-        solvent_count=solvent_count,
-        reactant_count=reactant_count,
-        sulfur_height_nm=args.sulfur_height_nm,
-        solvent_padding_nm=args.solvent_padding_nm,
-        packmol_working_dir=paths.packmol_dir,
-        pressure_bar=config.simulation.pressure_bar,
-        temperature_k=config.simulation.temperature_k,
-        pd_s_sigma_nm=args.pd_s_sigma_angstrom * 0.1,
-        pd_s_epsilon_kcal_mol=args.pd_s_epsilon_kcal_mol,
+    smoke_build = (
+        OpenMMSmokeBuilder.from_plan(
+            modules=modules,
+            plan=plan,
+            construction_fn=build_openmm_smoke_system,
+        )
+        .add_surface()
+        .add_sam_layer(sam_template)
+        .add_reactants(reactant_template, count=reactant_count)
+        .add_solvent(solvent_template, count=solvent_count)
+        .finalize(
+            OpenMMSmokeBuildOptions(
+                sulfur_height_nm=args.sulfur_height_nm,
+                solvent_padding_nm=args.solvent_padding_nm,
+                packmol_working_dir=paths.packmol_dir,
+                pressure_bar=config.simulation.pressure_bar,
+                temperature_k=config.simulation.temperature_k,
+                pd_s_sigma_nm=args.pd_s_sigma_angstrom * 0.1,
+                pd_s_epsilon_kcal_mol=args.pd_s_epsilon_kcal_mol,
+            )
+        )
     )
 
     write_build_config(
