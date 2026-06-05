@@ -48,6 +48,37 @@ def test_resolved_defaults() -> None:
     assert config.reactants[0].smiles == "C1=CC=C(C=C1)/C=C/C=O"
 
 
+def test_unsupported_facet_uses_sammd_message() -> None:
+    """Reject unsupported facets with a SAMMD-specific v0.1.0 message."""
+
+    data = _template_data()
+    data["surface"]["facet"] = "100"
+
+    with pytest.raises(ValidationError, match=r"only facet '111' is supported in SAMMD v0\.1\.0"):
+        load_config_dict(data)
+
+
+def test_sam_components_require_exactly_one_sulfur_anchor() -> None:
+    """Require one thiol/S anchor per SAM component for v0.1.0."""
+
+    data = _template_data()
+    data["sam"]["components"] = [{"name": "alkane", "smiles": "CCCC", "fraction": 1.0}]
+
+    with pytest.raises(ValidationError, match=r"exactly one sulfur atom.*thiol/S anchor"):
+        load_config_dict(data)
+
+    data = _template_data()
+    data["sam"]["components"] = [{"name": "dithiol", "smiles": "SCCS", "fraction": 1.0}]
+
+    with pytest.raises(ValidationError, match="supports exactly one thiol/S anchor"):
+        load_config_dict(data)
+
+    data = _template_data()
+    data["sam"]["components"] = [{"name": "bracketed", "smiles": "CC[SH]", "fraction": 1.0}]
+
+    assert load_config_dict(data).sam.components[0].smiles == "CC[SH]"
+
+
 def test_mixed_sam_fraction_validation() -> None:
     """Accept fraction-only mixed SAMs when fractions sum to one."""
 

@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 AnchorMode = Literal["nonbonded", "bonded"]
 AnchorSite = Literal["fcc_hollow", "hcp_hollow", "bridge", "atop"]
-Facet = Literal["111"]
+Facet = str
 Metal = Literal["Pd"]
 WaterModel = Literal["TIP3P"]
 EXPECTED_GRAFTING_DENSITY_UNIT = "nm^2 / molecule"
@@ -70,6 +70,16 @@ class SurfaceConfig(SAMMDBaseModel):
     facet: Facet = "111"
     slab: SlabConfig = Field(default_factory=SlabConfig)
 
+    @field_validator("facet")
+    @classmethod
+    def _validate_supported_facet(cls, value: str) -> str:
+        """Validate the SAMMD v0.1.0-supported metal surface facet."""
+
+        if value != "111":
+            msg = "only facet '111' is supported in SAMMD v0.1.0"
+            raise ValueError(msg)
+        return value
+
 
 class AnchorNonbondedConfig(SAMMDBaseModel):
     """Nonbonded sulfur-metal anchor proxy configuration."""
@@ -96,12 +106,78 @@ class SAMComponentConfig(SAMMDBaseModel):
 
     @model_validator(mode="after")
     def _validate_composition_mode(self) -> SAMComponentConfig:
-        """Require exactly one composition control per SAM component."""
+        """Require a valid SAM component composition and anchor chemistry."""
 
         if (self.fraction is None) == (self.count is None):
             msg = "each SAM component must define exactly one of fraction or count"
             raise ValueError(msg)
+        sulfur_count = count_smiles_sulfur_atoms(self.smiles)
+        if sulfur_count == 0:
+            msg = (
+                f"SAM component '{self.name}' must contain exactly one sulfur atom for "
+                "thiol/S anchor support in SAMMD v0.1.0"
+            )
+            raise ValueError(msg)
+        if sulfur_count > 1:
+            msg = (
+                f"SAM component '{self.name}' contains {sulfur_count} sulfur atoms; "
+                "SAMMD v0.1.0 supports exactly one thiol/S anchor per SAM component"
+            )
+            raise ValueError(msg)
         return self
+
+
+def count_smiles_sulfur_atoms(smiles: str) -> int:
+    """Count sulfur atoms in a SMILES string without optional chemistry backends.
+
+    Parameters
+    ----------
+    smiles
+        SMILES string for a SAM component.
+
+    Returns
+    -------
+    int
+        Number of bracketed or unbracketed sulfur atoms represented in the string.
+    """
+
+    sulfur_count = 0
+    index = 0
+    while index < len(smiles):
+        character = smiles[index]
+        if character == "[":
+            end_index = smiles.find("]", index + 1)
+            if end_index == -1:
+                index += 1
+                continue
+            if _bracket_atom_symbol(smiles[index + 1 : end_index]) in {"S", "s"}:
+                sulfur_count += 1
+            index = end_index + 1
+            continue
+        if character == "s":
+            sulfur_count += 1
+        elif character == "S":
+            next_character = smiles[index + 1] if index + 1 < len(smiles) else ""
+            if next_character not in {"e", "i"}:
+                sulfur_count += 1
+        index += 1
+    return sulfur_count
+
+
+def _bracket_atom_symbol(bracket_body: str) -> str:
+    """Extract a bracket atom symbol from simple SMILES bracket content."""
+
+    index = 0
+    while index < len(bracket_body) and bracket_body[index].isdigit():
+        index += 1
+    if index >= len(bracket_body):
+        return ""
+    first = bracket_body[index]
+    if first.islower() or first == "*":
+        return first
+    if first.isupper() and index + 1 < len(bracket_body) and bracket_body[index + 1].islower():
+        return bracket_body[index : index + 2]
+    return first
 
 
 class SAMConfig(SAMMDBaseModel):
