@@ -167,9 +167,9 @@ def molecule_template_from_smiles(
     ) = extract_openff_forces(modules, openmm_system)
     constraints = tuple(
         _ConstraintParameter(
-            atom1=openmm_system.get_ConstraintParameters(index)[0],
-            atom2=openmm_system.get_ConstraintParameters(index)[1],
-            distance_nm=openmm_system.get_ConstraintParameters(index)[2].value_in_unit(unit.nanometer),
+            atom1=openmm_system.getConstraintParameters(index)[0],
+            atom2=openmm_system.getConstraintParameters(index)[1],
+            distance_nm=openmm_system.getConstraintParameters(index)[2].value_in_unit(unit.nanometer),
         )
         for index in range(openmm_system.getNumConstraints())
     )
@@ -265,7 +265,7 @@ def extract_openff_forces(
                     epsilon_kj_mol=epsilon.value_in_unit(unit.kilojoule_per_mole),
                 )
                 for atom1, atom2, chargeprod, sigma, epsilon in (
-                    force.get_ExceptionParameters(index)
+                    force.getExceptionParameters(index)
                     for index in range(force.getNumExceptions())
                 )
             ]
@@ -280,7 +280,7 @@ def extract_openff_forces(
                     ),
                 )
                 for atom1, atom2, length, k in (
-                    force.get_BondParameters(index) for index in range(force.getNumBonds())
+                    force.getBondParameters(index) for index in range(force.getNumBonds())
                 )
             ]
         elif isinstance(force, openmm.HarmonicAngleForce):
@@ -295,7 +295,7 @@ def extract_openff_forces(
                     ),
                 )
                 for atom1, atom2, atom3, angle, k in (
-                    force.get_AngleParameters(index) for index in range(force.getNumAngles())
+                    force.getAngleParameters(index) for index in range(force.getNumAngles())
                 )
             ]
         elif isinstance(force, openmm.PeriodicTorsionForce):
@@ -310,7 +310,7 @@ def extract_openff_forces(
                     k_kj_mol=k.value_in_unit(unit.kilojoule_per_mole),
                 )
                 for atom1, atom2, atom3, atom4, periodicity, phase, k in (
-                    force.get_TorsionParameters(index)
+                    force.getTorsionParameters(index)
                     for index in range(force.getNumTorsions())
                 )
             ]
