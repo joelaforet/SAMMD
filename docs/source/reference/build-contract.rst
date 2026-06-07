@@ -83,10 +83,18 @@ artifacts. Missing reserved target artifacts such as ``positions.cif``,
 ``interchange.json``, ``system.xml``, and ``anchor_metadata.json`` are not
 failures in the current release.
 
-Future backend validation gates should cover full constructed atom counts,
-topology/positions/system agreement, no severe overlaps, charge and parameter
-assignment completeness, applied metal-S overrides, export reloadability, finite
-minimized coordinates, and lowered minimization energy.
+Future backend validation gates should stay skipped/not required when optional
+dependencies or backend artifacts are absent in the current release. Once the
+OpenFF/OpenMM backend writes concrete artifacts, those future gates should check
+that:
+
+* ``interchange.json`` reloads with ``Interchange.model_validate_json``.
+* The reloaded ``Interchange`` exports to an OpenMM ``System``.
+* Topology atom count, positions atom count, and OpenMM ``System`` particle
+  count agree.
+* ``system.xml`` deserializes if written and its particle count agrees with the
+  topology/positions/backend system count.
+* Minimization produces finite energies and the final energy is not increased.
 
 Artifact contract
 -----------------

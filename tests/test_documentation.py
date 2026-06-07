@@ -386,6 +386,26 @@ def test_build_contract_documents_first_release_boundary() -> None:
     assert "not a top-level public import" in " ".join(content.split())
 
 
+def test_build_contract_documents_deferred_backend_validation_gates() -> None:
+    """Lock the planned backend validation gates without requiring them now."""
+
+    page = PROJECT_ROOT / "docs" / "source" / "reference" / "build-contract.rst"
+    content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
+
+    required_phrases = [
+        "skipped/not required when optional dependencies or backend artifacts are absent",
+        "``interchange.json`` reloads with ``Interchange.model_validate_json``",
+        "reloaded ``Interchange`` exports to an OpenMM ``System``",
+        "Topology atom count, positions atom count, and OpenMM ``System`` particle count agree",
+        "``system.xml`` deserializes if written and its particle count agrees",
+        "Minimization produces finite energies and the final energy is not increased",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in normalized
+
+
 def test_yaml_configuration_docs_keep_backend_exports_reserved() -> None:
     """Keep YAML tutorial aligned with current lightweight build behavior."""
 

@@ -29,6 +29,27 @@ def test_default_build_plan_passes_validation(tmp_path: Path) -> None:
     assert report.to_summary()["passed"] is True
 
 
+def test_current_validation_gates_do_not_require_backend_artifacts(tmp_path: Path) -> None:
+    """Backend reload/export/minimization gates stay deferred for this release."""
+
+    plan = build_system({}, output_dir=tmp_path)
+    report = validate_build_plan(plan)
+    output_report = validate_output_paths(plan.output_paths)
+    current_gate_ids = {gate.gate_id for gate in report.gates + output_report.gates}
+    deferred_backend_gate_ids = {
+        "interchange_json_reload",
+        "interchange_openmm_export",
+        "topology_positions_system_atom_counts",
+        "system_xml_deserializes_particle_count",
+        "minimization_energy_finite_not_increased",
+    }
+
+    assert current_gate_ids.isdisjoint(deferred_backend_gate_ids)
+    assert not plan.output_paths.positions.exists()
+    assert not plan.output_paths.openff_interchange.exists()
+    assert not plan.output_paths.openmm_system.exists()
+
+
 def test_bad_box_volume_fails_validation(tmp_path: Path) -> None:
     """Box dimensions, bounds, and volume must agree."""
 
