@@ -80,6 +80,83 @@ def test_project_scope_page_uses_published_safe_link() -> None:
     assert "https://github.com/joelaforet/SAMMD/blob/main/docs/project-scope.md" in content
 
 
+def test_scientific_assumptions_page_exists_and_is_linked() -> None:
+    """Keep the beginner-facing assumptions page in the Explanation section."""
+
+    page = PROJECT_ROOT / "docs" / "source" / "explanation" / "scientific-assumptions.rst"
+    index = PROJECT_ROOT / "docs" / "source" / "index.rst"
+
+    assert page.is_file()
+    assert "explanation/scientific-assumptions" in index.read_text(encoding="utf-8")
+
+
+def test_readme_includes_approved_scientific_assumptions_wording() -> None:
+    """Lock the exact approved README science-boundary wording."""
+
+    page = PROJECT_ROOT / "README.md"
+    content = page.read_text(encoding="utf-8")
+    approved_wording = (
+        "SAMMD builds a physically reasonable starting structure with reproducible "
+        "force-field assignments for running MD simulations. The metal-S interaction "
+        "is modeled with a tunable, strengthened nonbonded interaction; it is not a "
+        "quantum or reactive description of chemisorption."
+    )
+
+    assert approved_wording in content
+
+
+def test_scientific_assumptions_document_current_model_boundaries() -> None:
+    """Document placement, force-field, backend-export, and simulation boundaries."""
+
+    page = PROJECT_ROOT / "docs" / "source" / "explanation" / "scientific-assumptions.rst"
+    content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
+
+    required_phrases = [
+        "registered Fcc(111) metal surfaces, defaulting to Pd(111)",
+        "slab is centered at the origin",
+        "SAMs placed normal to the surface: +z for the top face and -z for the bottom face",
+        "internal ``fcc_hollow`` default",
+        "selects sulfur pairs to the three nearest hollow-site metal atoms",
+        "neutral thiols with an HS/implicit-H thiol sulfur",
+        "not pre-deprotonated thiolates",
+        "Padding is measured from the fully extended SAM tips",
+        "Base metal Lennard-Jones parameters come from the INTERFACE Fcc metal data",
+        "target route for organic molecules is OpenFF",
+        "records and validates force-field choices",
+        "does not yet export a full OpenFF/OpenMM backend system",
+        "internal, post-export proxy",
+        "not currently a beginner YAML knob",
+        "does not own minimization, equilibration, production, trajectory writing, or "
+        "reporter setup",
+    ]
+    for phrase in required_phrases:
+        assert phrase in normalized
+
+
+def test_scientific_assumptions_do_not_overclaim_current_backend_or_simulations() -> None:
+    """Prevent assumptions docs from teaching unavailable exports or MD ownership."""
+
+    page = PROJECT_ROOT / "docs" / "source" / "explanation" / "scientific-assumptions.rst"
+    content = page.read_text(encoding="utf-8")
+    stale_patterns = [
+        r"SAMMD exports? a full OpenFF/OpenMM backend system",
+        r"SAMMD constructs? complete OpenMM systems",
+        r"SAMMD owns? minimization",
+        r"SAMMD runs? equilibration",
+        r"SAMMD runs? production",
+        r"SAMMD writes? trajectories",
+        r"SAMMD configures? reporters",
+        r"covalent metal-S bond",
+        r"is a quantum description",
+        r"is a reactive description",
+        r"is currently a beginner YAML knob",
+    ]
+
+    for pattern in stale_patterns:
+        assert re.search(pattern, content, flags=re.IGNORECASE) is None
+
+
 def test_project_scope_source_matches_first_release_contract() -> None:
     """Keep the source-of-truth scope doc aligned with v0.1.0 outputs."""
 

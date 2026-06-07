@@ -7,6 +7,8 @@ self-assembled monolayers on metal supports. The student-facing workflow uses a
 version-controllable YAML file to describe the system contents, packing, and
 parameterization choices before any OpenMM simulation protocol is written.
 
+SAMMD builds a physically reasonable starting structure with reproducible force-field assignments for running MD simulations. The metal-S interaction is modeled with a tunable, strengthened nonbonded interaction; it is not a quantum or reactive description of chemisorption.
+
 The package includes a generated CHARMM-INTERFACE Fcc metal OFFXML resource for
 OpenFF force-field assembly without making OpenFF a test dependency. Solution
 composition planning converts solvent mole fractions, explicit salt

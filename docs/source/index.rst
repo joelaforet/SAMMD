@@ -33,6 +33,7 @@ student-written OpenMM simulation scripts.
    :caption: Explanation
 
    explanation/project-scope
+   explanation/scientific-assumptions
 
 .. toctree::
    :maxdepth: 2
