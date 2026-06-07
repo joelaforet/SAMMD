@@ -117,7 +117,7 @@ The local notebook [`metal_example.ipynb`](file:///home/joelaforet/Desktop/SAMS_
 - `SolvatedMonolayer` fills a solvent box above the monolayer.
 - The Au surface example uses `mb.Lattice` and `TiledCompound`-style construction for Fcc metals.
 
-SAMMD should own its Pd(111) builder rather than depend on surface_coatings directly, because the MVP needs metal/facet-aware parameters, grafting-density controls, sulfur anchoring behavior, and OpenFF-ready topology handling.
+SAMMD should own its registered Fcc(111) builder, defaulting to Pd(111), rather than depend on surface_coatings directly, because the MVP needs metal/facet-aware parameters, grafting-density controls, sulfur anchoring behavior, and OpenFF-ready topology handling.
 
 ### Solvent And Packing
 
@@ -263,19 +263,19 @@ The total grafting density applies to all SAM components combined. The default g
 
 ### Slab Geometry And PBC
 
-The MVP box should be periodic in `x`, `y`, and `z`, with the Pd slab centered in `z`. The intended ordering is:
+The MVP box should be periodic in `x`, `y`, and `z`, with the registered Fcc(111) slab centered in `z`. Pd(111) remains the default and canonical scientific target. The intended ordering is:
 
 ```text
-Bulk solvent -> Bottom SAM -> Pd(111) slab -> Top SAM -> Bulk solvent
+Bulk solvent -> Bottom SAM -> Fcc(111) slab -> Top SAM -> Bulk solvent
 ```
 
 The bottom SAM should point toward negative `z`; the top SAM should point toward positive `z`. Through PBC, the two bulk solvent regions are one continuous bulk phase.
 
-The Pd slab should be restrained by default. We are not simulating SAM assembly or metal reconstruction; the surface mainly provides geometry and INTERFACE-derived nonbonded parameters. Use positional restraints to keep Pd atoms near ideal lattice coordinates. The default positional restraint force constant is `10000 kJ mol^-1 nm^-2`, with the exact units and restraint form documented in the generated YAML template.
+The registered Fcc(111) slab should be restrained by default. We are not simulating SAM assembly or metal reconstruction; the surface mainly provides geometry and INTERFACE-derived nonbonded parameters. Use positional restraints to keep metal atoms near ideal lattice coordinates. The default positional restraint force constant is `10000 kJ mol^-1 nm^-2`, with the exact units and restraint form documented in the generated YAML template.
 
-The slab must be thick enough that the two decorated interfaces do not see each other through the nonbonded cutoff. With a typical 0.9-1.2 nm cutoff and Pd(111) layer spacing of roughly `a / sqrt(3)`, a safe starting point is 8-10 Pd(111) layers. This should be configurable, validated against the chosen cutoff, and documented with a warning if the requested slab is too thin.
+The slab must be thick enough that the two decorated interfaces do not see each other through the nonbonded cutoff. With a typical 0.9-1.2 nm cutoff and registered Fcc(111) layer spacing of roughly `a / sqrt(3)`, a safe starting point is 8-10 layers for the default Pd(111) target. This should be configurable, validated against the chosen cutoff, and documented with a warning if the requested slab is too thin.
 
-For the first notebook/demo, a practical starting system is roughly 5 x 5 nm in the lateral plane, 8 Pd layers, SAMs on both faces, and at least 3 nm solvent padding from the fully extended SAM tips to the box boundary on each side before PBC wrapping. This is large enough for a full SAM coating and multiple cinnamaldehyde reactants (`C1=CC=C(C=C1)/C=C/C=O`) while still being plausible for prototype runs.
+For the first notebook/demo, a practical starting system is roughly 5 x 5 nm in the lateral plane, 8 layers of the default Pd(111) slab, SAMs on both faces, and at least 3 nm solvent padding from the fully extended SAM tips to the box boundary on each side before PBC wrapping. This is large enough for a full SAM coating and multiple cinnamaldehyde reactants (`C1=CC=C(C=C1)/C=C/C=O`) while still being plausible for prototype runs.
 
 Default metal-sulfur anchoring should begin as an internal nonbonded proxy:
 

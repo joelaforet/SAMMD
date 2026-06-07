@@ -12,12 +12,23 @@ from sammd.forcefields import (
     sigma_from_rmin_half,
     write_interface_metal_offxml,
 )
+from sammd.surfaces import FCC_SURFACE_REGISTRY
 
 
 def test_registry_contains_all_fcc_metals() -> None:
     """Reproduce the CHARMM-INTERFACE Fcc metal set."""
 
     assert set(FCC_METAL_LJ_REGISTRY) == {"Ag", "Al", "Au", "Cu", "Ni", "Pb", "Pd", "Pt"}
+
+
+def test_surface_registry_matches_interface_fcc_metal_metadata() -> None:
+    """Keep Fcc(111) surface metadata aligned with INTERFACE Fcc metals."""
+
+    surface_metals = {metal for metal, facet in FCC_SURFACE_REGISTRY if facet == "111"}
+
+    assert surface_metals == set(FCC_METAL_LJ_REGISTRY)
+    for symbol in surface_metals:
+        assert get_fcc_metal_parameters(symbol).symbol == symbol
 
 
 def test_registry_reproduces_pd_values() -> None:

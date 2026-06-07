@@ -87,25 +87,31 @@ class BindingSite:
     nearest_metal_atom_indices: tuple[int, ...] = ()
 
 
-# Ambient fcc lattice constants from the CRC Handbook/WebElements-style elemental
-# crystal data tables, converted from angstrom to nanometers. The metals match
-# the CHARMM-INTERFACE Fcc metal parameter registry in sammd.forcefields.
+# Ambient fcc cubic lattice constants for the CHARMM-INTERFACE Fcc metal set.
+# Provenance: WebElements, "Crystal structures of the elements" element pages,
+# exact URLs below, "Cell dimensions" table values in picometers, accessed
+# 2026-06-07. Values below are converted to nanometers and rounded to the
+# precision shown in the source table. Pd keeps the project-default 0.389 nm
+# value, consistent with the same 389 pm tabulation.
+FCC_SURFACE_LATTICE_CONSTANTS_NM: tuple[tuple[str, float, str], ...] = (
+    ("Ag", 0.40853, "https://www.webelements.com/silver/crystal_structure.html"),
+    ("Al", 0.40495, "https://www.webelements.com/aluminium/crystal_structure.html"),
+    ("Au", 0.40782, "https://www.webelements.com/gold/crystal_structure.html"),
+    ("Cu", 0.36149, "https://www.webelements.com/copper/crystal_structure.html"),
+    ("Ni", 0.35238, "https://www.webelements.com/nickel/crystal_structure.html"),
+    ("Pb", 0.49508, "https://www.webelements.com/lead/crystal_structure.html"),
+    ("Pd", 0.389, "https://www.webelements.com/palladium/crystal_structure.html"),
+    ("Pt", 0.39242, "https://www.webelements.com/platinum/crystal_structure.html"),
+)
+
+
 FCC_SURFACE_REGISTRY: dict[tuple[str, str], FccSurfaceMetadata] = {
     (symbol, "111"): FccSurfaceMetadata(
         metal=symbol,
         facet="111",
         lattice_constant_nm=lattice_constant_nm,
     )
-    for symbol, lattice_constant_nm in [
-        ("Ag", 0.40853),
-        ("Al", 0.40495),
-        ("Au", 0.40782),
-        ("Cu", 0.36149),
-        ("Ni", 0.35238),
-        ("Pb", 0.49508),
-        ("Pd", 0.389),
-        ("Pt", 0.39242),
-    ]
+    for symbol, lattice_constant_nm, _source_url in FCC_SURFACE_LATTICE_CONSTANTS_NM
 }
 
 
