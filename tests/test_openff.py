@@ -42,7 +42,57 @@ def test_openff_backend_availability_reports_missing_dependencies(
     assert not availability.backend_available
     assert any("OpenFF Toolkit" in message for message in availability.messages)
     assert any("OpenFF Interchange" in message for message in availability.messages)
+    assert "OpenFF Toolkit" in availability.guidance
+    assert "OpenFF Interchange" in availability.guidance
     assert _loaded_optional_modules(("openff", "openmm", "rdkit")) == optional_modules_before
+
+
+def test_openff_backend_availability_handles_absent_parent_package(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Treat find_spec absent-parent failures as unavailable optional backends."""
+
+    openff_adapter = importlib.import_module("sammd.openff")
+
+    def fake_find_spec(name: str):
+        raise ModuleNotFoundError("No module named 'openff'", name=name)
+
+    monkeypatch.setattr(openff_adapter.importlib_util, "find_spec", fake_find_spec)
+
+    availability = openff_adapter.check_openff_backend_availability()
+
+    assert not availability.toolkit_available
+    assert not availability.interchange_available
+    assert not availability.backend_available
+    assert any("OpenFF Toolkit" in message for message in availability.messages)
+    assert any("OpenFF Interchange" in message for message in availability.messages)
+
+
+def test_openff_backend_availability_reports_partial_dependencies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Report Interchange guidance when Toolkit is discoverable but Interchange is not."""
+
+    openff_adapter = importlib.import_module("sammd.openff")
+
+    def fake_find_spec(name: str):
+        if name == "openff.toolkit":
+            return object()
+        if name == "openff.interchange":
+            return None
+        raise AssertionError(name)
+
+    monkeypatch.setattr(openff_adapter.importlib_util, "find_spec", fake_find_spec)
+
+    availability = openff_adapter.check_openff_backend_availability()
+
+    assert availability.toolkit_available
+    assert not availability.interchange_available
+    assert not availability.backend_available
+    assert not any("Toolkit is not installed" in message for message in availability.messages)
+    assert any("OpenFF Interchange" in message for message in availability.messages)
+    assert "OpenFF Interchange" in availability.guidance
+    assert "OpenFF Toolkit" not in availability.guidance
 
 
 def test_force_field_inputs_from_config_are_inspectable_without_openff_imports() -> None:

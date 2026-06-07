@@ -102,21 +102,34 @@ def require_openff_interchange() -> Any:
         raise ImportError(OPENFF_INTERCHANGE_INSTALL_GUIDANCE) from error
 
 
+def _dotted_module_is_available(name: str) -> bool:
+    """Return whether a dotted optional module can be found without importing it."""
+
+    try:
+        return importlib_util.find_spec(name) is not None
+    except (ModuleNotFoundError, ImportError, ValueError):
+        return False
+
+
 def check_openff_backend_availability() -> OpenFFBackendAvailability:
     """Check optional OpenFF backend module availability without importing it."""
 
-    toolkit_available = importlib_util.find_spec("openff.toolkit") is not None
-    interchange_available = importlib_util.find_spec("openff.interchange") is not None
+    toolkit_available = _dotted_module_is_available("openff.toolkit")
+    interchange_available = _dotted_module_is_available("openff.interchange")
     messages: list[str] = []
+    guidance_messages: list[str] = []
     if not toolkit_available:
         messages.append("OpenFF Toolkit is not installed or not discoverable.")
+        messages.append(OPENFF_INSTALL_GUIDANCE)
+        guidance_messages.append(OPENFF_INSTALL_GUIDANCE)
     if not interchange_available:
         messages.append("OpenFF Interchange is not installed or not discoverable.")
-    if messages:
-        messages.append(OPENFF_INSTALL_GUIDANCE)
+        messages.append(OPENFF_INTERCHANGE_INSTALL_GUIDANCE)
+        guidance_messages.append(OPENFF_INTERCHANGE_INSTALL_GUIDANCE)
     return OpenFFBackendAvailability(
         toolkit_available=toolkit_available,
         interchange_available=interchange_available,
+        guidance="\n\n".join(guidance_messages),
         messages=tuple(messages),
     )
 
