@@ -14,7 +14,7 @@ face and -z for the bottom face.
 
 The hollow-site placement strategy is an internal ``fcc_hollow`` default. SAMMD
 selects sulfur pairs to the three nearest hollow-site metal atoms for each placed
-thiol anchor. Beginner YAML input does not choose fcc or hcp sites directly in
+thiol anchor. Beginner YAML input does not expose adsorption-site selection in
 this release.
 
 Beginner SAM inputs should be neutral thiols with an HS/implicit-H thiol sulfur,

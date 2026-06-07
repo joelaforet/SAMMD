@@ -157,6 +157,18 @@ def test_scientific_assumptions_do_not_overclaim_current_backend_or_simulations(
         assert re.search(pattern, content, flags=re.IGNORECASE) is None
 
 
+def test_beginner_docs_do_not_use_stale_fcc_or_hcp_wording() -> None:
+    """Prevent beginner docs from exposing stale hollow-site selection wording."""
+
+    beginner_doc_paths = [
+        PROJECT_ROOT / "docs" / "source" / "explanation" / "scientific-assumptions.rst",
+        PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst",
+    ]
+
+    for path in beginner_doc_paths:
+        assert "fcc or hcp" not in path.read_text(encoding="utf-8")
+
+
 def test_project_scope_source_matches_first_release_contract() -> None:
     """Keep the source-of-truth scope doc aligned with v0.1.0 outputs."""
 
