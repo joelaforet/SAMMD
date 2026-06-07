@@ -122,7 +122,10 @@ def test_main_docs_preserve_build_export_vs_openmm_run_model() -> None:
             "OpenMM runs minimization, equilibration, production, trajectories, and reporters",
         ],
         PROJECT_ROOT / "docs" / "source" / "index.rst": [
-            "building and exporting self-assembled monolayer chemistry, structure, and parameter artifacts",
+            (
+                "building and exporting self-assembled monolayer chemistry, "
+                "structure, and parameter artifacts"
+            ),
             "OpenMM owns minimization, equilibration, production runs, trajectories, and reporters",
         ],
         PROJECT_ROOT / "docs" / "source" / "reference" / "build-contract.rst": [
@@ -131,7 +134,10 @@ def test_main_docs_preserve_build_export_vs_openmm_run_model() -> None:
         ],
         PROJECT_ROOT / "docs" / "project-scope.md": [
             "SAMMD builds and exports chemistry, structure, and parameter artifacts",
-            "OpenMM runs minimization, equilibration, production MD, trajectory writing, and reporter setup",
+            (
+                "OpenMM runs minimization, equilibration, production MD, "
+                "trajectory writing, and reporter setup"
+            ),
             "without making SAMMD-owned run wrappers the canonical API",
         ],
     }
@@ -542,7 +548,10 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
     assert "SAMMD does not provide OpenMM simulation wrappers" in normalized
     assert "GROMACS, LAMMPS, and Amber are future downstream exports" in normalized
     assert "not beginner workflow commands" in normalized
-    assert "students will hand those build artifacts to their own OpenMM Python API script" in normalized
+    assert (
+        "students will hand those build artifacts to their own OpenMM Python API script"
+        in normalized
+    )
     assert "That handoff is not runnable in this lightweight release" in normalized
 
     current_outputs_section = re.search(
