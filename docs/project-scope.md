@@ -16,33 +16,33 @@ z: Bulk solvent -> Bottom SAM -> Metal slab -> Top SAM -> Bulk solvent
 
 The top and bottom bulk solvent regions are the same phase through periodic boundary conditions in `z`. The slab is centered in the box, SAM molecules decorate both exposed surfaces, and the metal slab must be thick enough that species on one SAM/slab interface do not interact with the other interface through the nonbonded cutoff.
 
-## MVP Boundary
+## v0.1.0 First-Release Boundary
 
 Ship a Python-first workflow before a broad CLI.
 
-Recommended MVP deliverables:
+Recommended v0.1.0 first-release deliverables:
 
 - Pixi-installable Python package with `src/` layout.
 - Pydantic configuration models loaded from YAML.
 - A minimal `sammd init` command that writes a commented template YAML file.
-- A canonical Jupyter notebook showing build, parameterization, OpenMM setup, and basic inspection.
+- A canonical Jupyter notebook showing configuration, deterministic build planning, export, and basic inspection.
 - A Pd(111) slab builder and propanethiol SAM placement with tunable grafting density.
 - Mixed SAM support through multiple SAM component definitions with fractions or explicit counts.
 - Centered, double-sided Pd(111) slab geometry with SAMs on both faces and solvent on both sides.
 - OpenFF/SMIRNOFF parameterization for organic SAM, solvent, salts, and reactants where supported by OpenFF.
 - CHARMM-INTERFACE-derived Fcc metal Lennard-Jones parameters converted to an OpenFF-compatible offxml resource.
-- Visualization-friendly output files, with mmCIF/PDBx for topology/starting coordinates and DCD for trajectories.
-- OpenMM thermodynamic reporting during simulation, configurable by the user.
+- Visualization-friendly build artifacts, centered on mmCIF/PDBx topology-inspection output plus machine-readable build summaries.
 - Pytest coverage for configuration validation, parameter conversion, deterministic builders, and import smoke tests.
 - ReadTheDocs/Sphinx scaffold with a canonical workflow tutorial and YAML configuration tutorial.
 
-Defer until after MVP:
+Defer until after v0.1.0:
 
 - Full production CLI for build/run/submit workflows.
 - SLURM or other HPC orchestration.
 - Umbrella sampling automation.
 - General metal facet support beyond the first Pd(111) path.
 - Explicit metal-sulfur bonded topology terms unless needed to correct SAM geometry.
+- SAMMD-owned OpenMM setup, tutorial simulations, DCD trajectory output, and thermodynamic reporting wrappers. Tutorial-only user code may demonstrate OpenMM usage, but those simulations are not part of the SAMMD v0.1.0 build contract.
 - Advanced analysis workflows beyond basic orientation observables.
 
 ## Reference Findings
@@ -151,8 +151,8 @@ Initial package modules:
 - `sammd.solvation`: solvent mixture, salt, and reactant count calculations from solvent-only mole fractions and concentrations, followed by OpenFF/PACKMOL packing.
 - `sammd.builders`: high-level builder. Current v0.1.0 code returns a lightweight deterministic build plan; future backend integration should add full OpenFF `Interchange` construction.
 - `sammd.simulation`: post-v0.1.0 target module for thin, user-facing OpenMM setup and run helpers, not part of the v0.1.0 first-release contract.
-- `sammd.io`: mmCIF/PDBx topology writing, DCD trajectory naming conventions, and visualization-oriented metadata helpers.
-- `sammd.reporting`: OpenMM reporter configuration for trajectories and thermodynamic state data.
+- `sammd.io`: v0.1.0 mmCIF/PDBx topology-inspection writing; post-v0.1.0 DCD trajectory naming conventions and visualization-oriented metadata helpers.
+- `sammd.reporting`: post-v0.1.0 OpenMM reporter configuration for trajectories and thermodynamic state data.
 - `sammd.analysis`: orientation metrics and later umbrella-sampling support.
 - `sammd.cli`: minimal `init` and maybe `validate` commands.
 
@@ -194,7 +194,7 @@ simulation = system.create_openmm_simulation()
 
 ### Simulation API Abstraction
 
-Simulation wrappers are post-v0.1.0 target work and are excluded from the v0.1.0 first-release contract. The current release does not provide `create_openmm_simulation`, minimization, equilibration, production MD, trajectory writing, or reporter setup helpers.
+Simulation wrappers are post-v0.1.0 target work and are excluded from the v0.1.0 first-release contract. Lightweight/internal OpenMM utilities may exist for development, but v0.1.0 does not expose student-facing SAMMD ownership of `create_openmm_simulation`, minimization, equilibration, production MD, trajectory writing, or reporter setup in the top-level build workflow.
 
 Future SAMMD releases should provide a user-facing simulation interface for the canonical workflow, not require users to write pure OpenMM code for routine runs.
 
@@ -211,7 +211,7 @@ For the nonbonded anchor proxy, users should only need to set the interaction ma
 
 SAMMD-generated systems should be optimized for visualization in tools such as PyMOL.
 
-Default output artifacts for a built or simulated system should include:
+Default post-v0.1.0 or tutorial-only user-code artifacts for a simulated system should include:
 
 - `topology.cif`: mmCIF/PDBx topology and starting coordinates.
 - `trajectory.dcd`: DCD trajectory from OpenMM.
@@ -226,11 +226,11 @@ until implemented: `positions.cif`, `interchange.json`, and `system.xml`.
 
 mmCIF/PDBx should be preferred over legacy PDB because SAMMD systems may have many atoms, many solvent/reactant molecules, nonstandard residues, and metal particles. Atom names, residue names, chain IDs, molecule labels, and component metadata should be chosen so PyMOL sessions are easy to inspect: metal slab, top SAM, bottom SAM, solvent, salts, and reactants should be distinguishable by selection.
 
-DCD should be the canonical trajectory format for the MVP. The topology/trajectory pair should load cleanly as `topology.cif` plus `trajectory.dcd` in PyMOL or common Python analysis tools.
+DCD should be the canonical post-v0.1.0/tutorial OpenMM trajectory convention, not a v0.1.0 build artifact. The topology/trajectory pair should load cleanly as `topology.cif` plus `trajectory.dcd` in PyMOL or common Python analysis tools once SAMMD-owned simulation workflows are added.
 
 ### Thermodynamic Reporting
 
-OpenMM simulations should report key thermodynamic quantities while they run. The user-facing configuration should allow users to choose output path, reporting interval, and reported fields.
+Post-v0.1.0 or tutorial-only OpenMM simulations should report key thermodynamic quantities while they run. Future user-facing configuration should allow users to choose output path, reporting interval, and reported fields.
 
 Default report fields for normal runs should include at least:
 
@@ -243,7 +243,7 @@ Default report fields for normal runs should include at least:
 - Volume and density for periodic systems when available.
 - Simulation speed and elapsed time when available.
 
-For tests, reporter configuration should request every supported field so schema validation and reporter construction cover the full surface area. Users should be able to override this with a smaller field list for production runs.
+For post-v0.1.0 reporting tests, reporter configuration should request every supported field so schema validation and reporter construction cover the full surface area. Users should be able to override this with a smaller field list for production runs.
 
 ### Mixed SAMs
 
@@ -312,7 +312,7 @@ High-value unit tests for the first implementation:
 
 - YAML template loads into the Pydantic model.
 - YAML template defaults include `fcc_hollow`, TIP3P, `0.25 nm^2 / molecule`, and `10000 kJ mol^-1 nm^-2` Pd restraints.
-- YAML template includes configurable output/reporting sections for mmCIF, DCD, and thermodynamic state data.
+- YAML template includes v0.1.0 configurable output sections for mmCIF build artifacts; DCD and thermodynamic state data remain post-v0.1.0/tutorial-only simulation conventions.
 - Invalid metal, facet, grafting density, solvent fraction, or concentration fails clearly.
 - Mixed SAM fractions must sum to one, or explicit counts must match selected grafting sites.
 - INTERFACE Fcc metal registry reproduces the table above.
@@ -322,9 +322,9 @@ High-value unit tests for the first implementation:
 - Pd(111) slab thickness validation warns or fails when the slab is thinner than the configured nonbonded cutoff plus buffer.
 - Propanethiol sulfur anchor detection is deterministic for `CCCS`.
 - Cinnamaldehyde reactant parsing is deterministic for `C1=CC=C(C=C1)/C=C/C=O`.
-- Reporter configuration maps user field names to OpenMM reporter arguments.
-- Test reporter defaults request all supported thermodynamic fields.
-- mmCIF and DCD output paths are deterministic and can be overridden.
+- Post-v0.1.0 reporter configuration maps user field names to OpenMM reporter arguments.
+- Post-v0.1.0 test reporter defaults request all supported thermodynamic fields.
+- v0.1.0 mmCIF output paths are deterministic and can be overridden; DCD output paths are post-v0.1.0/tutorial-only simulation conventions.
 - Python public imports are stable.
 
 Integration tests should be marked separately because OpenFF/OpenMM/packmol can be slow or environment-sensitive.
@@ -357,8 +357,8 @@ The docs should assume undergraduate contributors and make success states explic
 - Solvent and reactant placement should use OpenFF/PACKMOL-style packing, with counts derived from target composition.
 - Reactant orientation analysis can begin with a configurable COM-to-selection vector relative to the surface normal.
 - mmCIF/PDBx is the default topology/starting-coordinate output format.
-- DCD is the default trajectory output format.
-- OpenMM thermodynamic state data should be written during runs, with tests requesting all supported fields and users allowed to override fields/intervals.
+- DCD is the default post-v0.1.0/tutorial-only OpenMM trajectory output convention, not a v0.1.0 build artifact.
+- OpenMM thermodynamic state data should be written during post-v0.1.0/tutorial-only runs, with future tests requesting all supported fields and users allowed to override fields/intervals.
 
 ## Remaining Open Questions
 
@@ -366,7 +366,7 @@ The docs should assume undergraduate contributors and make success states explic
 
 ## Implementation Readiness
 
-The scope is ready for MVP scaffolding. The first implementation pass should create the package skeleton, pixi/pyproject configuration, Pydantic YAML schema, template generation, INTERFACE metal registry, and tests for the resolved defaults before implementing expensive OpenFF/OpenMM build steps.
+The scope is ready for v0.1.0 scaffolding. The first implementation pass should create the package skeleton, pixi/pyproject configuration, Pydantic YAML schema, template generation, INTERFACE metal registry, lightweight build/export artifacts, and tests for the resolved defaults before implementing expensive OpenFF/OpenMM build or simulation steps.
 
 ## Links
 

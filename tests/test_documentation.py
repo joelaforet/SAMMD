@@ -1,6 +1,7 @@
 """Documentation and notebook scaffold checks."""
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -95,7 +96,49 @@ def test_project_scope_source_matches_first_release_contract() -> None:
     assert "`positions.cif`, `interchange.json`, and `system.xml`" in content
     assert "Simulation wrappers are post-v0.1.0 target work" in content
     assert "excluded from the v0.1.0 first-release contract" in content
-    assert "does not provide `create_openmm_simulation`, minimization, equilibration" in content
+    assert "Lightweight/internal OpenMM utilities may exist" in content
+    assert "does not expose student-facing SAMMD ownership" in content
+
+
+def test_project_scope_keeps_simulation_work_out_of_current_scope() -> None:
+    """Prevent stale MVP/current-scope ownership of OpenMM simulation outputs."""
+
+    page = PROJECT_ROOT / "docs" / "project-scope.md"
+    content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
+
+    stale_phrases = [
+        "Recommended MVP deliverables",
+        "OpenMM setup, and basic inspection",
+        "OpenMM thermodynamic reporting during simulation, configurable by the user",
+        "DCD should be the canonical trajectory format for the MVP",
+        "DCD is the default trajectory output format.",
+        "YAML template includes configurable output/reporting sections for mmCIF, DCD, "
+        "and thermodynamic state data",
+        "The current release does not provide `create_openmm_simulation`, "
+        "minimization, equilibration",
+    ]
+    for phrase in stale_phrases:
+        assert phrase not in content
+
+    first_release_section = re.search(
+        r"Recommended v0\.1\.0 first-release deliverables:(.*?)Defer until after v0\.1\.0:",
+        content,
+        flags=re.DOTALL,
+    )
+    assert first_release_section is not None
+    first_release_deliverables = first_release_section.group(1)
+    assert "OpenMM setup" not in first_release_deliverables
+    assert "DCD" not in first_release_deliverables
+    assert "thermodynamic reporting" not in first_release_deliverables
+
+    guarded_patterns = [
+        r"post-v0\.1\.0[^.]*OpenMM setup",
+        r"DCD[^.]*post-v0\.1\.0/tutorial[^.]*not a v0\.1\.0 build artifact",
+        r"OpenMM thermodynamic state data[^.]*post-v0\.1\.0/tutorial-only",
+    ]
+    for pattern in guarded_patterns:
+        assert re.search(pattern, normalized) is not None
 
 
 def test_build_contract_documents_first_release_boundary() -> None:
