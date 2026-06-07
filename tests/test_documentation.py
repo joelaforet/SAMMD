@@ -450,8 +450,8 @@ def test_build_contract_documents_deferred_backend_validation_gates() -> None:
         assert phrase in normalized
 
 
-def test_yaml_configuration_docs_describe_backend_export_mode() -> None:
-    """Keep YAML tutorial aligned with lightweight and backend build behavior."""
+def test_yaml_configuration_docs_describe_openmm_export_files() -> None:
+    """Keep YAML tutorial aligned with default and OpenMM export files."""
 
     page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "yaml-configuration.rst"
     content = page.read_text(encoding="utf-8")
@@ -459,39 +459,37 @@ def test_yaml_configuration_docs_describe_backend_export_mode() -> None:
 
     assert "used while building the system" not in content
     assert "defines system construction and parameterization only" not in content
-    assert "backend export" in content
-    assert "validates and records these choices" in content
-    assert "current build artifacts such as ``topology.cif``" in normalized
-    assert "backend artifacts written by ``--export-backend``" in normalized
+    assert "complete OpenMM simulation system" in content
+    assert "checks and saves these choices" in normalized
+    assert "Names build output files such as ``topology.cif``" in normalized
+    assert "OpenMM export files written by ``--export-backend``" in normalized
     assert "``anchor_metadata.json``" in normalized
-    assert "``Interchange.model_dump_json``" in content
-    assert "``Interchange.model_validate_json``" in content
-    assert "pre-1.0 interchange json compatibility" in normalized.lower()
-    assert "not guaranteed" in normalized.lower()
-    assert "OpenMM is the student teaching path" in normalized
-    assert "``system.xml`` is only a convenience export" in normalized
-    assert "GROMACS, LAMMPS, and Amber are future downstream exports" in normalized
-    assert "not beginner workflow commands" in normalized
+    assert "``interchange.json`` stores OpenFF Interchange data" in normalized
+    assert "this JSON format may change between versions" in normalized
+    assert "For this tutorial, use OpenMM" in normalized
+    assert "``system.xml`` is an OpenMM file only" in normalized
+    assert "GROMACS, LAMMPS, or Amber exports" in normalized
+    assert "This version does not include GROMACS, LAMMPS, or Amber exports" in normalized
 
 
-def test_yaml_configuration_docs_clarify_beginner_schema_boundary() -> None:
-    """Keep YAML docs clear about SAM chemistry and deferred student knobs."""
+def test_yaml_configuration_docs_clarify_beginner_schema_limits() -> None:
+    """Keep YAML docs clear about SAM chemistry and beginner settings."""
 
     page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "yaml-configuration.rst"
     content = page.read_text(encoding="utf-8")
     normalized = " ".join(content.split())
 
-    assert "registered Fcc(111) INTERFACE surface" in normalized
+    assert "Fcc(111) metal surface from the INTERFACE force field" in normalized
     assert "neutral thiol SAM components" in normalized
     assert "HS/implicit-H thiol sulfur" in normalized
     assert "not a pre-deprotonated thiolate" in normalized
-    assert "strengthened nonbonded interaction" in normalized
-    assert "not as covalent, quantum," in normalized
-    assert "not yet a student-facing YAML knob" in normalized
-    assert "optional ``extended_length_nm``" in normalized
-    assert "fully extended SAM length used for box planning" in normalized
-    assert "requested z distance from fully extended SAM tips to the box boundary" in normalized
-    assert "same planned box volume is used for solvent, reactant, and salt counts" in normalized
+    assert "stronger nonbonded interaction" in normalized
+    assert "not as a covalent bond or chemical reaction" in normalized
+    assert "You cannot change this interaction in this beginner YAML file" in normalized
+    assert "``extended_length_nm`` to change the estimated fully extended SAM length" in normalized
+    assert "used to size the box" in normalized
+    assert "distance in ``z`` from the estimated SAM tips to the box edge" in normalized
+    assert "planned box volume to count solvent, reactant, and salt molecules" in normalized
 
 
 def test_developer_guide_cli_map_includes_build() -> None:

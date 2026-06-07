@@ -1,8 +1,8 @@
 YAML configuration tutorial
 ===========================
 
-SAMMD uses a strict Pydantic v2 schema loaded from YAML. Unknown keys are
-rejected so that spelling mistakes fail early.
+SAMMD checks the YAML file with Pydantic v2. Unknown keys are rejected so
+spelling mistakes fail early.
 
 Minimal starting point
 ----------------------
@@ -17,37 +17,34 @@ Important sections
 ------------------
 
 ``surface``
-   Selects a registered Fcc(111) INTERFACE surface. The registry supports
-   ``Ag``, ``Al``, ``Au``, ``Cu``, ``Ni``, ``Pb``, ``Pd``, and ``Pt`` with
-   ``facet: "111"`` and defaults to Pd(111). Users provide only the lateral
-   ``x`` and ``y`` size. SAMMD chooses the slab thickness automatically from the
-   registered metal geometry and nonbonded cutoff.
+   Selects an Fcc(111) metal surface from the INTERFACE force field. SAMMD
+   supports ``Ag``, ``Al``, ``Au``, ``Cu``, ``Ni``, ``Pb``, ``Pd``, and ``Pt``
+   with ``facet: "111"`` and defaults to Pd(111). You only set the surface
+   size in ``x`` and ``y``. SAMMD chooses the slab thickness from the metal
+   geometry and nonbonded cutoff.
 
 ``sam``
    Defines grafting density and one or more neutral thiol SAM components.
    Components should include the HS/implicit-H thiol sulfur in the SMILES, not a
-   pre-deprotonated thiolate. Metal-S attachment is represented/planned
-   internally as a strengthened nonbonded interaction, not as covalent, quantum,
-   or reactive chemistry, and it is not yet a student-facing YAML knob. The
-   current internal strategy records three nearest metal atoms at each Fcc(111)
-   hollow anchor for a future post-export OpenMM pair-specific LJ override; users
-   do not configure the override strength or site in this YAML file.
-   SAMMD plans internal sulfur anchor poses, but there is no YAML anchor-site or
-   sulfur-height setting in the beginner schema.
+   pre-deprotonated thiolate. SAMMD models the metal-S attachment as a stronger
+   nonbonded interaction, not as a covalent bond or chemical reaction. You cannot
+   change this interaction in this beginner YAML file. For each Fcc(111)
+   ``fcc_hollow`` anchor, SAMMD finds the three nearest metal atoms. OpenMM later
+   uses that information to strengthen the sulfur-metal Lennard-Jones
+   interaction. You do not set the anchor site or sulfur height here.
    Components need a human-readable name, a three-character ``residue_name``, a
    SMILES string, and either fractions that sum to 1.0 or explicit counts.
-   Advanced users may set optional ``extended_length_nm`` to override the
-   approximate fully extended SAM length used for box planning; otherwise SAMMD
-   applies a lightweight conservative SMILES heuristic with a 0.95 nm minimum
-   default.
+   Advanced users may set ``extended_length_nm`` to change the estimated fully
+   extended SAM length used to size the box. If you do not set it, SAMMD
+   estimates the length from the SMILES string and uses at least 0.95 nm.
 
 ``solvent``
-   Defines ``padding`` as the requested z distance from fully extended SAM tips
-   to the box boundary, plus solvent mole fractions normalized over solvent
-   components only. The same planned box volume is used for solvent, reactant,
-   and salt counts and later PACKMOL placement. Each component needs a
-   three-character ``residue_name``. Non-water solvents need density and molar
-   mass unless SAMMD has a supported built-in value.
+   Defines ``padding``, the distance in ``z`` from the estimated SAM tips to
+   the box edge. It also defines solvent mole fractions, normalized only over
+   the solvent components. SAMMD uses the planned box volume to count solvent,
+   reactant, and salt molecules, and then to place them with PACKMOL. Each
+   component needs a three-character ``residue_name``. Non-water solvents need
+   density and molar mass unless SAMMD has a supported built-in value.
 
 ``salts`` and ``reactants``
    Define optional ions and reactants. Reactants use exactly one of ``count`` or
@@ -59,43 +56,42 @@ Important sections
    Defines PACKMOL packing options such as tolerance and maximum loop count.
 
 ``parameterization``
-    Records the OpenFF small-molecule force field, charge model, INTERFACE metal
-    force-field resource, and nonbonded cutoff selected for backend export. The
-    default lightweight builder validates and records these choices without
-    constructing a parameterized backend system; ``sammd build --export-backend``
-    uses them in the science environment. The INTERFACE metal resource is the
-    base slab LJ model; selected sulfur-metal pair overrides are recorded in the
-    build summary as internal SAM metadata rather than configured here.
+     Records the OpenFF small-molecule force field, charge model, INTERFACE metal
+     force-field file, and nonbonded cutoff. The default builder checks and saves
+     these choices. It does not create a complete OpenMM simulation system unless
+     you run ``sammd build --export-backend`` in the science environment. The
+     INTERFACE metal file gives the base slab LJ parameters. SAMMD records
+     sulfur-metal LJ changes in the build summary; you do not configure them
+     here.
 
 ``outputs``
-    Names current build artifacts such as ``topology.cif``,
-    ``build_summary.json``, and ``resolved_config.yaml``. It also names backend
-    artifacts written by ``--export-backend`` such as ``positions.cif``,
-    ``interchange.json``, and ``system.xml``, plus ``anchor_metadata.json``.
-    These are not MD trajectory outputs. ``interchange.json`` uses JSON
-    serialization with ``Interchange.model_dump_json`` and reload through
-    ``Interchange.model_validate_json``; pre-1.0 Interchange JSON compatibility
-    is not guaranteed across versions. OpenMM is the student teaching path and
-    ``system.xml`` is only a convenience export; GROMACS, LAMMPS, and Amber are
-    future downstream exports from Interchange, not beginner workflow commands.
+     Names build output files such as ``topology.cif``,
+     ``build_summary.json``, and ``resolved_config.yaml``. It also names OpenMM
+     export files written by ``--export-backend`` such as ``positions.cif``,
+     ``interchange.json``, and ``system.xml``, plus ``anchor_metadata.json``.
+     These are not MD trajectory files. ``interchange.json`` stores OpenFF
+     Interchange data. Interchange is not yet at version 1.0, so this JSON
+     format may change between versions. For this tutorial, use OpenMM.
+     ``system.xml`` is an OpenMM file only. This version does not include
+     GROMACS, LAMMPS, or Amber exports.
 
 Resolved defaults to notice
 ---------------------------
 
-* The surface defaults to a ``[2.0, 2.0]`` nm Pd(111) lateral size
-* Slab thickness is hidden and chosen automatically
-* The SAM defaults to neutral propanethiol ``CCCS`` at ``0.25 nm^2 / molecule``
-* The solvent defaults to ethanol ``CCO`` with 3.0 nm padding from fully extended SAM tips to the box boundary
-* The default reactant is one cinnamaldehyde molecule
-* The default seed is 2026 for reproducible placement planning
+* The surface defaults to a ``[2.0, 2.0]`` nm Pd(111) size in ``x`` and ``y``.
+* SAMMD chooses the slab thickness automatically.
+* The SAM defaults to neutral propanethiol ``CCCS`` at ``0.25 nm^2 / molecule``.
+* The solvent defaults to ethanol ``CCO`` with 3.0 nm padding above the
+  estimated SAM tips.
+* The default reactant is one cinnamaldehyde molecule.
+* The default seed is 2026, so placement planning is reproducible.
 
-Current limitations
--------------------
+Limitations in this version
+---------------------------
 
-This config defines system construction choices and records parameterization
-selections for backend export. OpenMM simulation protocols, thermostats,
-barostats, equilibration stages, and trajectory saving are intentionally kept
-out of this release's YAML file.
+This YAML file controls how SAMMD builds the starting system and records
+force-field choices. It does not configure OpenMM simulation protocols,
+thermostats, barostats, equilibration stages, or trajectory saving.
 
 Beginner glossary
 -----------------
@@ -109,8 +105,9 @@ Beginner glossary
    force field.
 
 ``Fcc(111) slab``
-   A flat registered face-centered-cubic metal surface model. ``111`` names the
-   crystal face being exposed; Pd(111) is the default starting point.
+   A flat metal surface model with a face-centered-cubic crystal structure.
+   ``111`` names the exposed crystal face; Pd(111) is the default starting
+   point.
 
 ``grafting density``
    How much surface area is assigned to each attached SAM molecule. Smaller
@@ -125,7 +122,7 @@ Beginner glossary
    mole fractions should add to 1.0.
 
 ``topology``
-   The atoms, bonds, residue names, and starting coordinates for a full system.
+   The atoms, bonds, residue names, and, for some files, starting coordinates.
    The ``residue_name`` fields in the YAML control how components appear in
    topology files and molecular viewers.
 
@@ -135,6 +132,6 @@ Beginner glossary
 
 ``topology.cif``
    The first structure file to inspect after ``sammd build``. It shows the
-   configured surface and SAM sulfur anchor placeholders at planned sulfur
-   positions; full SAM molecule coordinates and trajectory frames are produced
-   later by backend construction and OpenMM simulation scripts.
+   configured surface and the planned sulfur anchor positions for the SAM.
+   Full SAM molecule coordinates are created when you export OpenMM files.
+   Trajectory frames are created later by OpenMM simulation scripts.
