@@ -503,8 +503,8 @@ def test_developer_guide_cli_map_includes_build() -> None:
     assert "``sammd init``, ``sammd validate``, and ``sammd build``" in content
 
 
-def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
-    """Ensure beginner docs separate current outputs from reserved artifacts."""
+def test_canonical_workflow_separates_default_and_backend_outputs() -> None:
+    """Check tutorial output sections."""
 
     page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst"
     content = page.read_text(encoding="utf-8")
@@ -513,47 +513,47 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
     expected_sections = [
         "1. Create config",
         "2. Validate config",
-        "3. Build system/plan",
-        "4. Inspect current outputs",
-        "5. Optional backend artifacts",
-        "6. OpenMM handoff",
+        "3. Build the starting model",
+        "4. Inspect outputs",
+        "5. Optional backend output files",
+        "6. Use these files with OpenMM",
         "7. Other engines",
     ]
     for section in expected_sections:
         assert section in content
     assert "SAMMD builds; OpenMM runs" in content
     assert "``topology.cif`` for a full system" not in content
-    assert "topology inspection of the deterministic plan" in content
-    assert "Today this command writes exactly three build artifacts" in content
+    assert "``topology.cif`` so you can inspect the planned topology" in content
+    assert "this command writes exactly three output files" in content
     assert "``resolved_config.yaml`` for the exact validated input used for the build" in content
     assert "default lightweight command does not write" in normalized
     assert "pixi run -e science sammd build" in content
     assert "--export-backend" in content
-    assert "``interchange.json`` for the primary portable OpenFF Interchange export" in normalized
+    assert "``interchange.json`` for the primary OpenFF Interchange export" in normalized
     assert (
-        "``system.xml`` for an OpenMM convenience export, not the primary portable artifact"
+        "``system.xml`` for an OpenMM file, not the primary OpenFF Interchange output"
         in normalized
     )
-    assert "``anchor_metadata.json`` for SAM anchor metadata export" in normalized
+    assert "``anchor_metadata.json`` for SAM anchor metadata" in normalized
     assert "``Interchange.model_dump_json``" in content
     assert "``Interchange.model_validate_json``" in content
     assert "``interchange.to_openmm()``" in content
     assert "pre-1.0 interchange json compatibility" in normalized.lower()
     assert "not guaranteed" in normalized.lower()
-    assert "OpenMM is the student teaching path" in normalized
-    assert "optionally use ``system.xml`` only as a convenience OpenMM system export" in normalized
+    assert "OpenMM is the recommended path for students" in normalized
+    assert "optionally use ``system.xml`` only as an OpenMM file" in normalized
     assert "create and run a raw OpenMM ``Simulation``" in normalized
-    assert "SAMMD does not provide OpenMM simulation wrappers" in normalized
-    assert "GROMACS, LAMMPS, and Amber are future downstream exports" in normalized
-    assert "not beginner workflow commands" in normalized
+    assert "SAMMD does not include helper wrappers for OpenMM simulations" in normalized
+    assert "Interchange may support GROMACS, LAMMPS, and Amber later" in normalized
+    assert "they do not have beginner command-line workflows in this version" in normalized
     assert (
-        "students will hand those build artifacts to their own OpenMM Python API script"
+        "students use them in their own OpenMM Python API script"
         in normalized
     )
-    assert "Salt-containing configs are rejected by backend export" in normalized
+    assert "Configs that include salt are rejected until backend export supports salt" in normalized
 
     current_outputs_section = re.search(
-        r"Today this command writes exactly three build artifacts:(.*?)The returned build plan",
+        r"In this version, this command writes exactly three output files:(.*?)The result includes",
         content,
         flags=re.DOTALL,
     )

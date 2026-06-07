@@ -1,9 +1,9 @@
-Canonical build-to-OpenMM workflow
-==================================
+Recommended build-to-OpenMM workflow
+====================================
 
-This tutorial shows the current student-facing path: SAMMD builds a checked,
-deterministic starting plan, and the optional backend export writes artifacts
-that students can hand to OpenMM. SAMMD builds; OpenMM runs.
+This tutorial shows the recommended path for students. SAMMD checks the YAML,
+builds the same starting structure each time, and, if requested, writes files
+you can load in OpenMM. SAMMD builds; OpenMM runs.
 
 1. Create config
 ----------------
@@ -31,95 +31,94 @@ Validate the YAML before building anything:
 Validation checks that SAMMD can interpret the file and reports configuration
 errors before any output files are written.
 
-3. Build system/plan
---------------------
+3. Build the starting model
+---------------------------
 
-Build the current deterministic system plan:
+Build the starting model:
 
 .. code-block:: bash
 
    sammd build sammd.yaml --output-dir outputs --overwrite
 
-Today this command writes exactly three build artifacts:
+In this version, this command writes exactly three output files:
 
-* ``topology.cif`` for topology inspection of the deterministic plan
-* ``build_summary.json`` for the machine-readable build report
+* ``topology.cif`` so you can inspect the planned topology
+* ``build_summary.json`` for a JSON build report that scripts can read
 * ``resolved_config.yaml`` for the exact validated input used for the build
 
-The returned build plan contains the validated configuration, a centered
-registered Fcc(111) slab defaulting to Pd(111), internal ``fcc_hollow`` binding
-sites, deterministic SAM sulfur anchor placeholders, approximate solution
-counts, and resolved output paths. Full SAM molecule coordinates and a
-parameterized backend system are written only when ``--export-backend`` is used
-from the science environment.
+The result includes the validated configuration and resolved output paths. It
+also includes a centered registered Fcc(111) slab, using Pd(111) by default,
+internal ``fcc_hollow`` binding sites, placeholder sulfur anchors for the SAM,
+and approximate solution counts. SAMMD writes full SAM molecule coordinates and
+a parameterized backend system only when you run from the science environment
+with ``--export-backend``.
 
-4. Inspect current outputs
---------------------------
+4. Inspect outputs
+------------------
 
 Open ``outputs/topology.cif`` in a molecule viewer such as PyMOL to inspect the
-configured surface and SAM sulfur anchor placeholders at planned sulfur
-positions. Use it to check the surface size, exposed faces, and placement
-pattern before moving on.
+configured surface and the placeholder sulfur anchors. Use it to check the
+surface size, exposed faces, and where the SAM anchors will go before moving on.
 
 Use ``outputs/build_summary.json`` to confirm the same build choices in a
 machine-readable form. Use ``outputs/resolved_config.yaml`` when you need the
 exact validated YAML that produced the plan.
 
-Those names may appear in resolved paths or planning metadata, but the default
+You may see those filenames in resolved paths or metadata, but the default
 lightweight command does not write ``positions.cif``, ``interchange.json``,
 ``system.xml``, or ``anchor_metadata.json``.
 
-5. Optional backend artifacts
------------------------------
+5. Optional backend output files
+--------------------------------
 
-Use the optional science environment when you want parameterized backend
-artifacts:
+Use the optional science environment when you want SAMMD to write files for
+OpenFF/OpenMM:
 
 .. code-block:: bash
 
    pixi run -e science sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
 
-That command writes these additional backend artifacts:
+That command writes these additional files:
 
-* ``interchange.json`` for the primary portable OpenFF Interchange export
-* ``positions.cif`` for fully constructed, human-inspectable/OpenMM-loadable coordinates
-* ``system.xml`` for an OpenMM convenience export, not the primary portable artifact
-* ``anchor_metadata.json`` for SAM anchor metadata export
+* ``interchange.json`` for the primary OpenFF Interchange export
+* ``positions.cif`` for coordinates you can inspect and load in OpenMM
+* ``system.xml`` for an OpenMM file, not the primary OpenFF Interchange output
+* ``anchor_metadata.json`` for SAM anchor metadata
 
-The ``interchange.json`` target is OpenFF Interchange JSON written with
+The ``interchange.json`` file is OpenFF Interchange JSON written with
 ``Interchange.model_dump_json`` and reloaded with
 ``Interchange.model_validate_json``. Pre-1.0 Interchange JSON compatibility is
-not guaranteed across OpenFF Interchange versions. Salt-containing configs are
-rejected by backend export until salt support is implemented.
+not guaranteed across OpenFF Interchange versions. Configs that include salt are
+rejected until backend export supports salt.
 
-6. OpenMM handoff
------------------
+6. Use these files with OpenMM
+------------------------------
 
-After backend export writes ``interchange.json`` and companion artifacts,
-students will hand those build artifacts to their own OpenMM Python API script.
-The intended teaching path is:
+After backend export writes ``interchange.json`` and the other output files,
+students use them in their own OpenMM Python API script. Follow these steps:
 
-* reload the portable OpenFF Interchange data from ``interchange.json`` with
+* reload the OpenFF Interchange data from ``interchange.json`` with
   ``Interchange.model_validate_json``
 * export an OpenMM ``System`` from that Interchange object with
   ``interchange.to_openmm()``
 * load positions from ``positions.cif`` for the constructed coordinates
-* optionally use ``system.xml`` only as a convenience OpenMM system export
+* optionally use ``system.xml`` only as an OpenMM file
 * create and run a raw OpenMM ``Simulation`` for minimization, equilibration,
   production, and reporters
 
-SAMMD does not provide OpenMM simulation wrappers for this handoff. Students use
-the OpenMM Python API directly after SAMMD produces the backend build artifacts.
-The important boundary is unchanged: SAMMD builds; OpenMM runs.
+SAMMD does not include helper wrappers for OpenMM simulations. Students use the
+OpenMM Python API directly after SAMMD writes the backend output files. The key
+idea is unchanged: SAMMD builds; OpenMM runs.
 
 7. Other engines
 ----------------
 
-OpenMM is the student teaching path. GROMACS, LAMMPS, and Amber are future
-downstream exports through Interchange, not beginner workflow commands.
+OpenMM is the recommended path for students. Interchange may support GROMACS,
+LAMMPS, and Amber later, but they do not have beginner command-line workflows in
+this version.
 
 Notebook version
 ----------------
 
 The related notebook ``notebooks/canonical_workflow.ipynb`` demonstrates the
-current lightweight build and inspection contract interactively.
+default lightweight build and inspection steps interactively.
