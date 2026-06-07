@@ -527,6 +527,28 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
         assert reserved_output not in current_outputs
 
 
+def test_canonical_workflow_other_engines_section_stays_concise() -> None:
+    """Keep alternate-engine notes as brief export context, not engine docs."""
+
+    page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst"
+    content = page.read_text(encoding="utf-8")
+    section_match = re.search(
+        r"^7\. Other engines\n[-]+\n\n(?P<section>.*?)(?=\n\n\S.*\n[-=]+\n|\Z)",
+        content,
+        flags=re.DOTALL | re.MULTILINE,
+    )
+    assert section_match is not None
+
+    section = section_match.group("section").strip()
+    normalized = " ".join(section.split())
+    for term in ["GROMACS", "LAMMPS", "Amber", "Interchange"]:
+        assert term in section
+
+    assert len(normalized.split()) <= 35
+    assert ".. code-block::" not in section
+    assert re.search(r"\b(gmx|mdrun|lmp|sander|pmemd)\b", section) is None
+
+
 def test_tutorial_docs_do_not_teach_current_md_outputs_or_openmm_code() -> None:
     """Keep beginner tutorials aligned with the lightweight build contract."""
 

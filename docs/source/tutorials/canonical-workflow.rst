@@ -114,7 +114,7 @@ important boundary is unchanged: SAMMD builds; OpenMM runs.
 ----------------
 
 OpenMM is the student teaching path. GROMACS, LAMMPS, and Amber are future
-downstream exports from Interchange, not beginner workflow commands.
+downstream exports through Interchange, not beginner workflow commands.
 
 Notebook version
 ----------------
