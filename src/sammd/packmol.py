@@ -199,8 +199,15 @@ def _validate_job(job: PackmolJob) -> None:
     if not job.structures:
         msg = "at least one PACKMOL structure is required"
         raise ValueError(msg)
+    if not str(job.output_path).strip():
+        msg = "output_path must be a non-empty path"
+        raise ValueError(msg)
     _validate_bounds(job.box_bounds_nm)
-    if not isfinite(job.tolerance_angstrom) or job.tolerance_angstrom <= 0.0:
+    if (
+        isinstance(job.tolerance_angstrom, bool)
+        or not isfinite(job.tolerance_angstrom)
+        or job.tolerance_angstrom <= 0.0
+    ):
         msg = "tolerance_angstrom must be a positive finite number"
         raise ValueError(msg)
     if isinstance(job.nloop, bool) or not isinstance(job.nloop, int) or job.nloop <= 0:
@@ -245,7 +252,13 @@ def _validate_bounds(bounds_nm: Any) -> None:
             msg = f"box_bounds_nm {axis}-axis bounds must contain exactly two values"
             raise ValueError(msg)
         lower, upper = bounds
-        if not isfinite(lower) or not isfinite(upper) or upper <= lower:
+        if (
+            isinstance(lower, bool)
+            or isinstance(upper, bool)
+            or not isfinite(lower)
+            or not isfinite(upper)
+            or upper <= lower
+        ):
             msg = f"box_bounds_nm {axis}-axis bounds must be finite with upper > lower"
             raise ValueError(msg)
 

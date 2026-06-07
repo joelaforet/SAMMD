@@ -159,6 +159,14 @@ def test_zero_origin_bounds_accept_plain_dimensions_and_box_plan() -> None:
         ),
         (
             PackmolJob(
+                "   ",
+                (PackmolStructure("water", "water.pdb", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "output_path must be a non-empty path",
+        ),
+        (
+            PackmolJob(
                 "out.pdb",
                 (PackmolStructure("water", "water.pdb", 1),),
                 ((0.0, 0.0), (0.0, 1.0), (0.0, 1.0)),
@@ -177,8 +185,33 @@ def test_zero_origin_bounds_accept_plain_dimensions_and_box_plan() -> None:
             PackmolJob(
                 "out.pdb",
                 (PackmolStructure("water", "water.pdb", 1),),
+                ((False, 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "x-axis bounds must be finite with upper > lower",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                ((0.0, True), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "x-axis bounds must be finite with upper > lower",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
                 ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
                 tolerance_angstrom=nan,
+            ),
+            "tolerance_angstrom must be a positive finite number",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+                tolerance_angstrom=True,
             ),
             "tolerance_angstrom must be a positive finite number",
         ),
