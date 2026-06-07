@@ -273,7 +273,7 @@ class ParameterizationConfig(SAMMDBaseModel):
 
 
 class OutputFilesConfig(SAMMDBaseModel):
-    """File names written by the system builder."""
+    """Current and reserved system-builder artifact file names."""
 
     topology: str = "topology.cif"
     positions: str = "positions.cif"
@@ -617,9 +617,9 @@ parameterization:
 #   - resolved_config.yaml
 #
 # Reserved future backend artifact names:
-#   - positions.cif
-#   - interchange.json
-#   - system.xml
+#   - interchange.json  # primary portable backend export
+#   - positions.cif     # companion coordinate structure file
+#   - system.xml        # OpenMM convenience export
 #
 # None of these are trajectory outputs from an MD simulation.
 #

@@ -345,6 +345,7 @@ def test_build_contract_documents_first_release_boundary() -> None:
 
     page = PROJECT_ROOT / "docs" / "source" / "reference" / "build-contract.rst"
     content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
 
     assert "sammd init" in content
     assert "sammd validate CONFIG" in content
@@ -353,10 +354,16 @@ def test_build_contract_documents_first_release_boundary() -> None:
     assert "positions.cif" in content
     assert "interchange.json" in content
     assert "system.xml" in content
-    assert "Full OpenFF/OpenMM construction" in content
+    assert "Full OpenFF/OpenMM construction" in normalized
     assert "does not own" in content.lower()
     assert "equilibration" in content.lower()
     assert "production simulation" in content.lower()
+    assert "``interchange.json`` as the primary portable system artifact" in normalized
+    assert "primary portable OpenFF Interchange export" in normalized
+    assert "OpenMM convenience export" in normalized
+    assert "not the primary portable SAMMD artifact" in normalized
+    assert "human-inspectable/OpenMM-loadable structure file" in normalized
+    assert "does not write ``positions.cif``, ``interchange.json``, or ``system.xml``" in normalized
     assert "* - ``SAMMDBuildPlan``" not in content
     assert "not a top-level public import" in " ".join(content.split())
 
@@ -410,12 +417,16 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
 
     page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst"
     content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
 
     assert "``topology.cif`` for a full system" not in content
     assert "topology inspection of the deterministic plan" in content
     assert "future backend construction artifacts" in content
-    assert "students will use those build artifacts from their own OpenMM" in content
-    assert "not runnable in this lightweight release" in content
+    assert "``interchange.json`` for the primary portable OpenFF Interchange export" in normalized
+    assert "``system.xml`` for an OpenMM convenience export, not the primary portable artifact" in normalized
+    assert "students will use those build artifacts from their own OpenMM" in normalized
+    assert "not runnable in this lightweight release" in normalized
+    assert "reserved target artifacts, not current outputs" in normalized
 
 
 def test_tutorial_docs_do_not_teach_current_md_outputs_or_openmm_code() -> None:
@@ -493,6 +504,9 @@ def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:
     )
 
     assert topology_path.is_file()
+    assert not plan.output_paths.positions.exists()
+    assert not plan.output_paths.openff_interchange.exists()
+    assert not plan.output_paths.openmm_system.exists()
     assert plan.slab.metal == "Pd"
     assert plan.slab.facet == "111"
     assert len(plan.binding_sites) > 0

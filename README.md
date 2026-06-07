@@ -15,11 +15,12 @@ composition planning converts solvent mole fractions, explicit salt
 stoichiometry, and reactant counts or concentrations into deterministic molecule
 counts.
 
-Build output planning resolves deterministic topology, position, OpenFF
-Interchange, OpenMM system, build summary, and resolved-config artifact paths. The
-build command writes an inspectable `topology.cif` for molecule-viewer checks;
+Build output planning resolves deterministic current and reserved artifact paths.
+The build command writes an inspectable `topology.cif` for molecule-viewer checks;
 SAM sulfur anchor placeholders are shown at planned sulfur positions above or
-below the selected surface sites.
+below the selected surface sites. Future backend work reserves `interchange.json`
+as the primary portable export, with `system.xml` only as an OpenMM convenience
+export.
 
 Lightweight orientation analysis primitives are available in `sammd.analysis` for
 future trajectory observables. They calculate reactant centers of mass, target
@@ -104,9 +105,9 @@ print(plan.solution.molecule_counts)
 plan.write_topology_cif()  # Writes outputs/topology.cif by default
 ```
 
-The config also names build artifacts such as `positions.cif`,
-`interchange.json`, `system.xml`, `build_summary.json`, and
-`resolved_config.yaml` for backend system-building work.
+The config also names future backend artifacts: `interchange.json` as the primary
+portable export, `positions.cif` as the companion coordinate structure file, and
+`system.xml` as an OpenMM convenience export.
 
 ## Developer checks
 

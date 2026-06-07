@@ -99,9 +99,9 @@ The current lightweight builder writes these artifacts today:
 
 The configuration also reserves names for future backend construction artifacts:
 
-* ``positions.cif`` for fully constructed build-time coordinates
-* ``interchange.json`` for OpenFF Interchange export
-* ``system.xml`` for an OpenMM system
+* ``interchange.json`` for the primary portable OpenFF Interchange export
+* ``positions.cif`` for fully constructed, human-inspectable/OpenMM-loadable coordinates
+* ``system.xml`` for an OpenMM convenience export, not the primary portable artifact
 
 The YAML intentionally does not define equilibration, production MD,
 thermostats, barostats, or trajectory writing. Those OpenMM concepts are taught
@@ -110,11 +110,13 @@ and controlled separately from the system-building config.
 Future direct OpenMM step
 -------------------------
 
-After a future SAMMD backend writes ``positions.cif``, ``interchange.json``, and
-``system.xml``, students will use those build artifacts from their own OpenMM
-Python API script for minimization, equilibration, production, and reporters.
-That direct OpenMM step is not runnable in this lightweight release because the
-backend exports are reserved target artifacts, not current outputs.
+After a future SAMMD backend writes the primary ``interchange.json`` export and
+its companion structure/convenience artifacts, students will use those build
+artifacts from their own OpenMM Python API script for minimization,
+equilibration, production, and reporters. That direct OpenMM step is not
+runnable in this lightweight release because ``positions.cif``,
+``interchange.json``, and ``system.xml`` are reserved target artifacts, not
+current outputs.
 
 Notebook version
 ----------------

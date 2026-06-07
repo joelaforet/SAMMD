@@ -91,7 +91,8 @@ Artifact contract
 -----------------
 
 The first-release output names are reserved so user scripts and documentation can
-refer to stable paths while backend work proceeds.
+refer to stable paths while backend work proceeds. Future backend exports should
+treat ``interchange.json`` as the primary portable system artifact.
 
 .. list-table::
    :header-rows: 1
@@ -102,7 +103,9 @@ refer to stable paths while backend work proceeds.
    * - ``topology.cif``
      - Current
      - Lightweight topology-inspection CIF for the deterministic plan, including
-       SAM sulfur anchor placeholders at planned sulfur positions.
+       SAM sulfur anchor placeholders at planned sulfur positions. This is a
+       human-inspectable/OpenMM-loadable structure file, not a parameterized
+       backend system.
    * - ``build_summary.json``
      - Current
      - Machine-readable summary of the validated plan, output paths, and
@@ -112,19 +115,23 @@ refer to stable paths while backend work proceeds.
      - Validated YAML configuration used for the build.
    * - ``positions.cif``
      - Target
-     - Reserved for fully constructed positions from the future backend.
+     - Reserved for fully constructed coordinates from the future backend. This
+       is a human-inspectable/OpenMM-loadable structure file paired with the
+       backend system artifact.
    * - ``interchange.json``
      - Target
-     - Reserved for future OpenFF Interchange export.
+     - Reserved for the future primary portable OpenFF Interchange export.
    * - ``system.xml``
      - Target
-     - Reserved for future OpenMM System XML export.
+     - Reserved for a future OpenMM convenience export derived from the backend
+       system, not the primary portable SAMMD artifact.
 
 Current limitation
 ------------------
 
 Today ``sammd build`` writes only ``topology.cif``, ``build_summary.json``, and
-``resolved_config.yaml``. Full OpenFF/OpenMM construction and OpenMM-ready exports
-remain future backend work, including full SAM molecule coordinates. Public SAMMD
-APIs should not add equilibration or production simulation helpers as part of
-this contract.
+``resolved_config.yaml``. It does not write ``positions.cif``,
+``interchange.json``, or ``system.xml`` in the current lightweight release. Full
+OpenFF/OpenMM construction and OpenMM-ready exports remain future backend work,
+including full SAM molecule coordinates. Public SAMMD APIs should not add
+equilibration or production simulation helpers as part of this contract.
