@@ -147,7 +147,7 @@ Initial package modules:
 
 - `sammd.config`: Pydantic models, YAML loading, YAML template generation.
 - `sammd.surfaces`: registered Fcc(111) slab builders with lattice constants and facet metadata, defaulting to Pd(111).
-- `sammd.sam`: RDKit/OpenFF molecule creation, conformer generation, sulfur anchor detection, single- and mixed-component monolayer placement.
+- `sammd.sam`: dependency-free SAM placement and sulfur anchor pose planning today; future backend work should add OpenFF/RDKit molecule creation, conformer generation, and molecule-graph sulfur anchor detection.
 - `sammd.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
 - `sammd.solvation`: solvent mixture, salt, and reactant count calculations from solvent-only mole fractions and concentrations, followed by OpenFF/PACKMOL packing.
 - `sammd.builders`: high-level builder. Current v0.1.0 code returns a lightweight deterministic build plan; future backend integration should add full OpenFF `Interchange` construction.
@@ -169,13 +169,14 @@ plan.write_topology_cif()  # Writes outputs/topology.cif by default
 ```
 
 The returned plan contains validated configuration, a commensurate registered Fcc(111) slab,
-binding sites, seeded SAM placement choices, approximate solution composition counts,
-and planned output paths. It is not a final OpenFF/OpenMM system and does not contain
-complete atomic coordinates for SAM, solvent, salts, or reactants.
+binding sites, seeded SAM placement choices with sulfur anchor poses, approximate
+solution composition counts, and planned output paths. It is not a final
+OpenFF/OpenMM system and does not contain complete atomic coordinates for SAM,
+solvent, salts, or reactants.
 
 The current `sammd build` command writes the v0.1.0 first-release artifacts:
 
-- `topology.cif`: lightweight topology-inspection CIF for the deterministic plan.
+- `topology.cif`: lightweight topology-inspection CIF for the deterministic plan, with SAM sulfur anchor placeholders at planned sulfur positions.
 - `build_summary.json`: machine-readable summary of the validated plan and output paths.
 - `resolved_config.yaml`: validated YAML configuration used for the build.
 
@@ -222,8 +223,9 @@ Default post-v0.1.0 or tutorial-only user-code artifacts for a simulated system 
 During the current v0.1.0 lightweight planning milestone, `sammd build` writes
 `topology.cif`, `build_summary.json`, and `resolved_config.yaml`. The current
 `topology.cif` is a lightweight topology-inspection CIF for the deterministic plan,
-not a complete OpenFF/OpenMM system. Full backend target artifacts remain reserved
-until implemented: `positions.cif`, `interchange.json`, and `system.xml`.
+showing placeholder sulfur anchors at planned sulfur positions rather than full
+SAM molecule coordinates. Full backend target artifacts remain reserved until
+implemented: `positions.cif`, `interchange.json`, and `system.xml`.
 
 mmCIF/PDBx should be preferred over legacy PDB because SAMMD systems may have many atoms, many solvent/reactant molecules, nonstandard residues, and metal particles. Atom names, residue names, chain IDs, molecule labels, and component metadata should be chosen so PyMOL sessions are easy to inspect: metal slab, top SAM, bottom SAM, solvent, salts, and reactants should be distinguishable by selection.
 

@@ -15,7 +15,9 @@ counts.
 
 Build output planning resolves deterministic topology, position, OpenFF
 Interchange, OpenMM system, build summary, and resolved-config artifact paths. The
-build command writes an inspectable `topology.cif` for molecule-viewer checks.
+build command writes an inspectable `topology.cif` for molecule-viewer checks;
+SAM sulfur anchor placeholders are shown at planned sulfur positions above or
+below the selected surface sites.
 
 Lightweight orientation analysis primitives are available in `sammd.analysis` for
 future trajectory observables. They calculate reactant centers of mass, target
@@ -55,7 +57,7 @@ residue per molecule with wrapping every 9999 residues.
 `build_system()` currently returns a deterministic build plan. The plan contains
 the validated config, an automatically thickened centered registered Fcc(111)
 slab defaulting to Pd(111), internal fcc hollow thiol binding sites, seeded
-top/bottom SAM placement choices,
+top/bottom SAM placement choices with dependency-free sulfur anchor poses,
 solution molecule counts from an approximate composition-planning volume, and
 build output paths. The YAML intentionally does not define OpenMM simulation
 phases, thermostats, barostats, trajectory writing, or production protocols.
@@ -78,6 +80,7 @@ sammd build sammd.yaml --output-dir outputs --overwrite
 The build command writes `outputs/topology.cif`, `outputs/build_summary.json`, and
 `outputs/resolved_config.yaml`. Open `outputs/topology.cif` in a molecule viewer
 to inspect the configured surface and SAM anchor placements before moving on.
+Full SAM molecule coordinates remain future backend work.
 
 ```python
 from sammd import build_system, load_config

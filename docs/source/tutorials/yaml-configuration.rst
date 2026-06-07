@@ -29,6 +29,8 @@ Important sections
    pre-deprotonated thiolate. Metal-S attachment is represented/planned
    internally as a strengthened nonbonded interaction, not as covalent, quantum,
    or reactive chemistry, and it is not yet a student-facing YAML knob.
+   SAMMD plans internal sulfur anchor poses, but there is no YAML anchor-site or
+   sulfur-height setting in the beginner schema.
    Components need a human-readable name, a three-character ``residue_name``, a
    SMILES string, and either fractions that sum to 1.0 or explicit counts.
    Advanced users may set optional ``extended_length_nm`` to override the
@@ -121,5 +123,6 @@ Beginner glossary
 
 ``topology.cif``
    The first structure file to inspect after ``sammd build``. It shows the
-   configured surface and SAM anchor placements; trajectory frames are produced
-   later by OpenMM simulation scripts.
+   configured surface and SAM sulfur anchor placeholders at planned sulfur
+   positions; full SAM molecule coordinates and trajectory frames are produced
+   later by backend construction and OpenMM simulation scripts.

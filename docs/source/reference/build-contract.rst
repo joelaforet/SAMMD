@@ -70,7 +70,8 @@ refer to stable paths while backend work proceeds.
      - Contract
    * - ``topology.cif``
      - Current
-     - Lightweight topology-inspection CIF for the deterministic plan.
+     - Lightweight topology-inspection CIF for the deterministic plan, including
+       SAM sulfur anchor placeholders at planned sulfur positions.
    * - ``build_summary.json``
      - Current
      - Machine-readable summary of the validated plan and output paths.
@@ -92,5 +93,6 @@ Current limitation
 
 Today ``sammd build`` writes only ``topology.cif``, ``build_summary.json``, and
 ``resolved_config.yaml``. Full OpenFF/OpenMM construction and OpenMM-ready exports
-remain future backend work. Public SAMMD APIs should not add equilibration or
-production simulation helpers as part of this contract.
+remain future backend work, including full SAM molecule coordinates. Public SAMMD
+APIs should not add equilibration or production simulation helpers as part of
+this contract.

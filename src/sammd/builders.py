@@ -133,6 +133,25 @@ class SAMMDBuildPlan:
                 "grafting_density_nm2_per_molecule": self.config.sam.grafting_density,
                 "molecules_total": len(self.sam_placements.placements),
                 "molecules_per_side": self.sam_placements.selected_sites_per_side,
+                "placements": [
+                    {
+                        "component_name": placement.component_name,
+                        "residue_name": placement.component_residue_name,
+                        "side": placement.side,
+                        "site_kind": placement.site_kind,
+                        "site_position_nm": list(placement.anchor_pose.site_position_nm),
+                        "sulfur_position_nm": list(placement.anchor_pose.sulfur_position_nm),
+                        "normal": list(placement.anchor_pose.normal),
+                        "axis_direction": list(placement.anchor_pose.axis_direction),
+                        "azimuth_rad": placement.anchor_pose.azimuth_rad,
+                        "sulfur_height_nm": placement.anchor_pose.sulfur_height_nm,
+                        "nearest_metal_atom_indices": list(
+                            placement.anchor_pose.nearest_metal_atom_indices
+                        ),
+                        "attachment_mode": placement.anchor_pose.attachment_mode,
+                    }
+                    for placement in self.sam_placements.placements
+                ],
                 "components": [
                     component.model_dump(mode="json") for component in self.config.sam.components
                 ],
@@ -296,7 +315,7 @@ def _topology_atom_records(plan: SAMMDBuildPlan) -> tuple[AtomRecord, ...]:
                 residue_id=residue_id,
                 chain_id="B" if placement.side == "bottom" else "C",
                 component_label=f"SAM {placement.component_name} {placement.side}",
-                coordinates_nm=placement.position_nm,
+                coordinates_nm=placement.anchor_pose.sulfur_position_nm,
             )
         )
         serial += 1

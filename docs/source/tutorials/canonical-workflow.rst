@@ -39,8 +39,9 @@ builds the current plan, and writes ``outputs/topology.cif``,
    sammd build sammd.yaml --output-dir outputs --overwrite
 
 Open ``outputs/topology.cif`` in a molecule viewer such as PyMOL to inspect the
-configured surface and SAM anchor placements. This file is the first build
-artifact to check before moving on to OpenMM simulation setup.
+configured surface and SAM sulfur anchor placeholders at planned sulfur
+positions. This file is the first build artifact to check before moving on to
+OpenMM simulation setup.
 
 Build a deterministic plan from Python
 --------------------------------------
@@ -83,8 +84,9 @@ Run it with:
    python run_plan.py
 
 This writes the configured ``topology.cif`` path for inspection in tools such as
-PyMOL. Use it to check the surface size, exposed faces, and SAM anchor placement
-before starting simulation-specific OpenMM work.
+PyMOL. Use it to check the surface size, exposed faces, and SAM sulfur anchor
+placement before starting simulation-specific OpenMM work. Full SAM molecule
+coordinates remain future backend work.
 
 Build artifacts
 ---------------

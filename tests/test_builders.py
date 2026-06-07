@@ -175,7 +175,32 @@ def test_build_plan_writes_topology_cif_and_refuses_overwrite(tmp_path) -> None:
         plan.sam_placements.placements
     )
     assert " PTL " in text
+    first_placement = plan.sam_placements.placements[0]
+    first_sulfur_z_angstrom = first_placement.anchor_pose.sulfur_position_nm[2] * 10.0
+    first_site_z_angstrom = first_placement.position_nm[2] * 10.0
+    first_sam_row = next(
+        line
+        for line in text.splitlines()
+        if f" {first_placement.component_residue_name} " in line and " S " in line
+    )
+    assert f"{first_sulfur_z_angstrom:.6f}" in first_sam_row
+    assert f"{first_site_z_angstrom:.6f}" not in first_sam_row
     assert summary["experiment"]["name"] == "propanethiol_cinnamaldehyde_pd111"
+    assert len(summary["sam"]["placements"]) == len(plan.sam_placements.placements)
+    assert summary["sam"]["placements"][0] == {
+        "component_name": first_placement.component_name,
+        "residue_name": first_placement.component_residue_name,
+        "side": first_placement.side,
+        "site_kind": first_placement.site_kind,
+        "site_position_nm": list(first_placement.anchor_pose.site_position_nm),
+        "sulfur_position_nm": list(first_placement.anchor_pose.sulfur_position_nm),
+        "normal": list(first_placement.anchor_pose.normal),
+        "axis_direction": list(first_placement.anchor_pose.axis_direction),
+        "azimuth_rad": first_placement.anchor_pose.azimuth_rad,
+        "sulfur_height_nm": first_placement.anchor_pose.sulfur_height_nm,
+        "nearest_metal_atom_indices": list(first_placement.anchor_pose.nearest_metal_atom_indices),
+        "attachment_mode": first_placement.anchor_pose.attachment_mode,
+    }
     assert summary["box"]["volume_nm3"] == pytest.approx(plan.box_plan.volume_nm3)
     assert summary["box"]["slab_center_nm"] == [0.0, 0.0, 0.0]
     assert summary["solution"]["count_planning_volume_nm3"] == pytest.approx(

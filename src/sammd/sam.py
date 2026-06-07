@@ -3,13 +3,29 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import floor
+from math import floor, pi, sqrt, tau
 from random import Random
 
 from sammd.config import SAMComponentConfig, SAMConfig
 from sammd.surfaces import BindingSite
 
 Vector3 = tuple[float, float, float]
+DEFAULT_SULFUR_HEIGHT_NM = 0.18
+
+
+@dataclass(frozen=True)
+class SAMAnchorPose:
+    """Dependency-free anchor pose for future full SAM coordinate generation."""
+
+    site_position_nm: Vector3
+    sulfur_position_nm: Vector3
+    axis_direction: Vector3
+    normal: Vector3
+    azimuth_rad: float
+    sulfur_height_nm: float
+    site_kind: str
+    nearest_metal_atom_indices: tuple[int, ...]
+    attachment_mode: str = "nonbonded"
 
 
 @dataclass(frozen=True)
@@ -23,6 +39,7 @@ class SAMPlacement:
     site_kind: str
     position_nm: Vector3
     normal: Vector3
+    anchor_pose: SAMAnchorPose
     anchor_metadata: dict[str, object]
 
 
@@ -100,7 +117,10 @@ def plan_sam_placements(
 
         selected_sites = _select_spaced_sites(side_sites, selected_sites_per_side, rng)
         components = _components_for_selected_sites(sam_config, selected_sites_per_side, rng)
-        for site, component in zip(selected_sites, components, strict=True):
+        for placement_index, (site, component) in enumerate(
+            zip(selected_sites, components, strict=True)
+        ):
+            anchor_pose = plan_anchor_pose(site, azimuth_rad=sam_azimuth_rad(placement_index))
             placements.append(
                 SAMPlacement(
                     component_name=component.name,
@@ -110,10 +130,13 @@ def plan_sam_placements(
                     site_kind=site.site_kind,
                     position_nm=site.position_nm,
                     normal=site.normal,
+                    anchor_pose=anchor_pose,
                     anchor_metadata={
-                        "mode": "nonbonded",
-                        "site": "fcc_hollow",
-                        "nearest_metal_atom_indices": site.nearest_metal_atom_indices,
+                        "mode": anchor_pose.attachment_mode,
+                        "site": anchor_pose.site_kind,
+                        "nearest_metal_atom_indices": anchor_pose.nearest_metal_atom_indices,
+                        "azimuth_rad": anchor_pose.azimuth_rad,
+                        "sulfur_height_nm": anchor_pose.sulfur_height_nm,
                     },
                 )
             )
@@ -123,6 +146,44 @@ def plan_sam_placements(
         selected_sites_per_side=selected_sites_per_side,
         lateral_area_nm2=lateral_area_nm2,
         seed=seed,
+    )
+
+
+def sam_azimuth_rad(placement_index: int) -> float:
+    """Return a deterministic golden-angle azimuth for a placement index."""
+
+    if placement_index < 0:
+        msg = "placement_index must be non-negative"
+        raise ValueError(msg)
+    golden_angle_rad = pi * (3.0 - sqrt(5.0))
+    return (placement_index * golden_angle_rad) % tau
+
+
+def plan_anchor_pose(
+    site: BindingSite,
+    sulfur_height_nm: float = DEFAULT_SULFUR_HEIGHT_NM,
+    azimuth_rad: float = 0.0,
+    attachment_mode: str = "nonbonded",
+) -> SAMAnchorPose:
+    """Plan a sulfur anchor pose from a binding-site plane coordinate."""
+
+    if sulfur_height_nm <= 0:
+        msg = "sulfur_height_nm must be positive"
+        raise ValueError(msg)
+    sulfur_position_nm = tuple(
+        position + normal * sulfur_height_nm
+        for position, normal in zip(site.position_nm, site.normal, strict=True)
+    )
+    return SAMAnchorPose(
+        site_position_nm=site.position_nm,
+        sulfur_position_nm=sulfur_position_nm,
+        axis_direction=site.normal,
+        normal=site.normal,
+        azimuth_rad=azimuth_rad,
+        sulfur_height_nm=sulfur_height_nm,
+        site_kind=site.site_kind,
+        nearest_metal_atom_indices=site.nearest_metal_atom_indices,
+        attachment_mode=attachment_mode,
     )
 
 

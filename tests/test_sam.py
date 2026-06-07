@@ -1,11 +1,16 @@
 """Tests for lightweight SAM placement planning."""
 
-from math import dist
+from math import dist, pi, sqrt
 
 import pytest
 
 from sammd.config import SAMComponentConfig, SAMConfig
-from sammd.sam import plan_sam_placements
+from sammd.sam import (
+    DEFAULT_SULFUR_HEIGHT_NM,
+    plan_anchor_pose,
+    plan_sam_placements,
+    sam_azimuth_rad,
+)
 from sammd.surfaces import generate_binding_sites, plan_pd111_slab
 
 
@@ -133,3 +138,53 @@ def test_placement_uses_internal_fcc_hollow_anchor_strategy() -> None:
     assert {placement.site_kind for placement in plan.placements} == {"fcc_hollow"}
     assert {placement.anchor_metadata["site"] for placement in plan.placements} == {"fcc_hollow"}
     assert {placement.anchor_metadata["mode"] for placement in plan.placements} == {"nonbonded"}
+
+
+def test_anchor_pose_offsets_sulfur_from_site_plane_and_preserves_metadata() -> None:
+    """Represent sulfur anchor placeholders above or below the binding-site plane."""
+
+    plan = plan_sam_placements(SAMConfig(), _binding_sites(), lateral_area_nm2=1.0, seed=29)
+
+    for placement in plan.placements:
+        pose = placement.anchor_pose
+        assert placement.position_nm == pose.site_position_nm
+        assert pose.site_kind == placement.site_kind == "fcc_hollow"
+        assert pose.normal == placement.normal
+        assert pose.axis_direction == placement.normal
+        assert pose.attachment_mode == "nonbonded"
+        assert pose.nearest_metal_atom_indices == placement.anchor_metadata[
+            "nearest_metal_atom_indices"
+        ]
+        assert pose.sulfur_height_nm == DEFAULT_SULFUR_HEIGHT_NM
+        assert pose.sulfur_position_nm[:2] == pose.site_position_nm[:2]
+        expected_z = pose.site_position_nm[2] + pose.normal[2] * DEFAULT_SULFUR_HEIGHT_NM
+        assert pose.sulfur_position_nm[2] == expected_z
+
+
+def test_plan_anchor_pose_supports_explicit_height_and_azimuth() -> None:
+    """Allow callers to build an anchor pose for a single site without backends."""
+
+    site = _binding_sites()[0]
+    pose = plan_anchor_pose(site, sulfur_height_nm=0.25, azimuth_rad=1.5)
+
+    assert pose.site_position_nm == site.position_nm
+    assert pose.sulfur_position_nm[2] == site.position_nm[2] + site.normal[2] * 0.25
+    assert pose.azimuth_rad == 1.5
+    assert pose.nearest_metal_atom_indices == site.nearest_metal_atom_indices
+
+
+def test_sam_azimuth_rad_uses_deterministic_golden_angle_sequence() -> None:
+    """Distribute per-placement twist deterministically without random state."""
+
+    golden_angle_rad = pi * (3.0 - sqrt(5.0))
+
+    assert sam_azimuth_rad(0) == 0.0
+    assert sam_azimuth_rad(1) == golden_angle_rad
+    assert sam_azimuth_rad(2) == (2 * golden_angle_rad) % (2.0 * pi)
+
+    plan = plan_sam_placements(SAMConfig(), _binding_sites(), lateral_area_nm2=1.0, seed=31)
+    for side in ("bottom", "top"):
+        side_placements = [placement for placement in plan.placements if placement.side == side]
+        assert [placement.anchor_pose.azimuth_rad for placement in side_placements] == [
+            sam_azimuth_rad(index) for index in range(len(side_placements))
+        ]
