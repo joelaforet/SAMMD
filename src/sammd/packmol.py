@@ -206,8 +206,11 @@ def _validate_job(job: PackmolJob) -> None:
     if isinstance(job.nloop, bool) or not isinstance(job.nloop, int) or job.nloop <= 0:
         msg = "nloop must be a positive integer"
         raise ValueError(msg)
-    if not str(job.filetype).strip():
+    if not isinstance(job.filetype, str) or not job.filetype.strip():
         msg = "filetype must be a non-empty string"
+        raise ValueError(msg)
+    if not isinstance(job.movebadrandom, bool):
+        msg = "movebadrandom must be a boolean"
         raise ValueError(msg)
     for structure in job.structures:
         _validate_structure(structure)
@@ -234,6 +237,9 @@ def _validate_structure(structure: PackmolStructure) -> None:
         or structure.atom_count <= 0
     ):
         msg = f"structure '{structure.name}' atom_count must be a positive integer when provided"
+        raise ValueError(msg)
+    if not isinstance(structure.fixed, bool):
+        msg = f"structure '{structure.name}' fixed must be a boolean"
         raise ValueError(msg)
 
 

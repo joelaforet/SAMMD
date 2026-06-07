@@ -144,6 +144,22 @@ def test_zero_origin_bounds_accept_plain_dimensions_and_box_plan() -> None:
         (
             PackmolJob(
                 "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1, fixed="False"),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "fixed must be a boolean",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1, fixed=0),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "fixed must be a boolean",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
                 (PackmolStructure("water", "", 1),),
                 ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
             ),
@@ -256,6 +272,51 @@ def test_zero_origin_bounds_accept_plain_dimensions_and_box_plan() -> None:
                 nloop=True,
             ),
             "nloop must be a positive integer",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+                filetype="",
+            ),
+            "filetype must be a non-empty string",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+                filetype=True,
+            ),
+            "filetype must be a non-empty string",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+                filetype=123,
+            ),
+            "filetype must be a non-empty string",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+                movebadrandom="no",
+            ),
+            "movebadrandom must be a boolean",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+                movebadrandom=1,
+            ),
+            "movebadrandom must be a boolean",
         ),
     ],
 )
