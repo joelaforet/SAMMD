@@ -398,7 +398,8 @@ experiment:
 # ============================================================================
 # Metal Surface
 # ============================================================================
-# SAMMD currently supports Pd(111).
+# SAMMD currently supports registered Fcc(111) INTERFACE metals and defaults to
+# Pd(111). Registered metals: Ag, Al, Au, Cu, Ni, Pb, Pd, and Pt.
 #
 # The slab thickness is chosen automatically from the metal geometry and
 # nonbonded cutoff so that periodic metal surfaces do not interact through

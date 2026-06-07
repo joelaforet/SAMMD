@@ -17,10 +17,11 @@ Important sections
 ------------------
 
 ``surface``
-   Selects a registered Fcc INTERFACE surface. Today the registry supports
-   ``metal: Pd`` and ``facet: "111"``. Users provide only the lateral ``x`` and
-   ``y`` size. SAMMD chooses the slab thickness automatically from the metal
-   geometry and nonbonded cutoff.
+   Selects a registered Fcc(111) INTERFACE surface. The registry supports
+   ``Ag``, ``Al``, ``Au``, ``Cu``, ``Ni``, ``Pb``, ``Pd``, and ``Pt`` with
+   ``facet: "111"`` and defaults to Pd(111). Users provide only the lateral
+   ``x`` and ``y`` size. SAMMD chooses the slab thickness automatically from the
+   registered metal geometry and nonbonded cutoff.
 
 ``sam``
    Defines grafting density and one or more neutral thiol SAM components.
@@ -93,8 +94,9 @@ Beginner glossary
    Molecular dynamics: a simulation method that moves atoms over time using a
    force field.
 
-``Pd(111) slab``
-   A flat palladium surface model. ``111`` names the crystal face being exposed.
+``Fcc(111) slab``
+   A flat registered face-centered-cubic metal surface model. ``111`` names the
+   crystal face being exposed; Pd(111) is the default starting point.
 
 ``grafting density``
    How much surface area is assigned to each attached SAM molecule. Smaller

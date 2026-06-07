@@ -11,8 +11,8 @@ Current package map
    Lightweight ``sammd init``, ``sammd validate``, and ``sammd build`` commands.
 
 ``sammd.surfaces``
-   Pd(111) lattice metadata, commensurate slab planning, and hollow binding-site
-   generation.
+   Registered Fcc(111) lattice metadata, commensurate slab planning, and hollow
+   binding-site generation.
 
 ``sammd.sam``
    Deterministic SAM site selection and component assignment.

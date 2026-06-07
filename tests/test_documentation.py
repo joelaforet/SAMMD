@@ -240,7 +240,7 @@ def test_project_scope_keeps_anchor_site_out_of_current_template_scope() -> None
     for phrase in stale_phrases:
         assert phrase not in content
 
-    assert "internal Pd(111) default strategy" in normalized
+    assert "internal modeling hypothesis that defaults to Pd(111)" in normalized
     assert "internal builder default rather than a beginner template field" in normalized
     assert "user-configurable site type belongs in a future advanced attachment API" in normalized
 
@@ -288,7 +288,7 @@ def test_yaml_configuration_docs_clarify_beginner_schema_boundary() -> None:
     content = page.read_text(encoding="utf-8")
     normalized = " ".join(content.split())
 
-    assert "registered Fcc INTERFACE surface" in normalized
+    assert "registered Fcc(111) INTERFACE surface" in normalized
     assert "neutral thiol SAM components" in normalized
     assert "HS/implicit-H thiol sulfur" in normalized
     assert "not a pre-deprotonated thiolate" in normalized

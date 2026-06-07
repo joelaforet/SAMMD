@@ -63,9 +63,10 @@ scripts. Save this as ``run_plan.py`` in the same directory as ``sammd.yaml``:
    print(plan.output_paths.topology)
 
 The returned object is a lightweight build plan. It contains the validated
-configuration, a commensurate centered Pd(111) slab, fcc or hcp hollow binding
-sites chosen by SAMMD's thiol-on-metal defaults, deterministic SAM placement
-choices, approximate solution counts, and resolved build output paths.
+configuration, a commensurate centered registered Fcc(111) slab defaulting to
+Pd(111), fcc or hcp hollow binding sites chosen by SAMMD's thiol-on-metal
+defaults, deterministic SAM placement choices, approximate solution counts, and
+resolved build output paths.
 
 Write the topology inspection file
 ----------------------------------

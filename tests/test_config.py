@@ -60,7 +60,10 @@ def test_surface_validation_uses_fcc_surface_registry() -> None:
     assert load_config_dict(data).surface.metal == "Pd"
 
     data["surface"]["metal"] = "Pt"
-    with pytest.raises(ValidationError, match="unsupported Fcc surface 'Pt\\(111\\)'"):
+    assert load_config_dict(data).surface.metal == "Pt"
+
+    data["surface"]["metal"] = "Fe"
+    with pytest.raises(ValidationError, match="unsupported Fcc surface 'Fe\\(111\\)'"):
         load_config_dict(data)
 
 

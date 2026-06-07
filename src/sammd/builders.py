@@ -20,7 +20,7 @@ from sammd.io import (
 )
 from sammd.sam import SAMPlacementPlan, plan_sam_placements
 from sammd.solvation import SolutionPlan, plan_solution_composition
-from sammd.surfaces import BindingSite, SurfaceSlab, generate_binding_sites, plan_pd111_slab
+from sammd.surfaces import BindingSite, SurfaceSlab, generate_binding_sites, plan_fcc111_slab
 
 DEFAULT_SOLVENT_PADDING_NM = 3.0
 DEFAULT_SAM_EXTENDED_LENGTH_NM = 0.95
@@ -238,7 +238,8 @@ def build_system(
         raise ValueError(msg)
 
     slab_layers = _auto_slab_layers(loaded_config)
-    slab = plan_pd111_slab(
+    slab = plan_fcc111_slab(
+        loaded_config.surface.metal,
         loaded_config.surface.lateral_size,
         slab_layers,
     )

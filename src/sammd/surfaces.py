@@ -87,12 +87,25 @@ class BindingSite:
     nearest_metal_atom_indices: tuple[int, ...] = ()
 
 
+# Ambient fcc lattice constants from the CRC Handbook/WebElements-style elemental
+# crystal data tables, converted from angstrom to nanometers. The metals match
+# the CHARMM-INTERFACE Fcc metal parameter registry in sammd.forcefields.
 FCC_SURFACE_REGISTRY: dict[tuple[str, str], FccSurfaceMetadata] = {
-    ("Pd", "111"): FccSurfaceMetadata(
-        metal="Pd",
+    (symbol, "111"): FccSurfaceMetadata(
+        metal=symbol,
         facet="111",
-        lattice_constant_nm=0.389,
+        lattice_constant_nm=lattice_constant_nm,
     )
+    for symbol, lattice_constant_nm in [
+        ("Ag", 0.40853),
+        ("Al", 0.40495),
+        ("Au", 0.40782),
+        ("Cu", 0.36149),
+        ("Ni", 0.35238),
+        ("Pb", 0.49508),
+        ("Pd", 0.389),
+        ("Pt", 0.39242),
+    ]
 }
 
 
@@ -120,20 +133,23 @@ def get_fcc_surface_metadata(metal: str, facet: str) -> FccSurfaceMetadata:
         raise ValueError(msg) from error
 
 
-def plan_pd111_slab(
+def plan_fcc111_slab(
+    metal: str,
     lateral_size_nm: tuple[float, float],
     layers: int,
     *,
     centered: bool = True,
 ) -> SurfaceSlab:
-    """Plan a deterministic centered Pd(111) slab in nanometers.
+    """Plan a deterministic centered registered Fcc(111) slab in nanometers.
 
     Parameters
     ----------
+    metal
+        Registered Fcc metal element symbol.
     lateral_size_nm
         Rectangular lateral dimensions in nanometers.
     layers
-        Number of Pd(111) atomic layers.
+        Number of Fcc(111) atomic layers.
     centered
         Whether to center the slab around ``z=0``.
 
@@ -143,6 +159,7 @@ def plan_pd111_slab(
         Slab positions and metadata suitable for later topology construction.
     """
 
+    metadata = get_fcc_surface_metadata(metal, "111")
     if len(lateral_size_nm) != 2 or any(dimension <= 0 for dimension in lateral_size_nm):
         msg = "lateral_size_nm must contain two positive dimensions"
         raise ValueError(msg)
@@ -150,10 +167,9 @@ def plan_pd111_slab(
         msg = "layers must be positive"
         raise ValueError(msg)
     if not centered:
-        msg = "only centered Pd(111) slabs are supported by the lightweight planner"
+        msg = "only centered Fcc(111) slabs are supported by the lightweight planner"
         raise ValueError(msg)
 
-    metadata = get_fcc_surface_metadata("Pd", "111")
     spacing_nm = metadata.nearest_neighbor_spacing_nm
     row_spacing_nm = spacing_nm * sqrt(3) / 2
     layer_spacing_nm = metadata.interlayer_spacing_nm
@@ -181,7 +197,7 @@ def plan_pd111_slab(
             offset_y,
         ):
             positions.append((x_nm, y_nm, z_nm))
-            labels.append(f"Pd{serial}")
+            labels.append(f"{metadata.metal}{serial}")
             layer_indices.append(layer)
             serial += 1
 
@@ -191,8 +207,8 @@ def plan_pd111_slab(
         metadata.slab_thickness_nm(layers),
     )
     return SurfaceSlab(
-        metal="Pd",
-        facet="111",
+        metal=metadata.metal,
+        facet=metadata.facet,
         requested_lateral_size_nm=lateral_size_nm,
         lateral_size_nm=effective_lateral_size_nm,
         supercell_counts=supercell_counts,
@@ -206,17 +222,28 @@ def plan_pd111_slab(
     )
 
 
+def plan_pd111_slab(
+    lateral_size_nm: tuple[float, float],
+    layers: int,
+    *,
+    centered: bool = True,
+) -> SurfaceSlab:
+    """Plan a deterministic centered Pd(111) slab in nanometers."""
+
+    return plan_fcc111_slab("Pd", lateral_size_nm, layers, centered=centered)
+
+
 def generate_binding_sites(
     slab: SurfaceSlab, site_kind: str = "fcc_hollow"
 ) -> tuple[BindingSite, ...]:
-    """Generate deterministic top and bottom Pd(111) binding sites.
+    """Generate deterministic top and bottom Fcc(111) binding sites.
 
     Parameters
     ----------
     slab
-        Planned slab from :func:`plan_pd111_slab`.
+        Planned slab from :func:`plan_fcc111_slab`.
     site_kind
-        Surface site label. ``fcc_hollow`` and ``hcp_hollow`` are supported for Pd(111).
+        Surface site label. ``fcc_hollow`` and ``hcp_hollow`` are supported for Fcc(111).
 
     Returns
     -------
@@ -229,10 +256,6 @@ def generate_binding_sites(
         supported = ", ".join(sorted(supported_site_kinds))
         msg = f"unsupported binding site kind '{site_kind}'; supported site kinds: {supported}"
         raise ValueError(msg)
-    if slab.metal != "Pd" or slab.facet != "111":
-        msg = "binding-site generation currently supports only Pd(111) slabs"
-        raise ValueError(msg)
-
     metadata = get_fcc_surface_metadata(slab.metal, slab.facet)
     spacing_nm = metadata.nearest_neighbor_spacing_nm
     row_spacing_nm = spacing_nm * sqrt(3) / 2
@@ -280,17 +303,17 @@ def _abc_layer_offsets(spacing_nm: float, row_spacing_nm: float) -> tuple[tuple[
 def _commensurate_supercell_counts(
     requested_lateral_size_nm: tuple[float, float], spacing_nm: float, row_spacing_nm: float
 ) -> tuple[int, int]:
-    """Return integer rectangular cell counts for a periodic Pd(111) surface."""
+    """Return integer rectangular cell counts for a periodic Fcc(111) surface."""
 
     nx = ceil(requested_lateral_size_nm[0] / spacing_nm)
     ny = ceil(requested_lateral_size_nm[1] / row_spacing_nm)
     if nx < 2 or ny < 2:
-        msg = "Pd(111) lateral cell must contain at least two columns and two rows"
+        msg = "Fcc(111) lateral cell must contain at least two columns and two rows"
         raise ValueError(msg)
     if ny % 2:
         ny += 1
     if nx * ny < 3:
-        msg = "Pd(111) lateral cell must contain at least three surface atoms"
+        msg = "Fcc(111) lateral cell must contain at least three surface atoms"
         raise ValueError(msg)
     return nx, ny
 

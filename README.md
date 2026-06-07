@@ -53,8 +53,9 @@ molecule, chain C contains cinnamaldehyde, and chain D+ contains one ethanol
 residue per molecule with wrapping every 9999 residues.
 
 `build_system()` currently returns a deterministic build plan. The plan contains
-the validated config, an automatically thickened centered Pd(111) slab, internal
-fcc hollow thiol binding sites, seeded top/bottom SAM placement choices,
+the validated config, an automatically thickened centered registered Fcc(111)
+slab defaulting to Pd(111), internal fcc hollow thiol binding sites, seeded
+top/bottom SAM placement choices,
 solution molecule counts from an approximate composition-planning volume, and
 build output paths. The YAML intentionally does not define OpenMM simulation
 phases, thermostats, barostats, trajectory writing, or production protocols.

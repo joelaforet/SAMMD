@@ -11,7 +11,7 @@ import pytest
 from sammd.builders import DEFAULT_SAM_EXTENDED_LENGTH_NM, DEFAULT_SOLVENT_PADDING_NM, build_system
 from sammd.config import CONFIG_TEMPLATE, SAMMDConfig
 from sammd.solvation import round_half_up
-from sammd.surfaces import plan_pd111_slab
+from sammd.surfaces import plan_fcc111_slab, plan_pd111_slab
 
 
 def test_build_system_accepts_config_dict_and_yaml_path(tmp_path) -> None:
@@ -52,6 +52,20 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
     assert not plan.full_construction_available
     with pytest.raises(NotImplementedError, match="OpenFF/OpenMM construction is not implemented"):
         plan.require_full_construction()
+
+
+def test_build_system_accepts_registered_non_pd_surface(tmp_path) -> None:
+    """Build a deterministic plan for a registered non-Pd Fcc(111) surface."""
+
+    config = SAMMDConfig(surface={"metal": "Pt", "lateral_size": (1.0, 1.0)})
+    plan = build_system(config, output_dir=tmp_path)
+    expected_slab = plan_fcc111_slab("Pt", (1.0, 1.0), plan.slab.layers)
+
+    assert plan.slab.metal == "Pt"
+    assert plan.slab.facet == "111"
+    assert plan.slab.labels[:3] == ("Pt1", "Pt2", "Pt3")
+    assert plan.slab.lateral_size_nm == expected_slab.lateral_size_nm
+    assert len(plan.binding_sites) > 0
 
 
 def test_box_plan_uses_adjusted_commensurate_lateral_dimensions() -> None:

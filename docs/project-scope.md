@@ -26,9 +26,9 @@ Recommended v0.1.0 first-release deliverables:
 - Pydantic configuration models loaded from YAML.
 - A minimal `sammd init` command that writes a commented template YAML file.
 - A canonical Jupyter notebook showing configuration, deterministic build planning, export, and basic inspection.
-- A Pd(111) slab builder and propanethiol SAM placement with tunable grafting density.
+- A registered Fcc(111) slab builder, defaulting to Pd(111), and propanethiol SAM placement with tunable grafting density.
 - Mixed SAM support through multiple SAM component definitions with fractions or explicit counts.
-- Centered, double-sided Pd(111) slab geometry with SAMs on both faces and solvent on both sides.
+- Centered, double-sided registered Fcc(111) slab geometry with SAMs on both faces and solvent on both sides.
 - Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices without constructing a parameterized backend system.
 - Static CHARMM-INTERFACE-derived Fcc metal Lennard-Jones parameters packaged or identified as OpenFF-compatible OFFXML resource support.
 - Visualization-friendly build artifacts, centered on mmCIF/PDBx topology-inspection output plus machine-readable build summaries.
@@ -139,14 +139,14 @@ SAMMD should keep this simpler than PolyzyMD initially: water, ethanol, simple m
 
 Broader thiolate literature cautions that site preferences can be metal-, coverage-, and adsorbate-dependent. For example, Au(111) DFT/HREELS work reports methylthiolate near a bridge site displaced toward fcc hollow rather than a simple hollow-site picture ([Hayashi et al., J. Chem. Phys. 2001](https://doi.org/10.1063/1.1360245)).
 
-For SAMMD MVP, use three-fold hollow placement on Pd(111) as the default internal modeling hypothesis. The builder should keep this assumption localized so future advanced APIs can switch among `fcc_hollow`, `hcp_hollow`, `bridge`, and `atop` placement after calibration against Pd-specific data.
+For SAMMD MVP, use three-fold hollow placement on registered Fcc(111) surfaces as an internal modeling hypothesis that defaults to Pd(111). The builder should keep this assumption localized so future advanced APIs can switch among `fcc_hollow`, `hcp_hollow`, `bridge`, and `atop` placement after calibration against metal- and adsorbate-specific data.
 
 ## Proposed Package Shape
 
 Initial package modules:
 
 - `sammd.config`: Pydantic models, YAML loading, YAML template generation.
-- `sammd.surfaces`: Fcc slab builders, initially Pd(111), with lattice constants and facet metadata.
+- `sammd.surfaces`: registered Fcc(111) slab builders with lattice constants and facet metadata, defaulting to Pd(111).
 - `sammd.sam`: RDKit/OpenFF molecule creation, conformer generation, sulfur anchor detection, single- and mixed-component monolayer placement.
 - `sammd.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
 - `sammd.solvation`: solvent mixture, salt, and reactant count calculations from solvent-only mole fractions and concentrations, followed by OpenFF/PACKMOL packing.
@@ -168,7 +168,7 @@ plan = build_system(config, output_dir="outputs")
 plan.write_topology_cif()  # Writes outputs/topology.cif by default
 ```
 
-The returned plan contains validated configuration, a commensurate Pd(111) slab,
+The returned plan contains validated configuration, a commensurate registered Fcc(111) slab,
 binding sites, seeded SAM placement choices, approximate solution composition counts,
 and planned output paths. It is not a final OpenFF/OpenMM system and does not contain
 complete atomic coordinates for SAM, solvent, salts, or reactants.
@@ -321,8 +321,8 @@ High-value unit tests for the first implementation:
 - INTERFACE Fcc metal registry reproduces the table above.
 - CHARMM epsilon sign conversion is tested.
 - Generated offxml can be loaded by OpenFF `ForceField`.
-- Pd(111) builder returns deterministic atom counts and box dimensions.
-- Pd(111) slab thickness validation warns or fails when the slab is thinner than the configured nonbonded cutoff plus buffer.
+- Registered Fcc(111) builder returns deterministic atom counts and box dimensions.
+- Registered Fcc(111) slab thickness validation warns or fails when the slab is thinner than the configured nonbonded cutoff plus buffer.
 - Propanethiol sulfur anchor detection is deterministic for `CCCS`.
 - Cinnamaldehyde reactant parsing is deterministic for `C1=CC=C(C=C1)/C=C/C=O`.
 - Post-v0.1.0 reporter configuration maps user field names to OpenMM reporter arguments.

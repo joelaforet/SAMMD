@@ -7,6 +7,7 @@ from sammd.surfaces import (
     _nearest_indices_xy,
     generate_binding_sites,
     get_fcc_surface_metadata,
+    plan_fcc111_slab,
     plan_pd111_slab,
 )
 
@@ -26,7 +27,26 @@ def test_unsupported_surface_fails_clearly() -> None:
     """Reject surfaces outside the lightweight metadata registry."""
 
     with pytest.raises(ValueError, match="unsupported Fcc surface"):
-        get_fcc_surface_metadata("Au", "111")
+        get_fcc_surface_metadata("Fe", "111")
+
+
+def test_fcc111_slab_supports_non_pd_registered_metal() -> None:
+    """Plan a centered Pt(111) slab with metal-specific labels and spacing."""
+
+    metadata = get_fcc_surface_metadata("Pt", "111")
+    slab = plan_fcc111_slab("Pt", (1.0, 1.0), 3)
+
+    assert slab.metal == "Pt"
+    assert slab.facet == "111"
+    assert slab.labels[:3] == ("Pt1", "Pt2", "Pt3")
+    assert slab.supercell_counts == (4, 6)
+    assert len(slab.positions_nm) == 72
+    assert slab.bottom_z_nm == pytest.approx(-metadata.interlayer_spacing_nm, rel=1e-6)
+    assert slab.top_z_nm == pytest.approx(metadata.interlayer_spacing_nm, rel=1e-6)
+    assert slab.lateral_size_nm[0] == pytest.approx(
+        slab.supercell_counts[0] * metadata.nearest_neighbor_spacing_nm
+    )
+    assert slab.lateral_size_nm != plan_pd111_slab((1.0, 1.0), 3).lateral_size_nm
 
 
 def test_pd111_slab_geometry_is_centered_and_deterministic() -> None:
@@ -74,6 +94,18 @@ def test_pd111_binding_sites_include_opposite_faces() -> None:
     assert {site.normal for site in bottom_sites} == {(0.0, 0.0, -1.0)}
     assert {site.position_nm[2] for site in top_sites} == {slab.top_z_nm}
     assert {site.position_nm[2] for site in bottom_sites} == {slab.bottom_z_nm}
+    assert all(len(site.nearest_metal_atom_indices) == 3 for site in sites)
+
+
+def test_binding_sites_support_non_pd_fcc111_slab() -> None:
+    """Generate hollow sites for a registered non-Pd Fcc(111) slab."""
+
+    slab = plan_fcc111_slab("Au", (1.0, 1.0), 3)
+    sites = generate_binding_sites(slab)
+
+    assert {site.side for site in sites} == {"bottom", "top"}
+    assert {site.site_kind for site in sites} == {"fcc_hollow"}
+    assert len(sites) == 48
     assert all(len(site.nearest_metal_atom_indices) == 3 for site in sites)
 
 
