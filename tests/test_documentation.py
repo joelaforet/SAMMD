@@ -186,6 +186,9 @@ def test_project_scope_source_matches_first_release_contract() -> None:
         "`positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json`"
         in content
     )
+    assert "`Interchange.model_dump_json`" in content
+    assert "`Interchange.model_validate_json`" in content
+    assert "pre-1.0 Interchange JSON compatibility is not guaranteed across versions" in content
     assert "Simulation wrappers are post-v0.1.0 target work" in content
     assert "excluded from the v0.1.0 first-release contract" in content
     assert "Lightweight/internal OpenMM utilities may exist" in content
@@ -364,6 +367,9 @@ def test_build_contract_documents_first_release_boundary() -> None:
     assert "production simulation" in content.lower()
     assert "``interchange.json`` as the primary portable system artifact" in normalized
     assert "primary portable OpenFF Interchange export" in normalized
+    assert "``Interchange.model_dump_json``" in content
+    assert "``Interchange.model_validate_json``" in content
+    assert "pre-1.0 Interchange JSON compatibility as not guaranteed" in normalized
     assert "OpenMM convenience export" in normalized
     assert "not the primary portable SAMMD artifact" in normalized
     assert "human-inspectable/OpenMM-loadable structure file" in normalized
@@ -389,6 +395,9 @@ def test_yaml_configuration_docs_keep_backend_exports_reserved() -> None:
     assert "current build artifacts such as ``topology.cif``" in normalized
     assert "future backend artifact names such as ``positions.cif``" in normalized
     assert "``anchor_metadata.json``" in normalized
+    assert "``Interchange.model_dump_json``" in content
+    assert "``Interchange.model_validate_json``" in content
+    assert "pre-1.0 Interchange JSON compatibility is not guaranteed" in normalized
 
 
 def test_yaml_configuration_docs_clarify_beginner_schema_boundary() -> None:
@@ -436,6 +445,9 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
         in normalized
     )
     assert "``anchor_metadata.json`` for SAM anchor metadata export" in normalized
+    assert "``Interchange.model_dump_json``" in content
+    assert "``Interchange.model_validate_json``" in content
+    assert "pre-1.0 Interchange JSON compatibility is not guaranteed" in normalized
     assert "students will use those build artifacts from their own OpenMM" in normalized
     assert "not runnable in this lightweight release" in normalized
     assert "reserved target artifacts, not current outputs" in normalized

@@ -71,7 +71,11 @@ Important sections
    ``build_summary.json``, and ``resolved_config.yaml``. It also reserves future
    backend artifact names such as ``positions.cif``, ``interchange.json``, and
    ``system.xml``, plus ``anchor_metadata.json``. These are not MD trajectory
-   outputs.
+   outputs. The reserved ``interchange.json`` plan is JSON serialization with
+   ``Interchange.model_dump_json`` and reload through
+   ``Interchange.model_validate_json``; SAMMD does not write it in the current
+   release, and pre-1.0 Interchange JSON compatibility is not guaranteed across
+   versions.
 
 Resolved defaults to notice
 ---------------------------

@@ -69,6 +69,19 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
         "status": "reserved",
         "available": False,
     }
+    assert artifacts["openff_interchange"] == {
+        "path": str(tmp_path / "interchange.json"),
+        "status": "reserved",
+        "available": False,
+        "constructed": False,
+        "format": "json",
+        "save_method": "Interchange.model_dump_json",
+        "load_method": "Interchange.model_validate_json",
+        "openff_interchange_package_version": None,
+        "compatibility_caveat": (
+            "Pre-1.0 OpenFF Interchange JSON compatibility is not guaranteed across versions."
+        ),
+    }
     interaction = plan.build_summary()["sam"]["metal_sulfur_interaction"]
     assert interaction["mode"] == METAL_SULFUR_INTERACTION_MODE
     assert interaction["site_kind"] == "fcc_hollow"

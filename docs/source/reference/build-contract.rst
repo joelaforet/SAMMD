@@ -121,7 +121,13 @@ treat ``interchange.json`` as the primary portable system artifact.
        backend system artifact.
    * - ``interchange.json``
      - Target
-     - Reserved for the future primary portable OpenFF Interchange export.
+     - Reserved for the future primary portable OpenFF Interchange export. The
+       planned JSON path is ``Interchange.model_dump_json`` for saving and
+       ``Interchange.model_validate_json`` for reload. SAMMD does not write this
+       artifact in the current release, records no concrete
+       ``openff-interchange`` package version until a real artifact is written,
+       and treats pre-1.0 Interchange JSON compatibility as not guaranteed
+       across versions.
    * - ``system.xml``
      - Target
      - Reserved for a future OpenMM convenience export derived from the backend

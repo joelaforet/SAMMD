@@ -104,6 +104,12 @@ The configuration also reserves names for future backend construction artifacts:
 * ``system.xml`` for an OpenMM convenience export, not the primary portable artifact
 * ``anchor_metadata.json`` for SAM anchor metadata export
 
+The future ``interchange.json`` target is planned as OpenFF Interchange JSON
+written with ``Interchange.model_dump_json`` and reloaded with
+``Interchange.model_validate_json``. SAMMD does not write it in this lightweight
+release, and pre-1.0 Interchange JSON compatibility is not guaranteed across
+OpenFF Interchange versions.
+
 The YAML intentionally does not define equilibration, production MD,
 thermostats, barostats, or trajectory writing. Those OpenMM concepts are taught
 and controlled separately from the system-building config.

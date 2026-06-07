@@ -210,11 +210,26 @@ class SAMMDBuildPlan:
         """Return path and lightweight-release availability for one artifact."""
 
         path = getattr(self.output_paths, key)
-        return {
+        summary: dict[str, object] = {
             "path": str(path) if path is not None else None,
             "status": status,
             "available": status == "current",
         }
+        if key == "openff_interchange":
+            summary.update(
+                {
+                    "constructed": False,
+                    "format": "json",
+                    "save_method": "Interchange.model_dump_json",
+                    "load_method": "Interchange.model_validate_json",
+                    "openff_interchange_package_version": None,
+                    "compatibility_caveat": (
+                        "Pre-1.0 OpenFF Interchange JSON compatibility is not "
+                        "guaranteed across versions."
+                    ),
+                }
+            )
+        return summary
 
     def write_build_summary(
         self, path: str | Path | None = None, *, overwrite: bool = False

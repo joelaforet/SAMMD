@@ -94,6 +94,8 @@ Conversion notes:
 
 The target SAMMD backend pipeline should prefer OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy should be applied after export to the selected OpenMM pair representation rather than encoded as a beginner-facing YAML option. Current v0.1.0 code may record these choices and artifact targets, but `positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json` remain reserved backend exports until implemented.
 
+The reserved `interchange.json` target is planned as OpenFF Interchange JSON serialization with `Interchange.model_dump_json` and reload through `Interchange.model_validate_json`. SAMMD should record the concrete `openff-interchange` package version only when a real artifact is written, because pre-1.0 Interchange JSON compatibility is not guaranteed across versions.
+
 Relevant behavior:
 
 - `Interchange` stores topology, parameter collections, positions, box vectors, and velocities.
@@ -228,6 +230,11 @@ During the current v0.1.0 lightweight planning milestone, `sammd build` writes
 showing placeholder sulfur anchors at planned sulfur positions rather than full
 SAM molecule coordinates. Full backend target artifacts remain reserved until
 implemented: `positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json`.
+The reserved `interchange.json` target is planned as JSON from
+`Interchange.model_dump_json` with reload through
+`Interchange.model_validate_json`; no concrete `openff-interchange` package
+version is recorded until SAMMD writes a real artifact, and pre-1.0 JSON
+compatibility is not guaranteed across versions.
 
 mmCIF/PDBx should be preferred over legacy PDB because SAMMD systems may have many atoms, many solvent/reactant molecules, nonstandard residues, and metal particles. Atom names, residue names, chain IDs, molecule labels, and component metadata should be chosen so PyMOL sessions are easy to inspect: metal slab, top SAM, bottom SAM, solvent, salts, and reactants should be distinguishable by selection.
 

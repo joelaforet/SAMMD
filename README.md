@@ -107,7 +107,11 @@ plan.write_topology_cif()  # Writes outputs/topology.cif by default
 
 The config also names future backend artifacts: `interchange.json` as the primary
 portable export, `positions.cif` as the companion coordinate structure file, and
-`system.xml` as an OpenMM convenience export.
+`system.xml` as an OpenMM convenience export. The reserved Interchange plan is a
+future JSON write/reload path using `Interchange.model_dump_json` and
+`Interchange.model_validate_json`; SAMMD does not write that artifact in the
+current release, and pre-1.0 Interchange JSON compatibility is not guaranteed
+across OpenFF Interchange versions.
 
 ## Developer checks
 
