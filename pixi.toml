@@ -21,6 +21,8 @@ ruff = ">=0.8"
 [feature.docs.dependencies]
 sphinx = ">=8"
 myst-parser = ">=4"
+sphinx-copybutton = ">=0.5"
+furo = ">=2024.8.6"
 
 [feature.science.dependencies]
 # Keep OpenMM's NVRTC/PTX target no newer than the local NVIDIA driver-supported CUDA line.
