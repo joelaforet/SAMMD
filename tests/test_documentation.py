@@ -113,6 +113,35 @@ def test_readme_includes_approved_scientific_assumptions_wording() -> None:
     assert approved_wording in content
 
 
+def test_main_docs_preserve_build_export_vs_openmm_run_model() -> None:
+    """Keep project-level docs aligned on SAMMD artifact export vs OpenMM runs."""
+
+    required_by_path = {
+        PROJECT_ROOT / "README.md": [
+            "SAMMD builds and exports chemistry, structure, and parameter artifacts",
+            "OpenMM runs minimization, equilibration, production, trajectories, and reporters",
+        ],
+        PROJECT_ROOT / "docs" / "source" / "index.rst": [
+            "building and exporting self-assembled monolayer chemistry, structure, and parameter artifacts",
+            "OpenMM owns minimization, equilibration, production runs, trajectories, and reporters",
+        ],
+        PROJECT_ROOT / "docs" / "source" / "reference" / "build-contract.rst": [
+            "SAMMD builds/exports artifacts; OpenMM owns minimization",
+            "Downstream OpenMM simulation scripts are taught separately",
+        ],
+        PROJECT_ROOT / "docs" / "project-scope.md": [
+            "SAMMD builds and exports chemistry, structure, and parameter artifacts",
+            "OpenMM runs minimization, equilibration, production MD, trajectory writing, and reporter setup",
+            "without making SAMMD-owned run wrappers the canonical API",
+        ],
+    }
+
+    for path, phrases in required_by_path.items():
+        normalized = " ".join(path.read_text(encoding="utf-8").split())
+        for phrase in phrases:
+            assert phrase in normalized, path
+
+
 def test_scientific_assumptions_document_current_model_boundaries() -> None:
     """Document placement, force-field, backend-export, and simulation boundaries."""
 
@@ -197,10 +226,11 @@ def test_project_scope_source_matches_first_release_contract() -> None:
     assert "`Interchange.model_dump_json`" in content
     assert "`Interchange.model_validate_json`" in content
     assert "pre-1.0 Interchange JSON compatibility is not guaranteed across versions" in content
-    assert "Simulation wrappers are post-v0.1.0 target work" in content
-    assert "excluded from the v0.1.0 first-release contract" in content
+    assert "SAMMD builds and exports chemistry, structure, and parameter artifacts" in content
+    assert "OpenMM runs minimization, equilibration, production MD" in content
+    assert "not a student-facing SAMMD run-wrapper API" in content
     assert "Lightweight/internal OpenMM utilities may exist" in content
-    assert "does not expose student-facing SAMMD ownership" in content
+    assert "do not establish student-facing SAMMD ownership" in content
 
 
 def test_project_scope_keeps_simulation_work_out_of_current_scope() -> None:
@@ -220,6 +250,9 @@ def test_project_scope_keeps_simulation_work_out_of_current_scope() -> None:
         "and thermodynamic state data",
         "The current release does not provide `create_openmm_simulation`, "
         "minimization, equilibration",
+        "Future SAMMD releases should provide a user-facing simulation interface",
+        "Expose simple methods for minimization, equilibration, production",
+        "once SAMMD-owned simulation workflows are added",
     ]
     for phrase in stale_phrases:
         assert phrase not in content
@@ -236,7 +269,9 @@ def test_project_scope_keeps_simulation_work_out_of_current_scope() -> None:
     assert "thermodynamic reporting" not in first_release_deliverables
 
     guarded_patterns = [
-        r"post-v0\.1\.0[^.]*OpenMM setup",
+        r"OpenMM minimization, equilibration, production[^.]*thermodynamic reporting protocols",
+        r"those runs are not part of the SAMMD build/export contract",
+        r"user-owned OpenMM scripts[^.]*SAMMD-exported artifacts",
         r"DCD[^.]*post-v0\.1\.0/tutorial[^.]*not a v0\.1\.0 build artifact",
         r"OpenMM thermodynamic state data[^.]*post-v0\.1\.0/tutorial-only",
     ]
@@ -370,7 +405,8 @@ def test_build_contract_documents_first_release_boundary() -> None:
     assert "system.xml" in content
     assert "anchor_metadata.json" in content
     assert "Full OpenFF/OpenMM construction" in normalized
-    assert "does not own" in content.lower()
+    assert "chemistry, structure, and parameter-planning artifacts" in normalized
+    assert "SAMMD builds/exports artifacts; OpenMM owns minimization" in normalized
     assert "equilibration" in content.lower()
     assert "production simulation" in content.lower()
     assert "``interchange.json`` as the primary portable system artifact" in normalized

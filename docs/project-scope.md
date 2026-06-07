@@ -1,10 +1,10 @@
 # SAMMD Project Scope
 
-This document captures the initial research context and scope interpretation for SAMMD: a Python package for reproducible molecular dynamics simulations of self-assembled monolayers on metal supports.
+This document captures the initial research context and scope interpretation for SAMMD: a Python package that builds and exports chemistry, structure, and parameter artifacts for self-assembled monolayers on metal supports. OpenMM owns minimization, equilibration, production runs, trajectories, and reporters after those artifacts exist.
 
 ## Goal
 
-SAMMD should let a user specify a metal surface, one or more thiol SAM components, solvent mixture, salts, and reactant molecules from a validated YAML file, then build an OpenFF/OpenMM-ready simulation system that can be inspected and extended from Python.
+SAMMD should let a user specify a metal surface, one or more thiol SAM components, solvent mixture, salts, and reactant molecules from a validated YAML file, then build/export OpenFF/OpenMM-ready chemistry, structure, and parameter artifacts that can be inspected and handed to user-controlled OpenMM Python scripts.
 
 The first scientific target is a propanethiol SAM (`CCCS`) on Pd(111), with small molecule ligands approaching the monolayer-covered metal surface.
 
@@ -42,7 +42,7 @@ Defer until after v0.1.0:
 - Umbrella sampling automation.
 - General surface support beyond registered Fcc(111) metals, including non-111 facets.
 - Explicit metal-sulfur bonded topology terms unless needed to correct SAM geometry.
-- SAMMD-owned OpenMM setup, tutorial simulations, DCD trajectory output, and thermodynamic reporting wrappers. Tutorial-only user code may demonstrate OpenMM usage, but those simulations are not part of the SAMMD v0.1.0 build contract.
+- OpenMM minimization, equilibration, production, DCD trajectory output, and thermodynamic reporting protocols. Tutorial-only user code may demonstrate OpenMM API usage after SAMMD exports backend artifacts, but those runs are not part of the SAMMD build/export contract.
 - Full OpenFF/SMIRNOFF parameterization for organic SAM, solvent, salts, and reactants, including OpenFF Interchange or OpenMM backend construction/export.
 - Advanced analysis workflows beyond basic orientation observables.
 
@@ -155,7 +155,7 @@ Initial package modules:
 - `sammd.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
 - `sammd.solvation`: solvent mixture, salt, and reactant count calculations from solvent-only mole fractions and concentrations, followed by OpenFF/PACKMOL packing.
 - `sammd.builders`: high-level builder. Current v0.1.0 code returns a lightweight deterministic build plan; future backend integration should add full OpenFF `Interchange` construction.
-- `sammd.simulation`: post-v0.1.0 target module for thin, user-facing OpenMM setup and run helpers, not part of the v0.1.0 first-release contract.
+- `sammd.openmm_runtime`: optional/internal OpenMM utilities for development and backend validation, not a student-facing SAMMD run-wrapper API.
 - `sammd.io`: v0.1.0 mmCIF/PDBx topology-inspection writing; post-v0.1.0 DCD trajectory naming conventions and visualization-oriented metadata helpers.
 - `sammd.reporting`: post-v0.1.0 OpenMM reporter configuration for trajectories and thermodynamic state data.
 - `sammd.analysis`: orientation metrics and later umbrella-sampling support.
@@ -185,7 +185,7 @@ The current `sammd build` command writes the v0.1.0 first-release artifacts:
 - `resolved_config.yaml`: validated YAML configuration used for the build.
 
 The post-v0.1.0 full-construction workflow should preserve the small API surface while
-adding backend artifacts and simulation helpers, for example:
+adding backend artifact exports for OpenMM handoff, for example:
 
 ```python
 from sammd import load_config, build_system
@@ -193,31 +193,31 @@ from sammd import load_config, build_system
 config = load_config("sammd.yaml")
 system = build_system(config)
 interchange = system.interchange
-simulation = system.create_openmm_simulation()
+openmm_system = interchange.to_openmm()
 ```
 
 ## Scientific Design Decisions
 
-### Simulation API Abstraction
+### OpenMM Handoff Boundary
 
-Simulation wrappers are post-v0.1.0 target work and are excluded from the v0.1.0 first-release contract. Lightweight/internal OpenMM utilities may exist for development, but v0.1.0 does not expose student-facing SAMMD ownership of `create_openmm_simulation`, minimization, equilibration, production MD, trajectory writing, or reporter setup in the top-level build workflow.
+SAMMD builds and exports chemistry, structure, and parameter artifacts; OpenMM runs minimization, equilibration, production MD, trajectory writing, and reporter setup. Lightweight/internal OpenMM utilities may exist for development and backend validation, but they do not establish student-facing SAMMD ownership of `create_openmm_simulation`, minimization, equilibration, production MD, trajectory writing, or reporter setup in the top-level build workflow.
 
-Future SAMMD releases should provide a user-facing simulation interface for the canonical workflow, not require users to write pure OpenMM code for routine runs.
+Future SAMMD releases should improve the build/export handoff and examples without making SAMMD-owned run wrappers the canonical API. Users should be able to inspect SAMMD artifacts and pass them to the OpenMM Python API for routine runs.
 
-The interface should:
+The handoff should:
 
-- Accept validated configuration objects and produce build artifacts.
-- Expose simple methods for minimization, equilibration, production, and export in the notebook workflow.
-- Return or expose the underlying OpenFF `Interchange` and OpenMM `System`, `Topology`, positions, and `Simulation` objects for advanced users.
+- Accept validated configuration objects and produce build/export artifacts.
+- Return or expose the underlying OpenFF `Interchange` and OpenMM `System`, `Topology`, and positions for advanced users.
+- Keep minimization, equilibration, production, trajectory writing, and reporter setup in user-owned OpenMM scripts.
 - Keep sulfur-metal anchoring details internal to planning/backend representation until an explicit advanced attachment API is designed.
 
 For the nonbonded anchor proxy, beginner users should not tune the interaction magnitude in the current MVP. Future advanced APIs may expose attachment strategy and strength choices once the backend behavior is validated, but v0.1.0 should treat these as internal planning/representation details.
 
 ### Visualization And Output Files
 
-SAMMD-generated systems should be optimized for visualization in tools such as PyMOL.
+SAMMD-generated structures and OpenMM-run outputs should be optimized for visualization in tools such as PyMOL.
 
-Default post-v0.1.0 or tutorial-only user-code artifacts for a simulated system should include:
+Default post-v0.1.0 backend exports plus tutorial-only OpenMM run outputs should include:
 
 - `topology.cif`: mmCIF/PDBx topology and starting coordinates.
 - `trajectory.dcd`: DCD trajectory from OpenMM.
@@ -238,7 +238,7 @@ compatibility is not guaranteed across versions.
 
 mmCIF/PDBx should be preferred over legacy PDB because SAMMD systems may have many atoms, many solvent/reactant molecules, nonstandard residues, and metal particles. Atom names, residue names, chain IDs, molecule labels, and component metadata should be chosen so PyMOL sessions are easy to inspect: metal slab, top SAM, bottom SAM, solvent, salts, and reactants should be distinguishable by selection.
 
-DCD should be the canonical post-v0.1.0/tutorial OpenMM trajectory convention, not a v0.1.0 build artifact. The topology/trajectory pair should load cleanly as `topology.cif` plus `trajectory.dcd` in PyMOL or common Python analysis tools once SAMMD-owned simulation workflows are added.
+DCD should be the canonical post-v0.1.0/tutorial OpenMM trajectory convention, not a v0.1.0 build artifact. The topology/trajectory pair should load cleanly as `topology.cif` plus `trajectory.dcd` in PyMOL or common Python analysis tools after user-owned OpenMM scripts run from SAMMD-exported artifacts.
 
 ### Thermodynamic Reporting
 
@@ -377,7 +377,7 @@ The docs should assume undergraduate contributors and make success states explic
 - Reactant orientation analysis can begin with a configurable COM-to-selection vector relative to the surface normal.
 - mmCIF/PDBx is the default topology/starting-coordinate output format.
 - DCD is the default post-v0.1.0/tutorial-only OpenMM trajectory output convention, not a v0.1.0 build artifact.
-- OpenMM thermodynamic state data should be written during post-v0.1.0/tutorial-only runs, with future tests requesting all supported fields and users allowed to override fields/intervals.
+- OpenMM thermodynamic state data should be written during post-v0.1.0/tutorial-only OpenMM runs, with future tests requesting all supported fields and users allowed to override fields/intervals.
 
 ## Remaining Open Questions
 

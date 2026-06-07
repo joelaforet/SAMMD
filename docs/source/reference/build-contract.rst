@@ -3,9 +3,10 @@ First-release build contract
 
 SAMMD's first release is a configuration-first builder/exporter contract. A user
 edits a YAML file, validates it, and runs a CLI build that writes deterministic
-inspection artifacts. SAMMD does not own equilibration or production simulation
-wrappers; downstream OpenMM simulation scripts are taught separately and should
-use the OpenMM Python API directly.
+chemistry, structure, and parameter-planning artifacts. SAMMD builds/exports
+artifacts; OpenMM owns minimization, equilibration, production runs,
+trajectories, and reporters. Downstream OpenMM simulation scripts are taught
+separately and should use the OpenMM Python API directly.
 
 CLI contract
 ------------

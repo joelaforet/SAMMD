@@ -6,6 +6,8 @@ SAMMD is a Python package for reproducible molecular dynamics setup of
 self-assembled monolayers on metal supports. The student-facing workflow uses a
 version-controllable YAML file to describe the system contents, packing, and
 parameterization choices before any OpenMM simulation protocol is written.
+SAMMD builds and exports chemistry, structure, and parameter artifacts; OpenMM
+runs minimization, equilibration, production, trajectories, and reporters.
 
 SAMMD builds a physically reasonable starting-structure plan with reproducible force-field assignments for future MD simulations. The metal-S interaction is modeled with a tunable, strengthened nonbonded interaction; it is not a quantum or reactive description of chemisorption.
 
