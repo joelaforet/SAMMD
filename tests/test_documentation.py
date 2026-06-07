@@ -212,6 +212,39 @@ def test_project_scope_keeps_metal_s_attachment_internal_for_mvp() -> None:
     )
 
 
+def test_project_scope_clarifies_neutral_thiol_beginner_inputs() -> None:
+    """Keep beginner scope guidance from teaching configured thiolate inputs."""
+
+    page = PROJECT_ROOT / "docs" / "project-scope.md"
+    content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
+
+    assert "neutral thiols with an HS/implicit-H thiol sulfur" in normalized
+    assert "should not provide pre-deprotonated thiolate inputs" in normalized
+    assert "SAMMD uses the sulfur atom for placement" in normalized
+
+
+def test_project_scope_keeps_anchor_site_out_of_current_template_scope() -> None:
+    """Prevent stale current YAML/template anchor-site configurability wording."""
+
+    page = PROJECT_ROOT / "docs" / "project-scope.md"
+    content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
+
+    stale_phrases = [
+        "YAML template defaults include `fcc_hollow`",
+        "The default sulfur site for Pd(111) should be `fcc_hollow`, "
+        "but site type must be configurable.",
+        "keep the adsorption site configurable",
+    ]
+    for phrase in stale_phrases:
+        assert phrase not in content
+
+    assert "internal Pd(111) default strategy" in normalized
+    assert "internal builder default rather than a beginner template field" in normalized
+    assert "user-configurable site type belongs in a future advanced attachment API" in normalized
+
+
 def test_build_contract_documents_first_release_boundary() -> None:
     """Lock the docs page that defines current and reserved build outputs."""
 

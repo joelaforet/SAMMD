@@ -139,7 +139,7 @@ SAMMD should keep this simpler than PolyzyMD initially: water, ethanol, simple m
 
 Broader thiolate literature cautions that site preferences can be metal-, coverage-, and adsorbate-dependent. For example, Au(111) DFT/HREELS work reports methylthiolate near a bridge site displaced toward fcc hollow rather than a simple hollow-site picture ([Hayashi et al., J. Chem. Phys. 2001](https://doi.org/10.1063/1.1360245)).
 
-For SAMMD MVP, use three-fold hollow placement on Pd(111) as the default modeling hypothesis, but keep the adsorption site configurable. The builder should not hard-code this assumption so future calibration against Pd-specific data can switch among `fcc_hollow`, `hcp_hollow`, `bridge`, and `atop` placement.
+For SAMMD MVP, use three-fold hollow placement on Pd(111) as the default internal modeling hypothesis. The builder should keep this assumption localized so future advanced APIs can switch among `fcc_hollow`, `hcp_hollow`, `bridge`, and `atop` placement after calibration against Pd-specific data.
 
 ## Proposed Package Shape
 
@@ -253,9 +253,11 @@ Mixed SAMs are in scope, even if the canonical demo uses a single propanethiol c
 The configuration should allow a list of SAM components:
 
 - `name`: human-readable component label.
-- `smiles`: thiol molecule SMILES.
+- `smiles`: neutral thiol molecule SMILES.
 - `fraction` or `count`: surface composition control.
 - Optional per-component anchor settings for future calibration.
+
+Beginner YAML configuration should teach SAM components as neutral thiols with an HS/implicit-H thiol sulfur, such as propanethiol `CCCS`. Users should not provide pre-deprotonated thiolate inputs; SAMMD uses the sulfur atom for placement and represents metal-sulfur attachment internally during planning/backend construction.
 
 The total grafting density applies to all SAM components combined. The default grafting density is `0.25 nm^2 / molecule`, equivalent to 4 molecules per nm^2. Placement should select binding sites deterministically from a seed, then assign component identities from fractions or counts. The same composition should decorate both slab faces by default, with a future extension point for side-specific compositions.
 
@@ -287,7 +289,7 @@ Future explicit anchor mode should be designed as a replaceable strategy:
 - `anchor.mode = "nonbonded"` for MVP.
 - `anchor.mode = "bonded"` later for metal-sulfur bond, angle, and torsion parameters.
 - A future angle target, such as 23 degrees relative to the surface, should not require rewriting the builder API.
-- `anchor.site = "fcc_hollow"` should be the Pd(111) default, with other configurable site labels available later.
+- `anchor.site = "fcc_hollow"` should be the internal Pd(111) default strategy, with other site labels reserved for a later advanced attachment API.
 
 Solvent and reactant composition should be converted from user-facing units:
 
@@ -312,7 +314,7 @@ An angle near 90 degrees means the selected reactant vector lies roughly paralle
 High-value unit tests for the first implementation:
 
 - YAML template loads into the Pydantic model.
-- YAML template defaults include `fcc_hollow`, TIP3P, `0.25 nm^2 / molecule`, and `10000 kJ mol^-1 nm^-2` Pd restraints.
+- YAML template defaults include TIP3P, `0.25 nm^2 / molecule`, and `10000 kJ mol^-1 nm^-2` Pd restraints; the Pd(111) sulfur site remains an internal builder default rather than a beginner template field.
 - YAML template includes v0.1.0 configurable output sections for mmCIF build artifacts; DCD and thermodynamic state data remain post-v0.1.0/tutorial-only simulation conventions.
 - Invalid metal, facet, grafting density, solvent fraction, or concentration fails clearly.
 - Mixed SAM fractions must sum to one, or explicit counts must match selected grafting sites.
@@ -350,7 +352,7 @@ The docs should assume undergraduate contributors and make success states explic
 - The MVP slab should be centered and decorated on both faces to use PBC in `z` cleanly.
 - The slab should be thick enough that the two SAM/slab interfaces are separated by more than the nonbonded cutoff plus a buffer.
 - The lateral box dimensions should be user-tunable; the first demo can start near 5 x 5 nm.
-- The default sulfur site for Pd(111) should be `fcc_hollow`, but site type must be configurable.
+- The default sulfur site for Pd(111) should be internal `fcc_hollow` builder behavior; user-configurable site type belongs in a future advanced attachment API.
 - Sulfur-metal interaction scaling remains an internal planning/backend detail for v0.1.0; any user-configurable scale factor belongs in a future advanced attachment API.
 - TIP3P is the default water model.
 - The default Pd positional restraint force constant is `10000 kJ mol^-1 nm^-2`.
