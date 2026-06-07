@@ -175,6 +175,43 @@ def test_project_scope_keeps_parameterization_backend_out_of_first_release() -> 
     ) is not None
 
 
+def test_readme_demo_uses_neutral_thiol_sam_wording() -> None:
+    """Prevent stale demo wording from teaching thiolate as configured SAM input."""
+
+    page = PROJECT_ROOT / "README.md"
+    content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
+
+    assert "Pd(111)/propanethiolate/" not in content
+    assert "one propanethiolate residue per SAM molecule" not in content
+    assert "Pd(111)/propanethiol SAM input with cinnamaldehyde and ethanol" in normalized
+    assert "propanethiol-derived thiol SAM residue" in normalized
+
+
+def test_project_scope_keeps_metal_s_attachment_internal_for_mvp() -> None:
+    """Prevent stale user-configurable metal-S MVP wording from returning."""
+
+    page = PROJECT_ROOT / "docs" / "project-scope.md"
+    content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
+
+    stale_phrases = [
+        "sulfur-metal interaction scaling factor must be user-configurable",
+        "Keep the scale factor in user configuration",
+        "users should only need to set the interaction magnitude",
+        "Increase the relevant sulfur-metal interaction strength by a configurable factor",
+    ]
+    for phrase in stale_phrases:
+        assert phrase not in content
+
+    assert "beginner users should not tune the interaction magnitude" in normalized
+    assert "backend/internal representation, not a beginner YAML knob" in normalized
+    assert (
+        "user-configurable scale factor belongs in a future advanced attachment API"
+        in normalized
+    )
+
+
 def test_build_contract_documents_first_release_boundary() -> None:
     """Lock the docs page that defines current and reserved build outputs."""
 

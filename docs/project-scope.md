@@ -204,9 +204,9 @@ The interface should:
 - Accept validated configuration objects and produce build artifacts.
 - Expose simple methods for minimization, equilibration, production, and export in the notebook workflow.
 - Return or expose the underlying OpenFF `Interchange` and OpenMM `System`, `Topology`, positions, and `Simulation` objects for advanced users.
-- Hide implementation details of sulfur-metal anchoring behind configuration fields such as `anchor.mode`, `anchor.site`, and `anchor.nonbonded.scale_factor`.
+- Keep sulfur-metal anchoring details internal to planning/backend representation until an explicit advanced attachment API is designed.
 
-For the nonbonded anchor proxy, users should only need to set the interaction magnitude, for example 4x or 6x stronger than the baseline sulfur-metal interaction. The implementation may use an OpenMM custom force, pair-specific nonbonded overrides, or another correct backend, but that choice should not leak into the user-facing API.
+For the nonbonded anchor proxy, beginner users should not tune the interaction magnitude in the current MVP. Future advanced APIs may expose attachment strategy and strength choices once the backend behavior is validated, but v0.1.0 should treat these as internal planning/representation details.
 
 ### Visualization And Output Files
 
@@ -275,11 +275,11 @@ The slab must be thick enough that the two decorated interfaces do not see each 
 
 For the first notebook/demo, a practical starting system is roughly 5 x 5 nm in the lateral plane, 8 Pd layers, SAMs on both faces, and at least 3 nm solvent padding on each side before PBC wrapping. This is large enough for a full SAM coating and multiple cinnamaldehyde reactants (`C1=CC=C(C=C1)/C=C/C=O`) while still being plausible for prototype runs.
 
-Default metal-sulfur anchoring should begin as a nonbonded proxy:
+Default metal-sulfur anchoring should begin as an internal nonbonded proxy:
 
 - Keep the SAM sulfur and surface metal atoms non-covalent in topology.
-- Increase the relevant sulfur-metal interaction strength by a configurable factor, initially `4.0`.
-- Keep the scale factor in user configuration, not source code, because users may tune values such as 4x, 5x, or 6x.
+- Plan the relevant sulfur-metal interaction strength as backend/internal representation, not a beginner YAML knob.
+- Defer any user-configurable scale factor, such as 4x, 5x, or 6x, until a later advanced attachment API.
 - Preserve a configuration/API path for future explicit bonded anchors.
 
 Future explicit anchor mode should be designed as a replaceable strategy:
@@ -351,7 +351,7 @@ The docs should assume undergraduate contributors and make success states explic
 - The slab should be thick enough that the two SAM/slab interfaces are separated by more than the nonbonded cutoff plus a buffer.
 - The lateral box dimensions should be user-tunable; the first demo can start near 5 x 5 nm.
 - The default sulfur site for Pd(111) should be `fcc_hollow`, but site type must be configurable.
-- The sulfur-metal interaction scaling factor must be user-configurable and backend details should be hidden behind SAMMD's simulation interface.
+- Sulfur-metal interaction scaling remains an internal planning/backend detail for v0.1.0; any user-configurable scale factor belongs in a future advanced attachment API.
 - TIP3P is the default water model.
 - The default Pd positional restraint force constant is `10000 kJ mol^-1 nm^-2`.
 - The default grafting density is `0.25 nm^2 / molecule`.

@@ -41,16 +41,16 @@ future construction code or their own backend workflow; SAMMD does not yet
 construct complete OpenMM systems.
 
 A development smoke runner is available at `tools/openmm_smoke.py` for testing
-the science environment against a compact real Pd(111)/propanethiolate/
-cinnamaldehyde/ethanol OpenMM system. It is not part of the public package API and
+the science environment against a compact real Pd(111)/propanethiol SAM input
+with cinnamaldehyde and ethanol. It is not part of the public package API and
 uses pragmatic direct OpenMM construction for stability testing while full
 backend construction remains a future milestone. Ethanol placement is generated
 by PACKMOL while holding the prebuilt Pd+SAM+cinnamaldehyde coordinates fixed for
 packing only; the OpenMM smoke run uses mobile, unrestrained Pd atoms. Topology
 output uses a PolyzyMD-style repeat-unit residue convention: chain A is the Pd
-slab, chain B contains one propanethiolate residue per SAM molecule, chain C
-contains cinnamaldehyde, and chain D+ contains one ethanol residue per molecule
-with wrapping every 9999 residues.
+slab, chain B contains one propanethiol-derived thiol SAM residue per SAM
+molecule, chain C contains cinnamaldehyde, and chain D+ contains one ethanol
+residue per molecule with wrapping every 9999 residues.
 
 `build_system()` currently returns a deterministic build plan. The plan contains
 the validated config, an automatically thickened centered Pd(111) slab, internal
