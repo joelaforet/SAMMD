@@ -59,25 +59,25 @@ Important sections
    Defines PACKMOL packing options such as tolerance and maximum loop count.
 
 ``parameterization``
-   Records the OpenFF small-molecule force field, charge model, INTERFACE metal
-   force-field resource, and nonbonded cutoff selected for future backend export.
-   The current lightweight builder validates and records these choices without
-   constructing a parameterized backend system. The INTERFACE metal resource is
-   the base slab LJ model; selected sulfur-metal pair overrides are recorded in
-   the build summary as internal SAM metadata rather than configured here.
+    Records the OpenFF small-molecule force field, charge model, INTERFACE metal
+    force-field resource, and nonbonded cutoff selected for backend export. The
+    default lightweight builder validates and records these choices without
+    constructing a parameterized backend system; ``sammd build --export-backend``
+    uses them in the science environment. The INTERFACE metal resource is the
+    base slab LJ model; selected sulfur-metal pair overrides are recorded in the
+    build summary as internal SAM metadata rather than configured here.
 
 ``outputs``
-   Names current build artifacts such as ``topology.cif``,
-   ``build_summary.json``, and ``resolved_config.yaml``. It also reserves future
-   backend artifact names such as ``positions.cif``, ``interchange.json``, and
-   ``system.xml``, plus ``anchor_metadata.json``. These are not MD trajectory
-   outputs. The reserved ``interchange.json`` plan is JSON serialization with
-   ``Interchange.model_dump_json`` and reload through
-   ``Interchange.model_validate_json``; SAMMD does not write it in the current
-   release, and pre-1.0 Interchange JSON compatibility is not guaranteed across
-   versions. OpenMM is the student teaching path and ``system.xml`` is only a
-   convenience export; GROMACS, LAMMPS, and Amber are future downstream exports
-   from Interchange, not beginner workflow commands.
+    Names current build artifacts such as ``topology.cif``,
+    ``build_summary.json``, and ``resolved_config.yaml``. It also names backend
+    artifacts written by ``--export-backend`` such as ``positions.cif``,
+    ``interchange.json``, and ``system.xml``, plus ``anchor_metadata.json``.
+    These are not MD trajectory outputs. ``interchange.json`` uses JSON
+    serialization with ``Interchange.model_dump_json`` and reload through
+    ``Interchange.model_validate_json``; pre-1.0 Interchange JSON compatibility
+    is not guaranteed across versions. OpenMM is the student teaching path and
+    ``system.xml`` is only a convenience export; GROMACS, LAMMPS, and Amber are
+    future downstream exports from Interchange, not beginner workflow commands.
 
 Resolved defaults to notice
 ---------------------------
@@ -93,7 +93,7 @@ Current limitations
 -------------------
 
 This config defines system construction choices and records parameterization
-selections for future backend export. OpenMM simulation protocols, thermostats,
+selections for backend export. OpenMM simulation protocols, thermostats,
 barostats, equilibration stages, and trajectory saving are intentionally kept
 out of this release's YAML file.
 

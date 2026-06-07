@@ -2,8 +2,8 @@ Canonical build-to-OpenMM workflow
 ==================================
 
 This tutorial shows the current student-facing path: SAMMD builds a checked,
-deterministic starting plan, and OpenMM will run the molecular dynamics after
-future backend artifacts exist. SAMMD builds; OpenMM runs.
+deterministic starting plan, and the optional backend export writes artifacts
+that students can hand to OpenMM. SAMMD builds; OpenMM runs.
 
 1. Create config
 ----------------
@@ -50,7 +50,8 @@ The returned build plan contains the validated configuration, a centered
 registered Fcc(111) slab defaulting to Pd(111), internal ``fcc_hollow`` binding
 sites, deterministic SAM sulfur anchor placeholders, approximate solution
 counts, and resolved output paths. Full SAM molecule coordinates and a
-parameterized backend system remain future backend work.
+parameterized backend system are written only when ``--export-backend`` is used
+from the science environment.
 
 4. Inspect current outputs
 --------------------------
@@ -64,34 +65,39 @@ Use ``outputs/build_summary.json`` to confirm the same build choices in a
 machine-readable form. Use ``outputs/resolved_config.yaml`` when you need the
 exact validated YAML that produced the plan.
 
-The current release does not write ``positions.cif``, ``interchange.json``,
-``system.xml``, or ``anchor_metadata.json``. Those names may appear in resolved
-paths or planning metadata, but they are reserved target artifacts, not current
-outputs.
+Those names may appear in resolved paths or planning metadata, but the default
+lightweight command does not write ``positions.cif``, ``interchange.json``,
+``system.xml``, or ``anchor_metadata.json``.
 
-5. Reserved future backend artifacts
-------------------------------------
+5. Optional backend artifacts
+-----------------------------
 
-SAMMD reserves these future backend construction artifacts so the student path
-has stable names when full construction is implemented:
+Use the optional science environment when you want parameterized backend
+artifacts:
+
+.. code-block:: bash
+
+   pixi run -e science sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+
+That command writes these additional backend artifacts:
 
 * ``interchange.json`` for the primary portable OpenFF Interchange export
 * ``positions.cif`` for fully constructed, human-inspectable/OpenMM-loadable coordinates
 * ``system.xml`` for an OpenMM convenience export, not the primary portable artifact
 * ``anchor_metadata.json`` for SAM anchor metadata export
 
-The future ``interchange.json`` target is planned as OpenFF Interchange JSON
-written with ``Interchange.model_dump_json`` and reloaded with
-``Interchange.model_validate_json``. SAMMD does not write it in this lightweight
-release, and pre-1.0 Interchange JSON compatibility is not guaranteed across
-OpenFF Interchange versions.
+The ``interchange.json`` target is OpenFF Interchange JSON written with
+``Interchange.model_dump_json`` and reloaded with
+``Interchange.model_validate_json``. Pre-1.0 Interchange JSON compatibility is
+not guaranteed across OpenFF Interchange versions. Salt-containing configs are
+rejected by backend export until salt support is implemented.
 
-6. Future OpenMM handoff
-------------------------
+6. OpenMM handoff
+-----------------
 
-After a future SAMMD backend writes ``interchange.json`` and companion
-artifacts, students will hand those build artifacts to their own OpenMM Python
-API script. The intended teaching path is:
+After backend export writes ``interchange.json`` and companion artifacts,
+students will hand those build artifacts to their own OpenMM Python API script.
+The intended teaching path is:
 
 * reload the portable OpenFF Interchange data from ``interchange.json`` with
   ``Interchange.model_validate_json``
@@ -103,12 +109,8 @@ API script. The intended teaching path is:
   production, and reporters
 
 SAMMD does not provide OpenMM simulation wrappers for this handoff. Students use
-the OpenMM Python API directly after SAMMD produces the future build artifacts.
-
-That handoff is not runnable in this lightweight release because
-``positions.cif``, ``interchange.json``, ``system.xml``, and
-``anchor_metadata.json`` are reserved target artifacts, not current outputs. The
-important boundary is unchanged: SAMMD builds; OpenMM runs.
+the OpenMM Python API directly after SAMMD produces the backend build artifacts.
+The important boundary is unchanged: SAMMD builds; OpenMM runs.
 
 7. Other engines
 ----------------

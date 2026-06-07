@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from sammd.builders import build_system
-from sammd.config import SAMMDConfig
+from sammd.config import SAMMDConfig, load_config_dict
 
 
 def test_backend_module_import_does_not_import_optional_science_modules() -> None:
@@ -49,6 +49,38 @@ def test_backend_build_summary_marks_completed_exports(tmp_path: Path) -> None:
     assert summary["engine_exports"]["openmm"]["available"] is True
     assert summary["backend_export"]["openff_interchange_version"] == "0.5.3"
     assert summary["backend_export"]["sulfur_metal_pair_count"] == 1
+
+
+def test_backend_export_rejects_salts_before_optional_imports(tmp_path: Path) -> None:
+    """Avoid silently omitting schema-supported salts from backend artifacts."""
+
+    backend = importlib.import_module("sammd.interchange_backend")
+    config = load_config_dict(
+        {
+            "salts": [
+                {
+                    "name": "sodium_chloride",
+                    "concentration": 0.1,
+                    "cation": {
+                        "name": "sodium",
+                        "residue_name": "NAI",
+                        "smiles": "[Na+]",
+                        "count_per_formula_unit": 1,
+                    },
+                    "anion": {
+                        "name": "chloride",
+                        "residue_name": "CLI",
+                        "smiles": "[Cl-]",
+                        "count_per_formula_unit": 1,
+                    },
+                }
+            ]
+        }
+    )
+    plan = build_system(config, output_dir=tmp_path)
+
+    with pytest.raises(NotImplementedError, match="does not yet support salts"):
+        backend.build_interchange_backend(plan)
 
 
 def test_interface_metal_offxml_loads_with_current_openff() -> None:

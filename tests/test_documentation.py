@@ -410,7 +410,9 @@ def test_build_contract_documents_first_release_boundary() -> None:
     assert "interchange.json" in content
     assert "system.xml" in content
     assert "anchor_metadata.json" in content
-    assert "Full OpenFF/OpenMM construction" in normalized
+    assert "--export-backend" in content
+    assert "optional science environment" in normalized
+    assert "Salt-containing configs are rejected until salt export is implemented" in normalized
     assert "chemistry, structure, and parameter-planning artifacts" in normalized
     assert "SAMMD builds/exports artifacts; OpenMM owns minimization" in normalized
     assert "equilibration" in content.lower()
@@ -422,16 +424,14 @@ def test_build_contract_documents_first_release_boundary() -> None:
     assert "pre-1.0 Interchange JSON compatibility as not guaranteed" in normalized
     assert "OpenMM convenience export" in normalized
     assert "not the primary portable SAMMD artifact" in normalized
-    assert "reserved engine export planning metadata" in normalized
+    assert "engine export planning metadata" in normalized
     assert "OpenMM is the student teaching path" in normalized
     assert "``system.xml`` is only a convenience export" in normalized
     assert "GROMACS, LAMMPS, and Amber are reserved only as future downstream exports" in normalized
     assert "not taught in the beginner workflow" in normalized
     assert "human-inspectable/OpenMM-loadable structure file" in normalized
-    assert (
-        "does not write ``positions.cif``, ``interchange.json``, ``system.xml``, "
-        "or ``anchor_metadata.json``" in normalized
-    )
+    assert "By default, ``sammd build`` writes only ``topology.cif``" in normalized
+    assert "With ``--export-backend`` in the science environment" in normalized
     assert "* - ``SAMMDBuildPlan``" not in content
     assert "not a top-level public import" in " ".join(content.split())
 
@@ -456,8 +456,8 @@ def test_build_contract_documents_deferred_backend_validation_gates() -> None:
         assert phrase in normalized
 
 
-def test_yaml_configuration_docs_keep_backend_exports_reserved() -> None:
-    """Keep YAML tutorial aligned with current lightweight build behavior."""
+def test_yaml_configuration_docs_describe_backend_export_mode() -> None:
+    """Keep YAML tutorial aligned with lightweight and backend build behavior."""
 
     page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "yaml-configuration.rst"
     content = page.read_text(encoding="utf-8")
@@ -465,14 +465,15 @@ def test_yaml_configuration_docs_keep_backend_exports_reserved() -> None:
 
     assert "used while building the system" not in content
     assert "defines system construction and parameterization only" not in content
-    assert "future backend export" in content
+    assert "backend export" in content
     assert "validates and records these choices" in content
     assert "current build artifacts such as ``topology.cif``" in normalized
-    assert "future backend artifact names such as ``positions.cif``" in normalized
+    assert "backend artifacts written by ``--export-backend``" in normalized
     assert "``anchor_metadata.json``" in normalized
     assert "``Interchange.model_dump_json``" in content
     assert "``Interchange.model_validate_json``" in content
-    assert "pre-1.0 Interchange JSON compatibility is not guaranteed" in normalized
+    assert "pre-1.0 interchange json compatibility" in normalized.lower()
+    assert "not guaranteed" in normalized.lower()
     assert "OpenMM is the student teaching path" in normalized
     assert "``system.xml`` is only a convenience export" in normalized
     assert "GROMACS, LAMMPS, and Amber are future downstream exports" in normalized
@@ -520,8 +521,8 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
         "2. Validate config",
         "3. Build system/plan",
         "4. Inspect current outputs",
-        "5. Reserved future backend artifacts",
-        "6. Future OpenMM handoff",
+        "5. Optional backend artifacts",
+        "6. OpenMM handoff",
         "7. Other engines",
     ]
     for section in expected_sections:
@@ -531,7 +532,9 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
     assert "topology inspection of the deterministic plan" in content
     assert "Today this command writes exactly three build artifacts" in content
     assert "``resolved_config.yaml`` for the exact validated input used for the build" in content
-    assert "reserved target artifacts, not current outputs" in normalized
+    assert "default lightweight command does not write" in normalized
+    assert "pixi run -e science sammd build" in content
+    assert "--export-backend" in content
     assert "``interchange.json`` for the primary portable OpenFF Interchange export" in normalized
     assert (
         "``system.xml`` for an OpenMM convenience export, not the primary portable artifact"
@@ -541,7 +544,8 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
     assert "``Interchange.model_dump_json``" in content
     assert "``Interchange.model_validate_json``" in content
     assert "``interchange.to_openmm()``" in content
-    assert "pre-1.0 Interchange JSON compatibility is not guaranteed" in normalized
+    assert "pre-1.0 interchange json compatibility" in normalized.lower()
+    assert "not guaranteed" in normalized.lower()
     assert "OpenMM is the student teaching path" in normalized
     assert "optionally use ``system.xml`` only as a convenience OpenMM system export" in normalized
     assert "create and run a raw OpenMM ``Simulation``" in normalized
@@ -552,7 +556,7 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
         "students will hand those build artifacts to their own OpenMM Python API script"
         in normalized
     )
-    assert "That handoff is not runnable in this lightweight release" in normalized
+    assert "Salt-containing configs are rejected by backend export" in normalized
 
     current_outputs_section = re.search(
         r"Today this command writes exactly three build artifacts:(.*?)The returned build plan",

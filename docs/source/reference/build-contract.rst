@@ -23,10 +23,14 @@ The supported first-release command-line surface is:
        unless ``--force`` is supplied.
    * - ``sammd validate CONFIG``
      - Load and validate a YAML configuration without writing build artifacts.
-   * - ``sammd build CONFIG --output-dir DIR --overwrite``
-     - Build the current deterministic plan and write the currently implemented
-       artifacts into ``DIR``. Existing artifacts are protected unless
-       ``--overwrite`` is supplied.
+    * - ``sammd build CONFIG --output-dir DIR --overwrite``
+      - Build the current deterministic plan and write the currently implemented
+        artifacts into ``DIR``. Existing artifacts are protected unless
+        ``--overwrite`` is supplied.
+    * - ``sammd build CONFIG --output-dir DIR --overwrite --export-backend``
+      - In the optional science environment, write OpenFF Interchange and OpenMM
+        backend artifacts in addition to the lightweight artifacts. Salt-containing
+        configs are rejected until salt export is implemented.
 
 The ``build`` command does not run minimization, equilibration, production MD,
 trajectory writing, or reporter setup.
@@ -54,8 +58,8 @@ exposes deterministic slab, SAM placement, solution composition, output paths,
 ``build_summary()``, and artifact writers for the current plan, but it is not a
 top-level public import in ``sammd.__all__``. ``SAMMDBuildPlan`` is not an OpenMM
 ``System``, an OpenFF ``Interchange``, or a simulation wrapper. Code that needs
-full backend construction should treat ``full_construction_available`` as false
-until the OpenFF/OpenMM construction backend lands.
+full backend construction should use the explicit CLI backend export path or the
+internal backend module from the science environment.
 
 The ``build_summary()`` SAM section records the first-release metal-S interaction
 strategy as dependency-free metadata. The canonical mode is
@@ -65,7 +69,9 @@ for a post-export OpenMM pair-specific LJ override with ``sigma = 0.22 nm`` and
 ``epsilon = 2.0 kcal/mol``. This is a strengthened nonbonded attraction layered
 on top of the base INTERFACE metal LJ model, not covalent, quantum, or reactive
 chemisorption. The first release records the strategy and selected pair indices
-but does not implement full OpenFF/Interchange construction or OpenMM export.
+in lightweight mode. The explicit backend export applies those selected pairs as
+post-Interchange OpenMM ``NonbondedForce`` exceptions and records them in
+``anchor_metadata.json``.
 
 Validation gates
 ----------------
@@ -80,14 +86,13 @@ current/reserved output suffixes, and lightweight topology CIF atom counts and
 cell lengths.
 
 These gates intentionally do not require OpenMM, OpenFF, or full backend
-artifacts. Missing reserved target artifacts such as ``positions.cif``,
+artifacts. Missing backend artifacts such as ``positions.cif``,
 ``interchange.json``, ``system.xml``, and ``anchor_metadata.json`` are not
-failures in the current release.
+failures unless ``--export-backend`` is requested.
 
-Future backend validation gates should stay skipped/not required when optional
-dependencies or backend artifacts are absent in the current release. Once the
-OpenFF/OpenMM backend writes concrete artifacts, those future gates should check
-that:
+Backend validation gates should stay skipped/not required when optional
+dependencies or backend artifacts are absent. Once ``--export-backend`` writes
+concrete artifacts, those gates should check that:
 
 * ``interchange.json`` reloads with ``Interchange.model_validate_json``.
 * The reloaded ``Interchange`` exports to an OpenMM ``System``.
@@ -100,16 +105,15 @@ that:
 Artifact contract
 -----------------
 
-The first-release output names are reserved so user scripts and documentation can
-refer to stable paths while backend work proceeds. Future backend exports should
-treat ``interchange.json`` as the primary portable system artifact.
+The output names are stable so user scripts and documentation can refer to one
+set of paths. Backend exports treat ``interchange.json`` as the primary portable
+system artifact.
 
-The build summary also records reserved engine export planning metadata. OpenMM
-is the student teaching path through the OpenMM Python API; ``system.xml`` is
-only a convenience export derived from the future backend, while OpenFF
-Interchange remains the primary handoff. GROMACS, LAMMPS, and Amber are reserved
-only as future downstream exports from Interchange and are not taught in the
-beginner workflow.
+The build summary also records engine export planning metadata. OpenMM is the
+student teaching path through the OpenMM Python API; ``system.xml`` is only a
+convenience export derived from the backend, while OpenFF Interchange remains the
+primary handoff. GROMACS, LAMMPS, and Amber are reserved only as future
+downstream exports from Interchange and are not taught in the beginner workflow.
 
 .. list-table::
    :header-rows: 1
@@ -130,35 +134,33 @@ beginner workflow.
    * - ``resolved_config.yaml``
      - Current
      - Validated YAML configuration used for the build.
-   * - ``positions.cif``
-     - Target
-     - Reserved for fully constructed coordinates from the future backend. This
-       is a human-inspectable/OpenMM-loadable structure file paired with the
-       backend system artifact.
-   * - ``interchange.json``
-     - Target
-     - Reserved for the future primary portable OpenFF Interchange export. The
-       planned JSON path is ``Interchange.model_dump_json`` for saving and
-       ``Interchange.model_validate_json`` for reload. SAMMD does not write this
-       artifact in the current release, records no concrete
-       ``openff-interchange`` package version until a real artifact is written,
-       and treats pre-1.0 Interchange JSON compatibility as not guaranteed
-       across versions.
-   * - ``system.xml``
-     - Target
-     - Reserved for a future OpenMM convenience export derived from the backend
-       system, not the primary portable SAMMD artifact.
-   * - ``anchor_metadata.json``
-     - Target
-     - Reserved for a future SAM anchor metadata export.
+    * - ``positions.cif``
+      - Backend
+      - Written by ``--export-backend`` for fully constructed coordinates. This
+        is a human-inspectable/OpenMM-loadable structure file paired with the
+        backend system artifact.
+    * - ``interchange.json``
+      - Backend
+      - Written by ``--export-backend`` as the primary portable OpenFF
+        Interchange export. The JSON path is ``Interchange.model_dump_json`` for
+        saving and ``Interchange.model_validate_json`` for reload. SAMMD records
+        the concrete ``openff-interchange`` package version when the artifact is
+        written and treats pre-1.0 Interchange JSON compatibility as not
+        guaranteed across versions.
+    * - ``system.xml``
+      - Backend
+      - Written by ``--export-backend`` as an OpenMM convenience export derived
+        from the backend system, not the primary portable SAMMD artifact.
+    * - ``anchor_metadata.json``
+      - Backend
+      - Written by ``--export-backend`` for selected sulfur-metal pair metadata.
 
 Current limitation
 ------------------
 
-Today ``sammd build`` writes only ``topology.cif``, ``build_summary.json``, and
-``resolved_config.yaml``. It does not write ``positions.cif``,
-``interchange.json``, ``system.xml``, or ``anchor_metadata.json`` in the current
-lightweight release. Full OpenFF/OpenMM construction and OpenMM-ready exports
-remain future backend work, including full SAM molecule coordinates. Public
-SAMMD APIs should not add equilibration, production simulation helpers, or direct
+By default, ``sammd build`` writes only ``topology.cif``,
+``build_summary.json``, and ``resolved_config.yaml``. With ``--export-backend``
+in the science environment, it also writes ``positions.cif``,
+``interchange.json``, ``system.xml``, and ``anchor_metadata.json``. Public SAMMD
+APIs should not add equilibration, production simulation helpers, or direct
 GROMACS/LAMMPS/Amber command workflows as part of this contract.

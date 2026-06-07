@@ -11,6 +11,16 @@ from pathlib import Path
 from typing import Any
 
 from sammd.forcefields import get_fcc_metal_parameters
+from sammd.geometry import (
+    Vector3,
+    add_vectors,
+    centroid,
+    distance,
+    matvec,
+    rotate_about_axis,
+    rotation_matrix,
+    subtract_vectors,
+)
 from sammd.io import safe_write_text
 from sammd.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
 from sammd.openff import (
@@ -22,7 +32,6 @@ from sammd.openmm_runtime import add_sulfur_metal_lj_exceptions, require_openmm
 from sammd.sam import SAMPlacement
 
 KCAL_TO_KJ = 4.184
-Vector3 = tuple[float, float, float]
 
 
 @dataclass(frozen=True)
@@ -132,6 +141,11 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
 
 def build_interchange_backend(plan: Any) -> BackendExportResult:
     """Build an OpenFF Interchange and patched OpenMM system from a SAMMD plan."""
+
+    if plan.solution.salts:
+        names = ", ".join(salt.name for salt in plan.solution.salts)
+        msg = f"Interchange backend export does not yet support salts: {names}"
+        raise NotImplementedError(msg)
 
     toolkit = require_openff_toolkit()
     interchange_module = require_openff_interchange()
@@ -389,7 +403,7 @@ def _terminal_heavy_axis_index(template: _MoleculeTemplate, anchor_index: int) -
         raise ValueError(msg)
     return max(
         heavy_indices,
-        key=lambda index: _distance(
+        key=lambda index: distance(
             template.positions_nm[anchor_index],
             template.positions_nm[index],
         ),
@@ -445,13 +459,13 @@ def _orient_template_by_anchor(
     azimuth_rad: float,
 ) -> tuple[Vector3, ...]:
     anchor = positions_nm[anchor_index]
-    source_vector = _subtract_vectors(positions_nm[axis_index], anchor)
-    rotation = _rotation_matrix(source_vector, target_direction)
+    source_vector = subtract_vectors(positions_nm[axis_index], anchor)
+    rotation = rotation_matrix(source_vector, target_direction)
     return tuple(
-        _add_vectors(
+        add_vectors(
             target_anchor_nm,
-            _rotate_about_axis(
-                _matvec(rotation, _subtract_vectors(position, anchor)),
+            rotate_about_axis(
+                matvec(rotation, subtract_vectors(position, anchor)),
                 target_direction,
                 azimuth_rad,
             ),
@@ -461,139 +475,8 @@ def _orient_template_by_anchor(
 
 
 def _center_template(positions_nm: tuple[Vector3, ...], center_nm: Vector3) -> tuple[Vector3, ...]:
-    current_center = _centroid(positions_nm)
+    current_center = centroid(positions_nm)
     return tuple(
-        _add_vectors(center_nm, _subtract_vectors(position, current_center))
+        add_vectors(center_nm, subtract_vectors(position, current_center))
         for position in positions_nm
     )
-
-
-def _rotation_matrix(source: Vector3, target: Vector3) -> tuple[Vector3, Vector3, Vector3]:
-    source_unit = _normalize(source)
-    target_unit = _normalize(target)
-    cross = _cross_product(source_unit, target_unit)
-    sine = _norm(cross)
-    cosine = _dot_product(source_unit, target_unit)
-    if sine < 1.0e-12:
-        if cosine > 0.0:
-            return ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
-        orthogonal = _normalize((1.0, 0.0, 0.0) if abs(source_unit[0]) < 0.9 else (0.0, 1.0, 0.0))
-        cross = _normalize(_cross_product(source_unit, orthogonal))
-        return _axis_angle_matrix(cross, math.pi)
-    skew = _skew_matrix(cross)
-    skew_squared = _matrix_multiply(skew, skew)
-    return _matrix_add(
-        _matrix_add(((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)), skew),
-        _matrix_scale(skew_squared, (1.0 - cosine) / (sine * sine)),
-    )
-
-
-def _axis_angle_matrix(axis: Vector3, angle_rad: float) -> tuple[Vector3, Vector3, Vector3]:
-    skew = _skew_matrix(axis)
-    return _matrix_add(
-        _matrix_add(
-            _matrix_scale(((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)), math.cos(angle_rad)),
-            _matrix_scale(skew, math.sin(angle_rad)),
-        ),
-        _matrix_scale(_outer_product(axis), 1.0 - math.cos(angle_rad)),
-    )
-
-
-def _rotate_about_axis(vector: Vector3, axis: Vector3, angle_rad: float) -> Vector3:
-    unit_axis = _normalize(axis)
-    cosine = math.cos(angle_rad)
-    sine = math.sin(angle_rad)
-    parallel = _scale_vector(unit_axis, _dot_product(unit_axis, vector) * (1.0 - cosine))
-    cross = _cross_product(unit_axis, vector)
-    return _add_vectors(
-        _add_vectors(_scale_vector(vector, cosine), _scale_vector(cross, sine)),
-        parallel,
-    )
-
-
-def _add_vectors(left: Vector3, right: Vector3) -> Vector3:
-    return (left[0] + right[0], left[1] + right[1], left[2] + right[2])
-
-
-def _subtract_vectors(left: Vector3, right: Vector3) -> Vector3:
-    return (left[0] - right[0], left[1] - right[1], left[2] - right[2])
-
-
-def _scale_vector(vector: Vector3, scale: float) -> Vector3:
-    return (vector[0] * scale, vector[1] * scale, vector[2] * scale)
-
-
-def _distance(left: Vector3, right: Vector3) -> float:
-    return _norm(_subtract_vectors(left, right))
-
-
-def _norm(vector: Vector3) -> float:
-    return math.sqrt(_dot_product(vector, vector))
-
-
-def _normalize(vector: Vector3) -> Vector3:
-    vector_norm = _norm(vector)
-    if vector_norm < 1.0e-15:
-        msg = "cannot normalize a zero vector"
-        raise ValueError(msg)
-    return (vector[0] / vector_norm, vector[1] / vector_norm, vector[2] / vector_norm)
-
-
-def _dot_product(left: Vector3, right: Vector3) -> float:
-    return left[0] * right[0] + left[1] * right[1] + left[2] * right[2]
-
-
-def _cross_product(left: Vector3, right: Vector3) -> Vector3:
-    return (
-        left[1] * right[2] - left[2] * right[1],
-        left[2] * right[0] - left[0] * right[2],
-        left[0] * right[1] - left[1] * right[0],
-    )
-
-
-def _centroid(positions: tuple[Vector3, ...]) -> Vector3:
-    count = len(positions)
-    return (
-        sum(position[0] for position in positions) / count,
-        sum(position[1] for position in positions) / count,
-        sum(position[2] for position in positions) / count,
-    )
-
-
-def _matvec(matrix: tuple[Vector3, Vector3, Vector3], vector: Vector3) -> Vector3:
-    return tuple(_dot_product(row, vector) for row in matrix)  # type: ignore[return-value]
-
-
-def _skew_matrix(vector: Vector3) -> tuple[Vector3, Vector3, Vector3]:
-    x, y, z = vector
-    return ((0.0, -z, y), (z, 0.0, -x), (-y, x, 0.0))
-
-
-def _outer_product(vector: Vector3) -> tuple[Vector3, Vector3, Vector3]:
-    return tuple(
-        tuple(vector[row] * vector[column] for column in range(3)) for row in range(3)
-    )  # type: ignore[return-value]
-
-
-def _matrix_multiply(
-    left: tuple[Vector3, Vector3, Vector3],
-    right: tuple[Vector3, Vector3, Vector3],
-) -> tuple[Vector3, Vector3, Vector3]:
-    columns = tuple((right[0][i], right[1][i], right[2][i]) for i in range(3))
-    return tuple(tuple(_dot_product(row, column) for column in columns) for row in left)  # type: ignore[return-value]
-
-
-def _matrix_add(
-    left: tuple[Vector3, Vector3, Vector3],
-    right: tuple[Vector3, Vector3, Vector3],
-) -> tuple[Vector3, Vector3, Vector3]:
-    return tuple(
-        tuple(left[row][column] + right[row][column] for column in range(3))
-        for row in range(3)
-    )  # type: ignore[return-value]
-
-
-def _matrix_scale(
-    matrix: tuple[Vector3, Vector3, Vector3], scale: float
-) -> tuple[Vector3, Vector3, Vector3]:
-    return tuple(tuple(value * scale for value in row) for row in matrix)  # type: ignore[return-value]

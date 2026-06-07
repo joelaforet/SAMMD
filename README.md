@@ -17,12 +17,12 @@ composition planning converts solvent mole fractions, explicit salt
 stoichiometry, and reactant counts or concentrations into deterministic molecule
 counts.
 
-Build output planning resolves deterministic current and reserved artifact paths.
-The build command writes an inspectable `topology.cif` for molecule-viewer checks;
+Build output planning resolves deterministic artifact paths. By default, the
+build command writes an inspectable `topology.cif` for molecule-viewer checks;
 SAM sulfur anchor placeholders are shown at planned sulfur positions above or
-below the selected surface sites. Future backend work reserves `interchange.json`
-as the primary portable export, with `system.xml` only as an OpenMM convenience
-export.
+below the selected surface sites. In the optional science environment,
+`sammd build --export-backend` writes `interchange.json` as the primary portable
+OpenFF Interchange export, with `system.xml` only as an OpenMM convenience export.
 
 Lightweight orientation analysis primitives are available in `sammd.analysis` for
 future trajectory observables. They calculate reactant centers of mass, target
@@ -38,18 +38,18 @@ metal OFFXML resource. The planned backend route is OpenFF Toolkit molecule and
 ForceField preparation, OpenFF Interchange construction/export, then a selected
 post-export metal-S Lennard-Jones override in OpenMM representation.
 Undefined stereochemistry follows the safer OpenFF default unless explicitly
-allowed. These helpers require the SAMMD science/pixi environment and do not
-perform full system construction.
+allowed. These helpers require the SAMMD science/pixi environment. Salt ions are
+planned in the YAML schema but are not yet supported by `--export-backend`; salt
+configs fail loudly rather than producing partial backend artifacts.
 
-Internal optional OpenMM runtime utilities exist for development and future
-backend integration. They can lazily create Langevin integrators, configure a
+Internal optional OpenMM runtime utilities exist for development and backend
+integration. They can lazily create Langevin integrators, configure a
 caller-supplied OpenMM simulation context from existing topology, system,
 positions, and reporter settings, and include an experimental sulfur-metal LJ
 scaling helper for explicit pair lists. These helpers are not a current
 student-facing SAMMD simulation wrapper and are not used by the quick start.
-Users must still supply existing OpenMM topology, system, and positions from
-future construction code or their own backend workflow; SAMMD does not yet
-construct complete OpenMM systems or write runnable MD outputs.
+Users must still run dynamics through OpenMM itself; SAMMD does not own
+minimization, production, trajectory writing, or reporter setup.
 
 A development smoke runner is available at `tools/openmm_smoke.py` for testing
 the science environment against a compact real Pd(111)/propanethiol SAM input
@@ -93,10 +93,21 @@ sammd validate sammd.yaml
 sammd build sammd.yaml --output-dir outputs --overwrite
 ```
 
-The build command writes `outputs/topology.cif`, `outputs/build_summary.json`, and
-`outputs/resolved_config.yaml`. Open `outputs/topology.cif` in a molecule viewer
-to inspect the configured surface and SAM anchor placements before moving on.
-Full SAM molecule coordinates remain future backend work.
+The default build command writes `outputs/topology.cif`,
+`outputs/build_summary.json`, and `outputs/resolved_config.yaml`. Open
+`outputs/topology.cif` in a molecule viewer to inspect the configured surface and
+SAM anchor placements before moving on.
+
+To write parameterized backend artifacts, use the optional science environment:
+
+```bash
+pixi run -e science sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+```
+
+That backend mode writes `interchange.json`, `positions.cif`, `system.xml`, and
+`anchor_metadata.json` in addition to the default artifacts. `interchange.json`
+is the primary portable artifact; `system.xml` is an OpenMM convenience export
+after SAMMD applies the selected metal-S pair overrides to the OpenMM system.
 
 ```python
 from sammd import build_system, load_config
@@ -109,13 +120,9 @@ print(plan.solution.molecule_counts)
 plan.write_topology_cif()  # Writes outputs/topology.cif by default
 ```
 
-The config also names future backend artifacts: `interchange.json` as the primary
-portable export, `positions.cif` as the companion coordinate structure file, and
-`system.xml` as an OpenMM convenience export. The reserved Interchange plan is a
-future JSON write/reload path using `Interchange.model_dump_json` and
-`Interchange.model_validate_json`; SAMMD does not write that artifact in the
-current release, and pre-1.0 Interchange JSON compatibility is not guaranteed
-across OpenFF Interchange versions.
+The Interchange JSON write/reload path uses `Interchange.model_dump_json` and
+`Interchange.model_validate_json`; pre-1.0 Interchange JSON compatibility is not
+guaranteed across OpenFF Interchange versions.
 
 ## Developer checks
 
