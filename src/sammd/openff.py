@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from importlib import import_module, resources
+from importlib import util as importlib_util
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,43 @@ OPENFF_INSTALL_GUIDANCE = (
     "SAMMD science/pixi environment with OpenFF Toolkit available before calling "
     "OpenFF adapter utilities."
 )
+
+OPENFF_INTERCHANGE_INSTALL_GUIDANCE = (
+    "OpenFF Interchange is an optional SAMMD backend dependency. Install and use the "
+    "SAMMD science/pixi environment with OpenFF Interchange available before calling "
+    "OpenFF backend construction utilities."
+)
+
+
+@dataclass(frozen=True)
+class OpenFFBackendAvailability:
+    """Structured optional-backend availability report without importing backends."""
+
+    toolkit_available: bool
+    interchange_available: bool
+    guidance: str = OPENFF_INSTALL_GUIDANCE
+    messages: tuple[str, ...] = ()
+
+    @property
+    def backend_available(self) -> bool:
+        """Return whether the OpenFF Toolkit and Interchange modules are discoverable."""
+
+        return self.toolkit_available and self.interchange_available
+
+
+@dataclass(frozen=True)
+class OpenFFParameterizationPlan:
+    """Lightweight record of future OpenFF parameterization choices and targets."""
+
+    small_molecule_force_field: str
+    charge_model: str
+    metal_force_field_type: str
+    metal_force_field_resource: str
+    force_field_inputs: tuple[Any, ...]
+    nonbonded_cutoff: float
+    output_targets: dict[str, str | None] = field(default_factory=dict)
+    component_counts: dict[str, int] = field(default_factory=dict)
+    molecule_counts: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -55,6 +93,34 @@ def require_openff_toolkit() -> Any:
         raise ImportError(OPENFF_INSTALL_GUIDANCE) from error
 
 
+def require_openff_interchange() -> Any:
+    """Import and return the optional OpenFF Interchange module."""
+
+    try:
+        return import_module("openff.interchange")
+    except ImportError as error:
+        raise ImportError(OPENFF_INTERCHANGE_INSTALL_GUIDANCE) from error
+
+
+def check_openff_backend_availability() -> OpenFFBackendAvailability:
+    """Check optional OpenFF backend module availability without importing it."""
+
+    toolkit_available = importlib_util.find_spec("openff.toolkit") is not None
+    interchange_available = importlib_util.find_spec("openff.interchange") is not None
+    messages: list[str] = []
+    if not toolkit_available:
+        messages.append("OpenFF Toolkit is not installed or not discoverable.")
+    if not interchange_available:
+        messages.append("OpenFF Interchange is not installed or not discoverable.")
+    if messages:
+        messages.append(OPENFF_INSTALL_GUIDANCE)
+    return OpenFFBackendAvailability(
+        toolkit_available=toolkit_available,
+        interchange_available=interchange_available,
+        messages=tuple(messages),
+    )
+
+
 def interface_fcc_metal_offxml_resource() -> resources.abc.Traversable:
     """Return the packaged INTERFACE Fcc metal OFFXML resource.
 
@@ -65,6 +131,56 @@ def interface_fcc_metal_offxml_resource() -> resources.abc.Traversable:
     """
 
     return resources.files("sammd.data").joinpath("interface_fcc_metals.offxml")
+
+
+def force_field_inputs_from_config(config: Any) -> tuple[Any, ...]:
+    """Return inspectable OpenFF force-field inputs from config without OpenFF imports."""
+
+    parameterization = config.parameterization
+    inputs: list[Any] = [parameterization.small_molecule_force_field]
+    metal_force_field = parameterization.metal_force_field
+    resource_name = metal_force_field.resource
+    if metal_force_field.type == "interface" and resource_name == "interface_fcc_metals.offxml":
+        inputs.append(interface_fcc_metal_offxml_resource())
+    else:
+        inputs.append(resource_name)
+    return tuple(inputs)
+
+
+def parameterization_plan_from_config(config: Any) -> OpenFFParameterizationPlan:
+    """Create a lightweight OpenFF parameterization plan from validated config."""
+
+    from sammd.io import plan_output_paths
+
+    output_paths = plan_output_paths(config, base_dir=config.outputs.directory)
+    return _parameterization_plan(
+        config,
+        output_paths=output_paths,
+        component_counts={
+            "sam": len(tuple(_iter_config_items(config.sam, "components"))),
+            "solvent": len(tuple(_iter_config_items(config.solvent, "components"))),
+            "reactants": len(getattr(config, "reactants", ())),
+            "salts": len(getattr(config, "salts", ())),
+        },
+    )
+
+
+def parameterization_plan_from_build_plan(plan: Any) -> OpenFFParameterizationPlan:
+    """Create a lightweight OpenFF parameterization plan from a SAMMD build plan."""
+
+    component_counts = {
+        "sam_components": len(tuple(_iter_config_items(plan.config.sam, "components"))),
+        "sam_placements": len(plan.sam_placements.placements),
+        "solvent_components": len(plan.solution.solvent_components),
+        "reactants": len(plan.solution.reactants),
+        "salts": len(plan.solution.salts),
+    }
+    return _parameterization_plan(
+        plan.config,
+        output_paths=plan.output_paths,
+        component_counts=component_counts,
+        molecule_counts=dict(plan.solution.molecule_counts),
+    )
 
 
 def molecule_from_smiles(
@@ -249,3 +365,30 @@ def _iter_config_items(section: Any, attribute: str) -> Iterable[Any]:
     """Yield config items from a section attribute when present."""
 
     return getattr(section, attribute, [])
+
+
+def _parameterization_plan(
+    config: Any,
+    *,
+    output_paths: Any,
+    component_counts: dict[str, int],
+    molecule_counts: dict[str, int] | None = None,
+) -> OpenFFParameterizationPlan:
+    """Build the shared inspectable parameterization plan record."""
+
+    parameterization = config.parameterization
+    metal_force_field = parameterization.metal_force_field
+    return OpenFFParameterizationPlan(
+        small_molecule_force_field=parameterization.small_molecule_force_field,
+        charge_model=parameterization.charge_model,
+        metal_force_field_type=metal_force_field.type,
+        metal_force_field_resource=metal_force_field.resource,
+        force_field_inputs=force_field_inputs_from_config(config),
+        nonbonded_cutoff=parameterization.nonbonded_cutoff,
+        output_targets={
+            key: str(value) if value is not None else None
+            for key, value in output_paths.__dict__.items()
+        },
+        component_counts=component_counts,
+        molecule_counts={} if molecule_counts is None else molecule_counts,
+    )

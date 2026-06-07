@@ -92,6 +92,8 @@ Conversion notes:
 
 [OpenFF Interchange construction](https://docs.openforcefield.org/projects/interchange/en/stable/using/construction.html) supports constructing an `Interchange` from a SMIRNOFF `ForceField` and OpenFF `Molecule` or `Topology` objects.
 
+The target SAMMD backend pipeline should prefer OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy should be applied after export to the selected OpenMM pair representation rather than encoded as a beginner-facing YAML option. Current v0.1.0 code may record these choices and artifact targets, but `positions.cif`, `interchange.json`, and `system.xml` remain reserved backend exports until implemented.
+
 Relevant behavior:
 
 - `Interchange` stores topology, parameter collections, positions, box vectors, and velocities.

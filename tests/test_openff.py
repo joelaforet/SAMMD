@@ -8,23 +8,95 @@ from types import SimpleNamespace
 
 import pytest
 
+from sammd.builders import build_system
 from sammd.config import SAMMDConfig, load_config_dict
 
 
 def test_adapter_import_does_not_import_openff_eagerly() -> None:
     """Keep importing the adapter independent of optional OpenFF dependencies."""
 
-    openff_modules_before = {
-        name for name in sys.modules if name == "openff" or name.startswith("openff.")
-    }
+    optional_prefixes = ("openff", "openmm", "rdkit")
+    optional_modules_before = _loaded_optional_modules(optional_prefixes)
 
     importlib.import_module("sammd.openff")
 
-    openff_modules_after = {
-        name for name in sys.modules if name == "openff" or name.startswith("openff.")
-    }
+    optional_modules_after = _loaded_optional_modules(optional_prefixes)
 
-    assert openff_modules_after == openff_modules_before
+    assert optional_modules_after == optional_modules_before
+
+
+def test_openff_backend_availability_reports_missing_dependencies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Return a structured unavailable report without importing optional backends."""
+
+    openff_adapter = importlib.import_module("sammd.openff")
+    optional_modules_before = _loaded_optional_modules(("openff", "openmm", "rdkit"))
+
+    monkeypatch.setattr(openff_adapter.importlib_util, "find_spec", lambda name: None)
+
+    availability = openff_adapter.check_openff_backend_availability()
+
+    assert not availability.toolkit_available
+    assert not availability.interchange_available
+    assert not availability.backend_available
+    assert any("OpenFF Toolkit" in message for message in availability.messages)
+    assert any("OpenFF Interchange" in message for message in availability.messages)
+    assert _loaded_optional_modules(("openff", "openmm", "rdkit")) == optional_modules_before
+
+
+def test_force_field_inputs_from_config_are_inspectable_without_openff_imports() -> None:
+    """Expose configured base force field and packaged INTERFACE resource marker."""
+
+    openff_adapter = importlib.import_module("sammd.openff")
+    config = SAMMDConfig(parameterization={"small_molecule_force_field": "openff-2.1.0.offxml"})
+
+    inputs = openff_adapter.force_field_inputs_from_config(config)
+
+    assert inputs[0] == "openff-2.1.0.offxml"
+    assert inputs[1].name == "interface_fcc_metals.offxml"
+    assert inputs[1].is_file()
+
+
+def test_parameterization_plan_from_config_records_choices_and_targets() -> None:
+    """Plan future backend parameterization without constructing backend objects."""
+
+    openff_adapter = importlib.import_module("sammd.openff")
+    config = SAMMDConfig(
+        parameterization={
+            "small_molecule_force_field": "openff-2.1.0.offxml",
+            "charge_model": "am1bcc",
+            "nonbonded_cutoff": 1.2,
+        },
+        outputs={"directory": "planned", "files": {"openff_interchange": "target.json"}},
+    )
+
+    plan = openff_adapter.parameterization_plan_from_config(config)
+
+    assert plan.small_molecule_force_field == "openff-2.1.0.offxml"
+    assert plan.charge_model == "am1bcc"
+    assert plan.metal_force_field_resource == "interface_fcc_metals.offxml"
+    assert plan.nonbonded_cutoff == 1.2
+    assert plan.output_targets["openff_interchange"] == "planned/target.json"
+    assert plan.output_targets["openmm_system"] == "planned/system.xml"
+    assert plan.component_counts == {"sam": 1, "solvent": 1, "reactants": 1, "salts": 0}
+
+
+def test_parameterization_plan_from_build_plan_records_counts_and_keeps_lightweight(
+    tmp_path,
+) -> None:
+    """Summarize build-plan molecule counts while leaving construction disabled."""
+
+    openff_adapter = importlib.import_module("sammd.openff")
+    build_plan = build_system(SAMMDConfig(), output_dir=tmp_path)
+
+    plan = openff_adapter.parameterization_plan_from_build_plan(build_plan)
+
+    assert not build_plan.full_construction_available
+    assert plan.output_targets["openff_interchange"] == str(tmp_path / "interchange.json")
+    assert plan.output_targets["openmm_system"] == str(tmp_path / "system.xml")
+    assert plan.component_counts["sam_placements"] == len(build_plan.sam_placements.placements)
+    assert plan.molecule_counts == build_plan.solution.molecule_counts
 
 
 def test_require_openff_toolkit_fails_with_guidance(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -260,3 +332,13 @@ def _quantity_text(value: object) -> str:
     """Return robust text for OpenFF quantity-like parameter values."""
 
     return str(value).replace(" ", "")
+
+
+def _loaded_optional_modules(prefixes: tuple[str, ...]) -> set[str]:
+    """Return loaded modules matching optional backend package roots."""
+
+    return {
+        name
+        for name in sys.modules
+        if any(name == prefix or name.startswith(f"{prefix}.") for prefix in prefixes)
+    }

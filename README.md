@@ -28,8 +28,10 @@ requiring MDAnalysis, OpenMM, OpenFF, or RDKit.
 Optional OpenFF adapter helpers live in `sammd.openff` for future backend
 parameterization work. They lazily create OpenFF molecules from configured SAM
 components, SMILES-bearing solvents, reactants, and separate salt ions, and can
-load base OpenFF force fields together with the packaged INTERFACE Fcc metal
-OFFXML resource.
+record or load base OpenFF force fields together with the packaged INTERFACE Fcc
+metal OFFXML resource. The planned backend route is OpenFF Toolkit molecule and
+ForceField preparation, OpenFF Interchange construction/export, then a selected
+post-export metal-S Lennard-Jones override in OpenMM representation.
 Undefined stereochemistry follows the safer OpenFF default unless explicitly
 allowed. These helpers require the SAMMD science/pixi environment and do not
 perform full system construction.
