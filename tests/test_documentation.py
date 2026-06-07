@@ -79,6 +79,25 @@ def test_project_scope_page_uses_published_safe_link() -> None:
     assert "https://github.com/joelaforet/SAMMD/blob/main/docs/project-scope.md" in content
 
 
+def test_project_scope_source_matches_first_release_contract() -> None:
+    """Keep the source-of-truth scope doc aligned with v0.1.0 outputs."""
+
+    page = PROJECT_ROOT / "docs" / "project-scope.md"
+    content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
+
+    assert "planned_slab.cif" not in content
+    assert "topology.cif remains reserved" not in normalized
+    assert "sammd build` writes" in content
+    assert "`topology.cif`: lightweight topology-inspection CIF" in content
+    assert "`build_summary.json`: machine-readable summary" in content
+    assert "`resolved_config.yaml`: validated YAML configuration" in content
+    assert "`positions.cif`, `interchange.json`, and `system.xml`" in content
+    assert "Simulation wrappers are post-v0.1.0 target work" in content
+    assert "excluded from the v0.1.0 first-release contract" in content
+    assert "does not provide `create_openmm_simulation`, minimization, equilibration" in content
+
+
 def test_build_contract_documents_first_release_boundary() -> None:
     """Lock the docs page that defines current and reserved build outputs."""
 

@@ -149,8 +149,8 @@ Initial package modules:
 - `sammd.sam`: RDKit/OpenFF molecule creation, conformer generation, sulfur anchor detection, single- and mixed-component monolayer placement.
 - `sammd.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
 - `sammd.solvation`: solvent mixture, salt, and reactant count calculations from solvent-only mole fractions and concentrations, followed by OpenFF/PACKMOL packing.
-- `sammd.builders`: high-level builder. Current MVP code returns a lightweight deterministic build plan; future backend integration should add full OpenFF `Interchange` construction.
-- `sammd.simulation`: thin, user-facing OpenMM setup and run helpers for the canonical notebook, not a large production run manager in the MVP.
+- `sammd.builders`: high-level builder. Current v0.1.0 code returns a lightweight deterministic build plan; future backend integration should add full OpenFF `Interchange` construction.
+- `sammd.simulation`: post-v0.1.0 target module for thin, user-facing OpenMM setup and run helpers, not part of the v0.1.0 first-release contract.
 - `sammd.io`: mmCIF/PDBx topology writing, DCD trajectory naming conventions, and visualization-oriented metadata helpers.
 - `sammd.reporting`: OpenMM reporter configuration for trajectories and thermodynamic state data.
 - `sammd.analysis`: orientation metrics and later umbrella-sampling support.
@@ -164,7 +164,7 @@ from sammd import load_config, build_system
 
 config = load_config("sammd.yaml")
 plan = build_system(config, output_dir="outputs")
-plan.write_planned_slab_mmcif()  # Writes outputs/planned_slab.cif by default
+plan.write_topology_cif()  # Writes outputs/topology.cif by default
 ```
 
 The returned plan contains validated configuration, a commensurate Pd(111) slab,
@@ -172,8 +172,14 @@ binding sites, seeded SAM placement choices, approximate solution composition co
 and planned output paths. It is not a final OpenFF/OpenMM system and does not contain
 complete atomic coordinates for SAM, solvent, salts, or reactants.
 
-The future full-construction workflow should preserve the small API surface while adding
-backend artifacts and simulation helpers, for example:
+The current `sammd build` command writes the v0.1.0 first-release artifacts:
+
+- `topology.cif`: lightweight topology-inspection CIF for the deterministic plan.
+- `build_summary.json`: machine-readable summary of the validated plan and output paths.
+- `resolved_config.yaml`: validated YAML configuration used for the build.
+
+The post-v0.1.0 full-construction workflow should preserve the small API surface while
+adding backend artifacts and simulation helpers, for example:
 
 ```python
 from sammd import load_config, build_system
@@ -188,7 +194,9 @@ simulation = system.create_openmm_simulation()
 
 ### Simulation API Abstraction
 
-SAMMD should provide a user-facing simulation interface for the canonical workflow, not require users to write pure OpenMM code for routine runs.
+Simulation wrappers are post-v0.1.0 target work and are excluded from the v0.1.0 first-release contract. The current release does not provide `create_openmm_simulation`, minimization, equilibration, production MD, trajectory writing, or reporter setup helpers.
+
+Future SAMMD releases should provide a user-facing simulation interface for the canonical workflow, not require users to write pure OpenMM code for routine runs.
 
 The interface should:
 
@@ -210,10 +218,11 @@ Default output artifacts for a built or simulated system should include:
 - `thermodynamics.csv`: tabular OpenMM state data from a thermodynamic reporter.
 - Optional OpenMM restart/checkpoint artifacts for continuing simulations.
 
-During the current lightweight planning milestone, `topology.cif` remains reserved for
-the future complete topology. The slab-only visualization helper writes
-`planned_slab.cif` by default and should not be interpreted as a complete topology or
-final simulation cell.
+During the current v0.1.0 lightweight planning milestone, `sammd build` writes
+`topology.cif`, `build_summary.json`, and `resolved_config.yaml`. The current
+`topology.cif` is a lightweight topology-inspection CIF for the deterministic plan,
+not a complete OpenFF/OpenMM system. Full backend target artifacts remain reserved
+until implemented: `positions.cif`, `interchange.json`, and `system.xml`.
 
 mmCIF/PDBx should be preferred over legacy PDB because SAMMD systems may have many atoms, many solvent/reactant molecules, nonstandard residues, and metal particles. Atom names, residue names, chain IDs, molecule labels, and component metadata should be chosen so PyMOL sessions are easy to inspect: metal slab, top SAM, bottom SAM, solvent, salts, and reactants should be distinguishable by selection.
 
