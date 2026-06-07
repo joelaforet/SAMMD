@@ -199,17 +199,9 @@ def _validate_job(job: PackmolJob) -> None:
     if not job.structures:
         msg = "at least one PACKMOL structure is required"
         raise ValueError(msg)
-    if not str(job.output_path).strip():
-        msg = "output_path must be a non-empty path"
-        raise ValueError(msg)
+    _validate_path(job.output_path, "output_path")
     _validate_bounds(job.box_bounds_nm)
-    if (
-        isinstance(job.tolerance_angstrom, bool)
-        or not isfinite(job.tolerance_angstrom)
-        or job.tolerance_angstrom <= 0.0
-    ):
-        msg = "tolerance_angstrom must be a positive finite number"
-        raise ValueError(msg)
+    _validate_positive_finite_number(job.tolerance_angstrom, "tolerance_angstrom")
     if isinstance(job.nloop, bool) or not isinstance(job.nloop, int) or job.nloop <= 0:
         msg = "nloop must be a positive integer"
         raise ValueError(msg)
@@ -224,9 +216,7 @@ def _validate_structure(structure: PackmolStructure) -> None:
     if not str(structure.name).strip():
         msg = "structure name must be a non-empty string"
         raise ValueError(msg)
-    if not str(structure.path).strip():
-        msg = f"structure '{structure.name}' path must be a non-empty path"
-        raise ValueError(msg)
+    _validate_path(structure.path, f"structure '{structure.name}' path")
     if (
         isinstance(structure.count, bool)
         or not isinstance(structure.count, int)
@@ -255,17 +245,56 @@ def _validate_bounds(bounds_nm: Any) -> None:
         if (
             isinstance(lower, bool)
             or isinstance(upper, bool)
-            or not isfinite(lower)
-            or not isfinite(upper)
-            or upper <= lower
         ):
             msg = f"box_bounds_nm {axis}-axis bounds must be finite with upper > lower"
             raise ValueError(msg)
+        try:
+            lower_finite = isfinite(lower)
+            upper_finite = isfinite(upper)
+            upper_after_lower = upper > lower
+        except TypeError as error:
+            msg = f"box_bounds_nm {axis}-axis bounds must be numeric"
+            raise TypeError(msg) from error
+        if not lower_finite or not upper_finite or not upper_after_lower:
+            msg = f"box_bounds_nm {axis}-axis bounds must be finite with upper > lower"
+            raise ValueError(msg)
+
+
+def _validate_path(path: Any, name: str) -> None:
+    if isinstance(path, bool):
+        msg = f"{name} must be a non-empty path"
+        raise TypeError(msg)
+    try:
+        path_text = os.fspath(path)
+    except TypeError as error:
+        msg = f"{name} must be a non-empty path"
+        raise TypeError(msg) from error
+    if not isinstance(path_text, str) or not path_text.strip():
+        msg = f"{name} must be a non-empty path"
+        raise ValueError(msg)
+
+
+def _validate_positive_finite_number(value: Any, name: str) -> None:
+    if isinstance(value, bool):
+        msg = f"{name} must be a positive finite number"
+        raise ValueError(msg)
+    try:
+        finite = isfinite(value)
+        positive = value > 0.0
+    except TypeError as error:
+        msg = f"{name} must be a numeric positive finite number"
+        raise TypeError(msg) from error
+    if not finite or not positive:
+        msg = f"{name} must be a positive finite number"
+        raise ValueError(msg)
 
 
 def _validate_vector3(values: Any, name: str) -> Vector3:
     if len(values) != 3:
         msg = f"{name} must contain exactly three values"
+        raise ValueError(msg)
+    if any(isinstance(value, bool) for value in values):
+        msg = f"{name} values must be finite"
         raise ValueError(msg)
     vector = tuple(float(value) for value in values)
     if any(not isfinite(value) for value in vector):

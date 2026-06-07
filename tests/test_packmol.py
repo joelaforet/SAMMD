@@ -242,7 +242,52 @@ def test_invalid_packmol_jobs_fail_clearly(job, message) -> None:
         build_packmol_input(job)
 
 
-@pytest.mark.parametrize("dimensions", [(0.0, 1.0, 1.0), (1.0, nan, 1.0)])
+@pytest.mark.parametrize(
+    ("job", "message"),
+    [
+        (
+            PackmolJob(
+                True,
+                (PackmolStructure("water", "water.pdb", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "output_path must be a non-empty path",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", True, 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "structure 'water' path must be a non-empty path",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                (("low", 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "x-axis bounds must be numeric",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+                tolerance_angstrom="tight",
+            ),
+            "tolerance_angstrom must be a numeric positive finite number",
+        ),
+    ],
+)
+def test_invalid_packmol_job_types_fail_clearly(job, message) -> None:
+    """Reject invalid path and numeric types before Path or isfinite failures."""
+
+    with pytest.raises(TypeError, match=message):
+        build_packmol_input(job)
+
+
+@pytest.mark.parametrize("dimensions", [(0.0, 1.0, 1.0), (1.0, nan, 1.0), (True, 1.0, 1.0)])
 def test_zero_origin_bounds_reject_invalid_dimensions(dimensions) -> None:
     """Reject invalid dimensions used to create packing bounds."""
 
