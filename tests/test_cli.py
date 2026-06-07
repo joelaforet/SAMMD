@@ -15,6 +15,7 @@ def test_init_cli_writes_loadable_template() -> None:
     with runner.isolated_filesystem():
         result = runner.invoke(main, ["init", "-o", "sammd.yaml"])
         assert result.exit_code == 0
+        assert "INIT Created a SAMMD configuration template at sammd.yaml" in result.output
         config = load_config("sammd.yaml")
         assert config.surface.metal == "Pd"
 
@@ -41,6 +42,7 @@ def test_validate_cli_accepts_template() -> None:
         runner.invoke(main, ["init", "-o", "sammd.yaml"])
         result = runner.invoke(main, ["validate", "sammd.yaml"])
         assert result.exit_code == 0
+        assert "OK" in result.output
         assert "Configuration valid" in result.output
 
 
@@ -62,11 +64,13 @@ def test_build_cli_writes_topology_and_summary() -> None:
         result = runner.invoke(main, ["build", "sammd.yaml", "--output-dir", "outputs"])
 
         assert result.exit_code == 0
-        assert "SAMMD build plan ready" in result.output
-        assert "Wrote topology CIF" in result.output
-        assert "Wrote build summary" in result.output
-        assert "Wrote resolved config" in result.output
-        assert "Inspect topology.cif" in result.output
+        assert "PLAN SAMMD build plan ready" in result.output
+        assert "OK Lightweight validation gates passed" in result.output
+        assert "PLAN Surface: Pd(111)" in result.output
+        assert "WRITE Wrote topology CIF" in result.output
+        assert "WRITE Wrote build summary" in result.output
+        assert "WRITE Wrote resolved config" in result.output
+        assert "NEXT Inspect topology.cif" in result.output
         assert load_config("sammd.yaml").surface.metal == "Pd"
 
         assert Path("outputs/topology.cif").is_file()
