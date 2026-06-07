@@ -225,6 +225,7 @@ def test_project_scope_source_matches_first_release_contract() -> None:
     assert "`topology.cif`: lightweight topology-inspection CIF" in content
     assert "`build_summary.json`: machine-readable summary" in content
     assert "`resolved_config.yaml`: validated YAML configuration" in content
+    assert "sammd build --export-backend" in content
     assert (
         "`positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json`"
         in content
@@ -285,8 +286,8 @@ def test_project_scope_keeps_simulation_work_out_of_current_scope() -> None:
         assert re.search(pattern, normalized) is not None
 
 
-def test_project_scope_keeps_parameterization_backend_out_of_first_release() -> None:
-    """Prevent stale v0.1.0 claims of full parameterization/backends."""
+def test_project_scope_documents_explicit_backend_export_boundary() -> None:
+    """Keep backend export explicit and salt-limited in project scope."""
 
     page = PROJECT_ROOT / "docs" / "project-scope.md"
     content = page.read_text(encoding="utf-8")
@@ -298,25 +299,18 @@ def test_project_scope_keeps_parameterization_backend_out_of_first_release() -> 
         flags=re.DOTALL,
     )
     assert first_release_section is not None
-    first_release_deliverables = first_release_section.group(1)
-
-    stale_patterns = [
-        r"OpenFF/SMIRNOFF parameterization",
-        r"full OpenFF",
-        r"backend construction",
-        r"OpenFF Interchange",
-        r"OpenMM backend",
-    ]
-    for pattern in stale_patterns:
-        assert re.search(pattern, first_release_deliverables, flags=re.IGNORECASE) is None
 
     assert "record the selected OpenFF small-molecule force field" in content
-    assert "without constructing a parameterized backend system" in content
+    assert "The default build remains lightweight" in content
+    assert "sammd build --export-backend" in content
+    assert "supported non-salt configs" in content
+    assert (
+        "Salt-containing configs are rejected until salt backend export is implemented"
+        in normalized
+    )
     assert "OpenFF-compatible OFFXML resource support" in content
-    assert re.search(
-        r"Full OpenFF/SMIRNOFF parameterization[^.]*backend construction/export",
-        normalized,
-    ) is not None
+    assert "Salt ion backend export" in content
+    assert "reserved backend exports until implemented" not in content
 
 
 def test_readme_demo_uses_neutral_thiol_sam_wording() -> None:

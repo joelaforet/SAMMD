@@ -29,7 +29,7 @@ Recommended v0.1.0 first-release deliverables:
 - A registered Fcc(111) slab builder, defaulting to Pd(111), and propanethiol SAM placement with tunable grafting density.
 - Mixed SAM support through multiple SAM component definitions with fractions or explicit counts.
 - Centered, double-sided registered Fcc(111) slab geometry with SAMs on both faces and solvent on both sides.
-- Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices without constructing a parameterized backend system.
+- Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices. The default build remains lightweight; `sammd build --export-backend` performs parameterized backend export in the science environment for supported non-salt configs.
 - Static CHARMM-INTERFACE-derived Fcc metal Lennard-Jones parameters packaged or identified as OpenFF-compatible OFFXML resource support.
 - Visualization-friendly build artifacts, centered on mmCIF/PDBx topology-inspection output plus machine-readable build summaries.
 - Pytest coverage for configuration validation, parameter conversion, deterministic builders, and import smoke tests.
@@ -43,7 +43,7 @@ Defer until after v0.1.0:
 - General surface support beyond registered Fcc(111) metals, including non-111 facets.
 - Explicit metal-sulfur bonded topology terms unless needed to correct SAM geometry.
 - OpenMM minimization, equilibration, production, DCD trajectory output, and thermodynamic reporting protocols. Tutorial-only user code may demonstrate OpenMM API usage after SAMMD exports backend artifacts, but those runs are not part of the SAMMD build/export contract.
-- Full OpenFF/SMIRNOFF parameterization for organic SAM, solvent, salts, and reactants, including OpenFF Interchange or OpenMM backend construction/export.
+- Salt ion backend export and broader noncanonical chemistry coverage beyond the first supported Interchange/OpenMM export path.
 - Advanced analysis workflows beyond basic orientation observables.
 
 ## Reference Findings
@@ -92,9 +92,9 @@ Conversion notes:
 
 [OpenFF Interchange construction](https://docs.openforcefield.org/projects/interchange/en/stable/using/construction.html) supports constructing an `Interchange` from a SMIRNOFF `ForceField` and OpenFF `Molecule` or `Topology` objects.
 
-The target SAMMD backend pipeline should prefer OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy should be applied after export to the selected OpenMM pair representation rather than encoded as a beginner-facing YAML option. Current v0.1.0 code may record these choices and artifact targets, but `positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json` remain reserved backend exports until implemented.
+The SAMMD backend pipeline uses OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy is applied after export to the selected OpenMM pair representation rather than encoded as a beginner-facing YAML option. The explicit `sammd build --export-backend` path writes `positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json` for supported non-salt configs in the science environment.
 
-The reserved `interchange.json` target is planned as OpenFF Interchange JSON serialization with `Interchange.model_dump_json` and reload through `Interchange.model_validate_json`. SAMMD should record the concrete `openff-interchange` package version only when a real artifact is written, because pre-1.0 Interchange JSON compatibility is not guaranteed across versions.
+The `interchange.json` artifact is OpenFF Interchange JSON serialization with `Interchange.model_dump_json` and reload through `Interchange.model_validate_json`. SAMMD records the concrete `openff-interchange` package version when a real artifact is written, because pre-1.0 Interchange JSON compatibility is not guaranteed across versions.
 
 Relevant behavior:
 
@@ -154,7 +154,8 @@ Initial package modules:
 - `sammd.sam`: dependency-free SAM placement and sulfur anchor pose planning today; future backend work should add OpenFF/RDKit molecule creation, conformer generation, and molecule-graph sulfur anchor detection.
 - `sammd.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
 - `sammd.solvation`: solvent mixture, salt, and reactant count calculations from solvent-only mole fractions and concentrations, followed by OpenFF/PACKMOL packing.
-- `sammd.builders`: high-level builder. Current v0.1.0 code returns a lightweight deterministic build plan; future backend integration should add full OpenFF `Interchange` construction.
+- `sammd.builders`: high-level lightweight build planner.
+- `sammd.interchange_backend`: optional science-environment OpenFF `Interchange` construction/export path for supported non-salt configs.
 - `sammd.openmm_runtime`: optional/internal OpenMM utilities for development and backend validation, not a student-facing SAMMD run-wrapper API.
 - `sammd.io`: v0.1.0 mmCIF/PDBx topology-inspection writing; post-v0.1.0 DCD trajectory naming conventions and visualization-oriented metadata helpers.
 - `sammd.reporting`: post-v0.1.0 OpenMM reporter configuration for trajectories and thermodynamic state data.
@@ -184,17 +185,16 @@ The current `sammd build` command writes the v0.1.0 first-release artifacts:
 - `build_summary.json`: machine-readable summary of the validated plan and output paths.
 - `resolved_config.yaml`: validated YAML configuration used for the build.
 
-The post-v0.1.0 full-construction workflow should preserve the small API surface while
-adding backend artifact exports for OpenMM handoff, for example:
+The optional science-environment backend export preserves the small public API surface while
+adding artifact exports for OpenMM handoff:
 
-```python
-from sammd import load_config, build_system
-
-config = load_config("sammd.yaml")
-system = build_system(config)
-interchange = system.interchange
-openmm_system = interchange.to_openmm()
+```bash
+pixi run -e science sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
 ```
+
+That command writes `interchange.json`, `positions.cif`, `system.xml`, and
+`anchor_metadata.json` in addition to the lightweight artifacts. Salt-containing
+configs are rejected until salt backend export is implemented.
 
 ## Scientific Design Decisions
 
@@ -224,17 +224,16 @@ Default post-v0.1.0 backend exports plus tutorial-only OpenMM run outputs should
 - `thermodynamics.csv`: tabular OpenMM state data from a thermodynamic reporter.
 - Optional OpenMM restart/checkpoint artifacts for continuing simulations.
 
-During the current v0.1.0 lightweight planning milestone, `sammd build` writes
-`topology.cif`, `build_summary.json`, and `resolved_config.yaml`. The current
-`topology.cif` is a lightweight topology-inspection CIF for the deterministic plan,
-showing placeholder sulfur anchors at planned sulfur positions rather than full
-SAM molecule coordinates. Full backend target artifacts remain reserved until
-implemented: `positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json`.
-The reserved `interchange.json` target is planned as JSON from
-`Interchange.model_dump_json` with reload through
-`Interchange.model_validate_json`; no concrete `openff-interchange` package
-version is recorded until SAMMD writes a real artifact, and pre-1.0 JSON
-compatibility is not guaranteed across versions.
+By default, `sammd build` writes `topology.cif`, `build_summary.json`, and
+`resolved_config.yaml`. The default `topology.cif` is a lightweight
+topology-inspection CIF for the deterministic plan, showing placeholder sulfur
+anchors at planned sulfur positions rather than full SAM molecule coordinates.
+With `--export-backend` in the science environment, SAMMD also writes
+`positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json`.
+The `interchange.json` artifact is JSON from `Interchange.model_dump_json` with
+reload through `Interchange.model_validate_json`; the concrete
+`openff-interchange` package version is recorded when SAMMD writes the artifact,
+and pre-1.0 JSON compatibility is not guaranteed across versions.
 
 mmCIF/PDBx should be preferred over legacy PDB because SAMMD systems may have many atoms, many solvent/reactant molecules, nonstandard residues, and metal particles. Atom names, residue names, chain IDs, molecule labels, and component metadata should be chosen so PyMOL sessions are easy to inspect: metal slab, top SAM, bottom SAM, solvent, salts, and reactants should be distinguishable by selection.
 
