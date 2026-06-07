@@ -203,7 +203,7 @@ def _validate_job(job: PackmolJob) -> None:
     if not isfinite(job.tolerance_angstrom) or job.tolerance_angstrom <= 0.0:
         msg = "tolerance_angstrom must be a positive finite number"
         raise ValueError(msg)
-    if not isinstance(job.nloop, int) or job.nloop <= 0:
+    if isinstance(job.nloop, bool) or not isinstance(job.nloop, int) or job.nloop <= 0:
         msg = "nloop must be a positive integer"
         raise ValueError(msg)
     if not str(job.filetype).strip():
@@ -217,11 +217,22 @@ def _validate_structure(structure: PackmolStructure) -> None:
     if not str(structure.name).strip():
         msg = "structure name must be a non-empty string"
         raise ValueError(msg)
-    if not isinstance(structure.count, int) or structure.count <= 0:
+    if not str(structure.path).strip():
+        msg = f"structure '{structure.name}' path must be a non-empty path"
+        raise ValueError(msg)
+    if (
+        isinstance(structure.count, bool)
+        or not isinstance(structure.count, int)
+        or structure.count <= 0
+    ):
         msg = f"structure '{structure.name}' count must be a positive integer"
         raise ValueError(msg)
-    if structure.atom_count is not None and structure.atom_count <= 0:
-        msg = f"structure '{structure.name}' atom_count must be positive when provided"
+    if structure.atom_count is not None and (
+        isinstance(structure.atom_count, bool)
+        or not isinstance(structure.atom_count, int)
+        or structure.atom_count <= 0
+    ):
+        msg = f"structure '{structure.name}' atom_count must be a positive integer when provided"
         raise ValueError(msg)
 
 

@@ -128,6 +128,38 @@ def test_zero_origin_bounds_accept_plain_dimensions_and_box_plan() -> None:
         (
             PackmolJob(
                 "out.pdb",
+                (PackmolStructure("water", "water.pdb", True),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "count must be a positive integer",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1, atom_count=True),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "atom_count must be a positive integer",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "path must be a non-empty path",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "   ", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "path must be a non-empty path",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
                 (PackmolStructure("water", "water.pdb", 1),),
                 ((0.0, 0.0), (0.0, 1.0), (0.0, 1.0)),
             ),
@@ -156,6 +188,15 @@ def test_zero_origin_bounds_accept_plain_dimensions_and_box_plan() -> None:
                 (PackmolStructure("water", "water.pdb", 1),),
                 ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
                 nloop=0,
+            ),
+            "nloop must be a positive integer",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+                nloop=True,
             ),
             "nloop must be a positive integer",
         ),
