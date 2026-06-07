@@ -50,6 +50,19 @@ def test_resolved_defaults_match_approved_student_schema() -> None:
     assert config.outputs.files.openff_interchange == "interchange.json"
 
 
+def test_surface_validation_uses_fcc_surface_registry() -> None:
+    """Validate surface metal/facet combinations through the metadata registry."""
+
+    data = _template_data()
+    data["surface"]["metal"] = "Pd"
+    data["surface"]["facet"] = "111"
+    assert load_config_dict(data).surface.metal == "Pd"
+
+    data["surface"]["metal"] = "Pt"
+    with pytest.raises(ValidationError, match="unsupported Fcc surface 'Pt\\(111\\)'"):
+        load_config_dict(data)
+
+
 def test_yaml_template_describes_current_build_contract() -> None:
     """Prevent template comments from overstating current backend outputs."""
 
@@ -65,6 +78,30 @@ def test_yaml_template_describes_current_build_contract() -> None:
     assert "positions.cif" in CONFIG_TEMPLATE
     assert "interchange.json" in CONFIG_TEMPLATE
     assert "system.xml" in CONFIG_TEMPLATE
+
+
+def test_yaml_template_describes_neutral_thiols_and_internal_nonbonded_attachment() -> None:
+    """Keep beginner SAM wording aligned with the current validation contract."""
+
+    normalized = " ".join(CONFIG_TEMPLATE.split())
+
+    assert "neutral thiol with an HS/implicit-H sulfur" in normalized
+    assert "not a pre-deprotonated thiolate" in normalized
+    assert "strengthened" in normalized
+    assert "nonbonded interaction" in normalized
+    assert "not as covalent, quantum, or reactive chemistry" in normalized
+    assert "not exposed as a beginner YAML knob yet" in normalized
+
+
+def test_beginner_template_defers_sam_attachment_knobs() -> None:
+    """Do not expose advanced metal-S controls in the beginner YAML template."""
+
+    data = _template_data()
+
+    assert "anchor" not in data["sam"]
+    assert "metal_sulfur_interaction" not in data["sam"]
+    assert "sam.anchor" not in CONFIG_TEMPLATE
+    assert "metal_sulfur_interaction" not in CONFIG_TEMPLATE
 
 
 def test_mixed_sam_fraction_validation() -> None:
@@ -198,7 +235,7 @@ def test_solvent_density_and_molar_mass_validation() -> None:
 @pytest.mark.parametrize(
     ("path", "value", "message"),
     [
-        (("surface", "metal"), "Fe", "Input should be 'Pd'"),
+        (("surface", "metal"), "Fe", "unsupported Fcc surface 'Fe\\(111\\)'"),
         (("surface", "lateral_size"), [-1.0, 2.0], "lateral_size"),
         (("sam", "grafting_density"), -0.1, "greater than 0"),
         (("solvent", "components", 0, "mole_fraction"), 0.0, "greater than 0"),

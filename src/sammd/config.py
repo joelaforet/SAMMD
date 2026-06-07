@@ -9,8 +9,6 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-Facet = Literal["111"]
-Metal = Literal["Pd"]
 MOLE_FRACTION_TOLERANCE = 1.0e-6
 KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL = {"ethanol": 46.06844}
 RESIDUE_NAME_PATTERN = re.compile(r"^[A-Z0-9]{3}$")
@@ -33,9 +31,18 @@ class ExperimentConfig(SAMMDBaseModel):
 class SurfaceConfig(SAMMDBaseModel):
     """Metal surface exposed to the SAM."""
 
-    metal: Metal = "Pd"
-    facet: Facet = "111"
+    metal: str = "Pd"
+    facet: str = "111"
     lateral_size: tuple[float, float] = (2.0, 2.0)
+
+    @model_validator(mode="after")
+    def _validate_registered_fcc_surface(self) -> SurfaceConfig:
+        """Require a surface present in the Fcc metadata registry."""
+
+        from sammd.surfaces import get_fcc_surface_metadata
+
+        get_fcc_surface_metadata(self.metal, self.facet)
+        return self
 
     @field_validator("lateral_size")
     @classmethod
@@ -405,8 +412,13 @@ surface:
 # ============================================================================
 # Self-Assembled Monolayer
 # ============================================================================
-# Each SAM molecule must contain a thiol group. SAMMD uses the sulfur atom
-# to attach the molecule to the metal surface.
+# Each SAM molecule must be a neutral thiol with an HS/implicit-H sulfur
+# terminus, not a pre-deprotonated thiolate. SAMMD uses the sulfur atom for
+# placement on the metal surface.
+#
+# Metal-S attachment is represented/planned internally as a strengthened
+# nonbonded interaction, not as covalent, quantum, or reactive chemistry. This
+# is not exposed as a beginner YAML knob yet.
 #
 # residue_name must be a 3-character PDB residue code.
 #
@@ -474,13 +486,13 @@ reactants:
 # ============================================================================
 # Solvent is packed above and around the slab/SAM/reactant system.
 #
-# padding is the solvent padding above the slab in the z direction.
-# The simulation box is always periodic in this release.
+# padding is a requested z-padding/count-planning knob for solvent above the
+# slab. Final box construction details are owned by later build stages.
 #
 # residue_name must be a 3-character PDB residue code.
 #
 solvent:
-  padding: 3.0  # nm, z-direction solvent padding above the slab
+  padding: 3.0  # nm, requested z-padding/count-planning value
 
   components:
     - name: ethanol
@@ -493,7 +505,7 @@ solvent:
 # Example water solvent:
 #
 # solvent:
-#   padding: 3.0  # nm, z-direction solvent padding above the slab
+#   padding: 3.0  # nm, requested z-padding/count-planning value
 #   components:
 #     - name: water
 #       residue_name: HOH

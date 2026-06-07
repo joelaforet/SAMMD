@@ -17,19 +17,24 @@ Important sections
 ------------------
 
 ``surface``
-   Selects the supported MVP surface. Today this is ``metal: Pd`` and
-   ``facet: "111"``. Users provide only the lateral ``x`` and ``y`` size. SAMMD
-   chooses the slab thickness automatically from the metal geometry and
-   nonbonded cutoff.
+   Selects a registered Fcc INTERFACE surface. Today the registry supports
+   ``metal: Pd`` and ``facet: "111"``. Users provide only the lateral ``x`` and
+   ``y`` size. SAMMD chooses the slab thickness automatically from the metal
+   geometry and nonbonded cutoff.
 
 ``sam``
-   Defines grafting density and one or more thiol-containing SAM components.
+   Defines grafting density and one or more neutral thiol SAM components.
+   Components should include the HS/implicit-H thiol sulfur in the SMILES, not a
+   pre-deprotonated thiolate. Metal-S attachment is represented/planned
+   internally as a strengthened nonbonded interaction, not as covalent, quantum,
+   or reactive chemistry, and it is not yet a student-facing YAML knob.
    Components need a human-readable name, a three-character ``residue_name``, a
    SMILES string, and either fractions that sum to 1.0 or explicit counts.
 
 ``solvent``
-   Defines z-direction padding above the slab and solvent mole fractions
-   normalized over solvent components only. Each component needs a
+   Defines a requested z-padding/count-planning value for solvent above the slab
+   and solvent mole fractions normalized over solvent components only. Final box
+   construction details are owned by later build stages. Each component needs a
    three-character ``residue_name``. Non-water solvents need density and molar
    mass unless SAMMD has a supported built-in value.
 
@@ -59,8 +64,8 @@ Resolved defaults to notice
 
 * The surface defaults to a ``[2.0, 2.0]`` nm Pd(111) lateral size
 * Slab thickness is hidden and chosen automatically
-* The SAM defaults to propanethiol ``CCCS`` at ``0.25 nm^2 / molecule``
-* The solvent defaults to ethanol ``CCO`` with 3.0 nm z padding
+* The SAM defaults to neutral propanethiol ``CCCS`` at ``0.25 nm^2 / molecule``
+* The solvent defaults to ethanol ``CCO`` with a requested 3.0 nm z-padding/count-planning value
 * The default reactant is one cinnamaldehyde molecule
 * The default seed is 2026 for reproducible placement planning
 

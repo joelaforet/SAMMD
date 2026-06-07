@@ -211,6 +211,24 @@ def test_yaml_configuration_docs_keep_backend_exports_reserved() -> None:
     assert "future backend artifact names such as ``positions.cif``" in normalized
 
 
+def test_yaml_configuration_docs_clarify_beginner_schema_boundary() -> None:
+    """Keep YAML docs clear about SAM chemistry and deferred student knobs."""
+
+    page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "yaml-configuration.rst"
+    content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
+
+    assert "registered Fcc INTERFACE surface" in normalized
+    assert "neutral thiol SAM components" in normalized
+    assert "HS/implicit-H thiol sulfur" in normalized
+    assert "not a pre-deprotonated thiolate" in normalized
+    assert "strengthened nonbonded interaction" in normalized
+    assert "not as covalent, quantum," in normalized
+    assert "not yet a student-facing YAML knob" in normalized
+    assert "requested z-padding/count-planning value" in normalized
+    assert "Final box construction details are owned by later build stages" in normalized
+
+
 def test_developer_guide_cli_map_includes_build() -> None:
     """Keep contributor package map aligned with available CLI commands."""
 
