@@ -80,7 +80,8 @@ cell lengths.
 
 These gates intentionally do not require OpenMM, OpenFF, or full backend
 artifacts. Missing reserved target artifacts such as ``positions.cif``,
-``interchange.json``, and ``system.xml`` are not failures in the current release.
+``interchange.json``, ``system.xml``, and ``anchor_metadata.json`` are not
+failures in the current release.
 
 Future backend validation gates should cover full constructed atom counts,
 topology/positions/system agreement, no severe overlaps, charge and parameter
@@ -125,13 +126,17 @@ treat ``interchange.json`` as the primary portable system artifact.
      - Target
      - Reserved for a future OpenMM convenience export derived from the backend
        system, not the primary portable SAMMD artifact.
+   * - ``anchor_metadata.json``
+     - Target
+     - Reserved for a future SAM anchor metadata export.
 
 Current limitation
 ------------------
 
 Today ``sammd build`` writes only ``topology.cif``, ``build_summary.json``, and
 ``resolved_config.yaml``. It does not write ``positions.cif``,
-``interchange.json``, or ``system.xml`` in the current lightweight release. Full
-OpenFF/OpenMM construction and OpenMM-ready exports remain future backend work,
-including full SAM molecule coordinates. Public SAMMD APIs should not add
-equilibration or production simulation helpers as part of this contract.
+``interchange.json``, ``system.xml``, or ``anchor_metadata.json`` in the current
+lightweight release. Full OpenFF/OpenMM construction and OpenMM-ready exports
+remain future backend work, including full SAM molecule coordinates. Public
+SAMMD APIs should not add equilibration or production simulation helpers as part
+of this contract.

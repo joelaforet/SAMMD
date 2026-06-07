@@ -192,7 +192,28 @@ class SAMMDBuildPlan:
                 key: str(value) if value is not None else None
                 for key, value in self.output_paths.__dict__.items()
             },
+            "artifacts": {
+                "topology": self._artifact_summary("topology", "current"),
+                "build_summary": self._artifact_summary("build_summary", "current"),
+                "resolved_config": self._artifact_summary("resolved_config", "current"),
+                "positions": self._artifact_summary("positions", "reserved"),
+                "openff_interchange": self._artifact_summary(
+                    "openff_interchange", "reserved"
+                ),
+                "openmm_system": self._artifact_summary("openmm_system", "reserved"),
+                "anchor_metadata": self._artifact_summary("anchor_metadata", "reserved"),
+            },
             "full_construction_available": self.full_construction_available,
+        }
+
+    def _artifact_summary(self, key: str, status: str) -> dict[str, object]:
+        """Return path and lightweight-release availability for one artifact."""
+
+        path = getattr(self.output_paths, key)
+        return {
+            "path": str(path) if path is not None else None,
+            "status": status,
+            "available": status == "current",
         }
 
     def write_build_summary(

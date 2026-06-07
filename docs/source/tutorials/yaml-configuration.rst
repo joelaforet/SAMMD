@@ -70,7 +70,8 @@ Important sections
    Names current build artifacts such as ``topology.cif``,
    ``build_summary.json``, and ``resolved_config.yaml``. It also reserves future
    backend artifact names such as ``positions.cif``, ``interchange.json``, and
-   ``system.xml``. These are not MD trajectory outputs.
+   ``system.xml``, plus ``anchor_metadata.json``. These are not MD trajectory
+   outputs.
 
 Resolved defaults to notice
 ---------------------------

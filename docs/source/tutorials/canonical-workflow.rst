@@ -102,6 +102,7 @@ The configuration also reserves names for future backend construction artifacts:
 * ``interchange.json`` for the primary portable OpenFF Interchange export
 * ``positions.cif`` for fully constructed, human-inspectable/OpenMM-loadable coordinates
 * ``system.xml`` for an OpenMM convenience export, not the primary portable artifact
+* ``anchor_metadata.json`` for SAM anchor metadata export
 
 The YAML intentionally does not define equilibration, production MD,
 thermostats, barostats, or trajectory writing. Those OpenMM concepts are taught
@@ -115,8 +116,8 @@ its companion structure/convenience artifacts, students will use those build
 artifacts from their own OpenMM Python API script for minimization,
 equilibration, production, and reporters. That direct OpenMM step is not
 runnable in this lightweight release because ``positions.cif``,
-``interchange.json``, and ``system.xml`` are reserved target artifacts, not
-current outputs.
+``interchange.json``, ``system.xml``, and ``anchor_metadata.json`` are reserved
+target artifacts, not current outputs.
 
 Notebook version
 ----------------

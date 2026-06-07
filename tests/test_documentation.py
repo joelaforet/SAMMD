@@ -182,7 +182,10 @@ def test_project_scope_source_matches_first_release_contract() -> None:
     assert "`topology.cif`: lightweight topology-inspection CIF" in content
     assert "`build_summary.json`: machine-readable summary" in content
     assert "`resolved_config.yaml`: validated YAML configuration" in content
-    assert "`positions.cif`, `interchange.json`, and `system.xml`" in content
+    assert (
+        "`positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json`"
+        in content
+    )
     assert "Simulation wrappers are post-v0.1.0 target work" in content
     assert "excluded from the v0.1.0 first-release contract" in content
     assert "Lightweight/internal OpenMM utilities may exist" in content
@@ -354,6 +357,7 @@ def test_build_contract_documents_first_release_boundary() -> None:
     assert "positions.cif" in content
     assert "interchange.json" in content
     assert "system.xml" in content
+    assert "anchor_metadata.json" in content
     assert "Full OpenFF/OpenMM construction" in normalized
     assert "does not own" in content.lower()
     assert "equilibration" in content.lower()
@@ -363,7 +367,10 @@ def test_build_contract_documents_first_release_boundary() -> None:
     assert "OpenMM convenience export" in normalized
     assert "not the primary portable SAMMD artifact" in normalized
     assert "human-inspectable/OpenMM-loadable structure file" in normalized
-    assert "does not write ``positions.cif``, ``interchange.json``, or ``system.xml``" in normalized
+    assert (
+        "does not write ``positions.cif``, ``interchange.json``, ``system.xml``, "
+        "or ``anchor_metadata.json``" in normalized
+    )
     assert "* - ``SAMMDBuildPlan``" not in content
     assert "not a top-level public import" in " ".join(content.split())
 
@@ -381,6 +388,7 @@ def test_yaml_configuration_docs_keep_backend_exports_reserved() -> None:
     assert "validates and records these choices" in content
     assert "current build artifacts such as ``topology.cif``" in normalized
     assert "future backend artifact names such as ``positions.cif``" in normalized
+    assert "``anchor_metadata.json``" in normalized
 
 
 def test_yaml_configuration_docs_clarify_beginner_schema_boundary() -> None:
@@ -423,7 +431,11 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
     assert "topology inspection of the deterministic plan" in content
     assert "future backend construction artifacts" in content
     assert "``interchange.json`` for the primary portable OpenFF Interchange export" in normalized
-    assert "``system.xml`` for an OpenMM convenience export, not the primary portable artifact" in normalized
+    assert (
+        "``system.xml`` for an OpenMM convenience export, not the primary portable artifact"
+        in normalized
+    )
+    assert "``anchor_metadata.json`` for SAM anchor metadata export" in normalized
     assert "students will use those build artifacts from their own OpenMM" in normalized
     assert "not runnable in this lightweight release" in normalized
     assert "reserved target artifacts, not current outputs" in normalized
@@ -473,7 +485,12 @@ def test_canonical_notebook_outputs_match_current_contract() -> None:
 
     for current_output in ["topology.cif", "build_summary.json", "resolved_config.yaml"]:
         assert current_output in sources
-    for reserved_output in ["positions.cif", "interchange.json", "system.xml"]:
+    for reserved_output in [
+        "positions.cif",
+        "interchange.json",
+        "system.xml",
+        "anchor_metadata.json",
+    ]:
         assert reserved_output in sources
 
 

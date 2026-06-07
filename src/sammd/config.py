@@ -279,6 +279,7 @@ class OutputFilesConfig(SAMMDBaseModel):
     positions: str = "positions.cif"
     openff_interchange: str = "interchange.json"
     openmm_system: str = "system.xml"
+    anchor_metadata: str = "anchor_metadata.json"
     build_summary: str = "build_summary.json"
     resolved_config: str = "resolved_config.yaml"
 
@@ -620,6 +621,7 @@ parameterization:
 #   - interchange.json  # primary portable backend export
 #   - positions.cif     # companion coordinate structure file
 #   - system.xml        # OpenMM convenience export
+#   - anchor_metadata.json  # SAM anchor metadata export
 #
 # None of these are trajectory outputs from an MD simulation.
 #
@@ -631,6 +633,7 @@ outputs:
     positions: positions.cif
     openff_interchange: interchange.json
     openmm_system: system.xml
+    anchor_metadata: anchor_metadata.json
     build_summary: build_summary.json
     resolved_config: resolved_config.yaml
 """

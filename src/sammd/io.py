@@ -22,6 +22,7 @@ class OutputPaths:
     positions: Path | None = None
     openff_interchange: Path | None = None
     openmm_system: Path | None = None
+    anchor_metadata: Path | None = None
     build_summary: Path | None = None
     resolved_config: Path | None = None
     trajectory: Path | None = None
@@ -65,6 +66,7 @@ def plan_output_paths(config: Any, base_dir: str | Path = ".") -> OutputPaths:
     positions = _resolve_output_path(root, files.positions)
     openff_interchange = _resolve_output_path(root, files.openff_interchange)
     openmm_system = _resolve_output_path(root, files.openmm_system)
+    anchor_metadata = _resolve_output_path(root, files.anchor_metadata)
     build_summary = _resolve_output_path(root, files.build_summary)
     resolved_config = _resolve_output_path(root, files.resolved_config)
 
@@ -72,6 +74,7 @@ def plan_output_paths(config: Any, base_dir: str | Path = ".") -> OutputPaths:
     _validate_suffix(positions, ".cif", "positions")
     _validate_suffix(openff_interchange, ".json", "OpenFF Interchange")
     _validate_suffix(openmm_system, ".xml", "OpenMM system")
+    _validate_suffix(anchor_metadata, ".json", "anchor metadata")
     _validate_suffix(build_summary, ".json", "build summary")
     _validate_suffix(resolved_config, ".yaml", "resolved config")
     return OutputPaths(
@@ -79,6 +82,7 @@ def plan_output_paths(config: Any, base_dir: str | Path = ".") -> OutputPaths:
         positions=positions,
         openff_interchange=openff_interchange,
         openmm_system=openmm_system,
+        anchor_metadata=anchor_metadata,
         build_summary=build_summary,
         resolved_config=resolved_config,
     )

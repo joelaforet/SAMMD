@@ -49,6 +49,7 @@ def test_resolved_defaults_match_approved_student_schema() -> None:
     assert config.solvent.components[0].density == 0.789
     assert config.parameterization.nonbonded_cutoff == 1.0
     assert config.outputs.files.openff_interchange == "interchange.json"
+    assert config.outputs.files.anchor_metadata == "anchor_metadata.json"
 
 
 def test_surface_validation_uses_fcc_surface_registry() -> None:
@@ -82,6 +83,7 @@ def test_yaml_template_describes_current_build_contract() -> None:
     assert "positions.cif" in CONFIG_TEMPLATE
     assert "interchange.json" in CONFIG_TEMPLATE
     assert "system.xml" in CONFIG_TEMPLATE
+    assert "anchor_metadata.json" in CONFIG_TEMPLATE
 
 
 def test_sam_extended_length_override_is_optional_and_positive() -> None:

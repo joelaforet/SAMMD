@@ -56,7 +56,19 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
     assert plan.output_paths.positions == tmp_path / "positions.cif"
     assert plan.output_paths.openff_interchange == tmp_path / "interchange.json"
     assert plan.output_paths.openmm_system == tmp_path / "system.xml"
+    assert plan.output_paths.anchor_metadata == tmp_path / "anchor_metadata.json"
     assert not plan.full_construction_available
+    artifacts = plan.build_summary()["artifacts"]
+    assert artifacts["topology"] == {
+        "path": str(tmp_path / "topology.cif"),
+        "status": "current",
+        "available": True,
+    }
+    assert artifacts["anchor_metadata"] == {
+        "path": str(tmp_path / "anchor_metadata.json"),
+        "status": "reserved",
+        "available": False,
+    }
     interaction = plan.build_summary()["sam"]["metal_sulfur_interaction"]
     assert interaction["mode"] == METAL_SULFUR_INTERACTION_MODE
     assert interaction["site_kind"] == "fcc_hollow"

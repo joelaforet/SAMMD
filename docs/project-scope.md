@@ -92,7 +92,7 @@ Conversion notes:
 
 [OpenFF Interchange construction](https://docs.openforcefield.org/projects/interchange/en/stable/using/construction.html) supports constructing an `Interchange` from a SMIRNOFF `ForceField` and OpenFF `Molecule` or `Topology` objects.
 
-The target SAMMD backend pipeline should prefer OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy should be applied after export to the selected OpenMM pair representation rather than encoded as a beginner-facing YAML option. Current v0.1.0 code may record these choices and artifact targets, but `positions.cif`, `interchange.json`, and `system.xml` remain reserved backend exports until implemented.
+The target SAMMD backend pipeline should prefer OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy should be applied after export to the selected OpenMM pair representation rather than encoded as a beginner-facing YAML option. Current v0.1.0 code may record these choices and artifact targets, but `positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json` remain reserved backend exports until implemented.
 
 Relevant behavior:
 
@@ -227,7 +227,7 @@ During the current v0.1.0 lightweight planning milestone, `sammd build` writes
 `topology.cif` is a lightweight topology-inspection CIF for the deterministic plan,
 showing placeholder sulfur anchors at planned sulfur positions rather than full
 SAM molecule coordinates. Full backend target artifacts remain reserved until
-implemented: `positions.cif`, `interchange.json`, and `system.xml`.
+implemented: `positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json`.
 
 mmCIF/PDBx should be preferred over legacy PDB because SAMMD systems may have many atoms, many solvent/reactant molecules, nonstandard residues, and metal particles. Atom names, residue names, chain IDs, molecule labels, and component metadata should be chosen so PyMOL sessions are easy to inspect: metal slab, top SAM, bottom SAM, solvent, salts, and reactants should be distinguishable by selection.
 
