@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from sammd import build_system, load_config
-from sammd.analysis import analyze_orientation
 from sammd.config import CONFIG_TEMPLATE
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -46,9 +45,10 @@ def test_canonical_notebook_has_expected_sections() -> None:
         "# SAMMD canonical lightweight workflow",
         "## Create a template configuration",
         "## Validate, load, and build a plan",
-        "## Inspect the plan summary",
-        "## Write topology.cif",
-        "## Toy orientation analysis",
+        "## Write current artifacts",
+        "## Inspect current outputs",
+        "## Reserved future backend artifacts",
+        "## Future OpenMM handoff",
     ]
     for heading in expected_headings:
         assert heading in headings
@@ -586,23 +586,12 @@ def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:
     config = load_config(config_path)
     plan = build_system(config, output_dir=output_dir)
     topology_path = plan.write_topology_cif(overwrite=True)
-
-    toy_coordinates = [
-        (-0.30, 0.00, 0.00),
-        (-0.10, 0.15, 0.02),
-        (0.10, 0.10, 0.05),
-        (0.30, 0.00, 0.12),
-        (0.45, -0.08, 0.24),
-    ]
-    orientation = analyze_orientation(
-        toy_coordinates,
-        atom_index=4,
-        masses=[12.0, 12.0, 12.0, 12.0, 16.0],
-        side="top",
-        reactant_label="toy cinnamaldehyde",
-    )
+    build_summary_path = plan.write_build_summary(overwrite=True)
+    resolved_config_path = plan.write_resolved_config(overwrite=True)
 
     assert topology_path.is_file()
+    assert build_summary_path.is_file()
+    assert resolved_config_path.is_file()
     assert not plan.output_paths.positions.exists()
     assert not plan.output_paths.openff_interchange.exists()
     assert not plan.output_paths.openmm_system.exists()
@@ -612,6 +601,6 @@ def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:
     assert len(plan.sam_placements.placements) > 0
     assert plan.solution.molecule_counts["ethanol"] > 0
     assert plan.output_paths.topology == output_dir / "topology.cif"
+    assert plan.output_paths.build_summary == output_dir / "build_summary.json"
+    assert plan.output_paths.resolved_config == output_dir / "resolved_config.yaml"
     assert not plan.full_construction_available
-    assert 0.0 <= orientation.angle_degrees <= 180.0
-    assert orientation.reactant_label == "toy cinnamaldehyde"
