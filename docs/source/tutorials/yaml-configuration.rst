@@ -75,7 +75,9 @@ Important sections
    ``Interchange.model_dump_json`` and reload through
    ``Interchange.model_validate_json``; SAMMD does not write it in the current
    release, and pre-1.0 Interchange JSON compatibility is not guaranteed across
-   versions.
+   versions. OpenMM is the student teaching path and ``system.xml`` is only a
+   convenience export; GROMACS, LAMMPS, and Amber are future downstream exports
+   from Interchange, not beginner workflow commands.
 
 Resolved defaults to notice
 ---------------------------

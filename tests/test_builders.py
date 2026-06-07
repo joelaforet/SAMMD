@@ -82,6 +82,21 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
             "Pre-1.0 OpenFF Interchange JSON compatibility is not guaranteed across versions."
         ),
     }
+    engine_exports = plan.build_summary()["engine_exports"]
+    assert set(engine_exports) == {"openmm", "gromacs", "lammps", "amber"}
+    assert engine_exports["openmm"] == {
+        "status": "reserved",
+        "available": False,
+        "handoff": "Interchange primary; system.xml convenience export",
+        "teaching_scope": "student OpenMM Python API path",
+    }
+    for engine in ["gromacs", "lammps", "amber"]:
+        assert engine_exports[engine] == {
+            "status": "reserved",
+            "available": False,
+            "handoff": "future downstream export from Interchange",
+            "teaching_scope": "not taught in beginner workflow",
+        }
     interaction = plan.build_summary()["sam"]["metal_sulfur_interaction"]
     assert interaction["mode"] == METAL_SULFUR_INTERACTION_MODE
     assert interaction["site_kind"] == "fcc_hollow"

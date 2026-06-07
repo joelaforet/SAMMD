@@ -95,6 +95,13 @@ The first-release output names are reserved so user scripts and documentation ca
 refer to stable paths while backend work proceeds. Future backend exports should
 treat ``interchange.json`` as the primary portable system artifact.
 
+The build summary also records reserved engine export planning metadata. OpenMM
+is the student teaching path through the OpenMM Python API; ``system.xml`` is
+only a convenience export derived from the future backend, while OpenFF
+Interchange remains the primary handoff. GROMACS, LAMMPS, and Amber are reserved
+only as future downstream exports from Interchange and are not taught in the
+beginner workflow.
+
 .. list-table::
    :header-rows: 1
 
@@ -144,5 +151,5 @@ Today ``sammd build`` writes only ``topology.cif``, ``build_summary.json``, and
 ``interchange.json``, ``system.xml``, or ``anchor_metadata.json`` in the current
 lightweight release. Full OpenFF/OpenMM construction and OpenMM-ready exports
 remain future backend work, including full SAM molecule coordinates. Public
-SAMMD APIs should not add equilibration or production simulation helpers as part
-of this contract.
+SAMMD APIs should not add equilibration, production simulation helpers, or direct
+GROMACS/LAMMPS/Amber command workflows as part of this contract.

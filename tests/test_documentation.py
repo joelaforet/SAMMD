@@ -372,6 +372,11 @@ def test_build_contract_documents_first_release_boundary() -> None:
     assert "pre-1.0 Interchange JSON compatibility as not guaranteed" in normalized
     assert "OpenMM convenience export" in normalized
     assert "not the primary portable SAMMD artifact" in normalized
+    assert "reserved engine export planning metadata" in normalized
+    assert "OpenMM is the student teaching path" in normalized
+    assert "``system.xml`` is only a convenience export" in normalized
+    assert "GROMACS, LAMMPS, and Amber are reserved only as future downstream exports" in normalized
+    assert "not taught in the beginner workflow" in normalized
     assert "human-inspectable/OpenMM-loadable structure file" in normalized
     assert (
         "does not write ``positions.cif``, ``interchange.json``, ``system.xml``, "
@@ -398,6 +403,10 @@ def test_yaml_configuration_docs_keep_backend_exports_reserved() -> None:
     assert "``Interchange.model_dump_json``" in content
     assert "``Interchange.model_validate_json``" in content
     assert "pre-1.0 Interchange JSON compatibility is not guaranteed" in normalized
+    assert "OpenMM is the student teaching path" in normalized
+    assert "``system.xml`` is only a convenience export" in normalized
+    assert "GROMACS, LAMMPS, and Amber are future downstream exports" in normalized
+    assert "not beginner workflow commands" in normalized
 
 
 def test_yaml_configuration_docs_clarify_beginner_schema_boundary() -> None:
@@ -448,6 +457,11 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
     assert "``Interchange.model_dump_json``" in content
     assert "``Interchange.model_validate_json``" in content
     assert "pre-1.0 Interchange JSON compatibility is not guaranteed" in normalized
+    assert "Engine exports are reserved in the build summary only" in normalized
+    assert "OpenMM is the student teaching path" in normalized
+    assert "``system.xml`` planned only as a convenience export" in normalized
+    assert "GROMACS, LAMMPS, and Amber are future downstream exports" in normalized
+    assert "not beginner workflow commands" in normalized
     assert "students will use those build artifacts from their own OpenMM" in normalized
     assert "not runnable in this lightweight release" in normalized
     assert "reserved target artifacts, not current outputs" in normalized
@@ -470,10 +484,17 @@ def test_tutorial_docs_do_not_teach_current_md_outputs_or_openmm_code() -> None:
         r"^\s*(from\s+openmm\b|import\s+openmm\b)",
         r"\bSimulation\s*\(",
     ]
+    executable_non_openmm_engine_patterns = [
+        r"^\s*(gmx|gmx_mpi|mdrun|lmp|lmp_mpi|sander|pmemd)\b",
+        r"^\s*(from\s+parmed\b|import\s+parmed\b)",
+    ]
 
     for path in tutorial_paths:
         content = path.read_text(encoding="utf-8")
-        for pattern in stale_patterns + executable_openmm_patterns:
+        blocked_patterns = (
+            stale_patterns + executable_openmm_patterns + executable_non_openmm_engine_patterns
+        )
+        for pattern in blocked_patterns:
             assert re.search(pattern, content, flags=re.MULTILINE) is None
 
 

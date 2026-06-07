@@ -110,6 +110,11 @@ written with ``Interchange.model_dump_json`` and reloaded with
 release, and pre-1.0 Interchange JSON compatibility is not guaranteed across
 OpenFF Interchange versions.
 
+Engine exports are reserved in the build summary only. OpenMM is the student
+teaching path through the OpenMM Python API, with ``system.xml`` planned only as
+a convenience export. GROMACS, LAMMPS, and Amber are future downstream exports
+from Interchange, not beginner workflow commands.
+
 The YAML intentionally does not define equilibration, production MD,
 thermostats, barostats, or trajectory writing. Those OpenMM concepts are taught
 and controlled separately from the system-building config.

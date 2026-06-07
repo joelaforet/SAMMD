@@ -28,6 +28,33 @@ DEFAULT_SAM_EXTENDED_LENGTH_NM = 0.95
 SLAB_CUTOFF_BUFFER_NM = 0.5
 OPENMM_CONSTRUCTION_IMPLEMENTED = False
 
+ENGINE_EXPORT_PLAN: dict[str, dict[str, object]] = {
+    "openmm": {
+        "status": "reserved",
+        "available": False,
+        "handoff": "Interchange primary; system.xml convenience export",
+        "teaching_scope": "student OpenMM Python API path",
+    },
+    "gromacs": {
+        "status": "reserved",
+        "available": False,
+        "handoff": "future downstream export from Interchange",
+        "teaching_scope": "not taught in beginner workflow",
+    },
+    "lammps": {
+        "status": "reserved",
+        "available": False,
+        "handoff": "future downstream export from Interchange",
+        "teaching_scope": "not taught in beginner workflow",
+    },
+    "amber": {
+        "status": "reserved",
+        "available": False,
+        "handoff": "future downstream export from Interchange",
+        "teaching_scope": "not taught in beginner workflow",
+    },
+}
+
 
 @dataclass(frozen=True)
 class SAMLengthEstimate:
@@ -203,6 +230,7 @@ class SAMMDBuildPlan:
                 "openmm_system": self._artifact_summary("openmm_system", "reserved"),
                 "anchor_metadata": self._artifact_summary("anchor_metadata", "reserved"),
             },
+            "engine_exports": ENGINE_EXPORT_PLAN,
             "full_construction_available": self.full_construction_available,
         }
 
