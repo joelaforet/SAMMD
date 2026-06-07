@@ -18,6 +18,7 @@ from sammd.io import (
     slab_to_atom_records,
     write_mmcif,
 )
+from sammd.metal_sulfur import default_metal_sulfur_interaction
 from sammd.sam import SAMPlacementPlan, plan_sam_placements
 from sammd.solvation import SolutionPlan, plan_solution_composition
 from sammd.surfaces import BindingSite, SurfaceSlab, generate_binding_sites, plan_fcc111_slab
@@ -133,6 +134,7 @@ class SAMMDBuildPlan:
                 "grafting_density_nm2_per_molecule": self.config.sam.grafting_density,
                 "molecules_total": len(self.sam_placements.placements),
                 "molecules_per_side": self.sam_placements.selected_sites_per_side,
+                "metal_sulfur_interaction": default_metal_sulfur_interaction().to_summary(),
                 "placements": [
                     {
                         "component_name": placement.component_name,
@@ -149,6 +151,9 @@ class SAMMDBuildPlan:
                             placement.anchor_pose.nearest_metal_atom_indices
                         ),
                         "attachment_mode": placement.anchor_pose.attachment_mode,
+                        "metal_sulfur_interaction": (
+                            placement.anchor_pose.metal_sulfur_interaction.to_summary()
+                        ),
                     }
                     for placement in self.sam_placements.placements
                 ],

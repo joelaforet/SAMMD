@@ -28,7 +28,10 @@ Important sections
    Components should include the HS/implicit-H thiol sulfur in the SMILES, not a
    pre-deprotonated thiolate. Metal-S attachment is represented/planned
    internally as a strengthened nonbonded interaction, not as covalent, quantum,
-   or reactive chemistry, and it is not yet a student-facing YAML knob.
+   or reactive chemistry, and it is not yet a student-facing YAML knob. The
+   current internal strategy records three nearest metal atoms at each Fcc(111)
+   hollow anchor for a future post-export OpenMM pair-specific LJ override; users
+   do not configure the override strength or site in this YAML file.
    SAMMD plans internal sulfur anchor poses, but there is no YAML anchor-site or
    sulfur-height setting in the beginner schema.
    Components need a human-readable name, a three-character ``residue_name``, a
@@ -59,7 +62,9 @@ Important sections
    Records the OpenFF small-molecule force field, charge model, INTERFACE metal
    force-field resource, and nonbonded cutoff selected for future backend export.
    The current lightweight builder validates and records these choices without
-   constructing a parameterized backend system.
+   constructing a parameterized backend system. The INTERFACE metal resource is
+   the base slab LJ model; selected sulfur-metal pair overrides are recorded in
+   the build summary as internal SAM metadata rather than configured here.
 
 ``outputs``
    Names current build artifacts such as ``topology.cif``,

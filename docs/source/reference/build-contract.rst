@@ -56,6 +56,16 @@ top-level public import in ``sammd.__all__``. ``SAMMDBuildPlan`` is not an OpenM
 full backend construction should treat ``full_construction_available`` as false
 until the OpenFF/OpenMM construction backend lands.
 
+The ``build_summary()`` SAM section records the first-release metal-S interaction
+strategy as dependency-free metadata. The canonical mode is
+``nonbonded_lj_override``: for each neutral thiol anchor, the backend should use
+the three nearest registered Fcc(111) hollow-site metal atoms as selected pairs
+for a post-export OpenMM pair-specific LJ override with ``sigma = 0.22 nm`` and
+``epsilon = 2.0 kcal/mol``. This is a strengthened nonbonded attraction layered
+on top of the base INTERFACE metal LJ model, not covalent, quantum, or reactive
+chemisorption. The first release records the strategy and selected pair indices
+but does not implement full OpenFF/Interchange construction or OpenMM export.
+
 Artifact contract
 -----------------
 
@@ -74,7 +84,8 @@ refer to stable paths while backend work proceeds.
        SAM sulfur anchor placeholders at planned sulfur positions.
    * - ``build_summary.json``
      - Current
-     - Machine-readable summary of the validated plan and output paths.
+     - Machine-readable summary of the validated plan, output paths, and
+       backend-ready metal-S LJ override metadata.
    * - ``resolved_config.yaml``
      - Current
      - Validated YAML configuration used for the build.

@@ -10,6 +10,13 @@ import pytest
 
 from sammd.builders import DEFAULT_SAM_EXTENDED_LENGTH_NM, DEFAULT_SOLVENT_PADDING_NM, build_system
 from sammd.config import CONFIG_TEMPLATE, SAMMDConfig
+from sammd.metal_sulfur import (
+    METAL_SULFUR_EPSILON_KCAL_MOL,
+    METAL_SULFUR_EPSILON_KJ_MOL,
+    METAL_SULFUR_INTERACTION_MODE,
+    METAL_SULFUR_PAIRS_PER_ANCHOR,
+    METAL_SULFUR_SIGMA_NM,
+)
 from sammd.solvation import round_half_up
 from sammd.surfaces import plan_fcc111_slab, plan_pd111_slab
 
@@ -50,6 +57,13 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
     assert plan.output_paths.openff_interchange == tmp_path / "interchange.json"
     assert plan.output_paths.openmm_system == tmp_path / "system.xml"
     assert not plan.full_construction_available
+    interaction = plan.build_summary()["sam"]["metal_sulfur_interaction"]
+    assert interaction["mode"] == METAL_SULFUR_INTERACTION_MODE
+    assert interaction["site_kind"] == "fcc_hollow"
+    assert interaction["pairs_per_anchor"] == METAL_SULFUR_PAIRS_PER_ANCHOR
+    assert interaction["sigma_nm"] == METAL_SULFUR_SIGMA_NM
+    assert interaction["epsilon_kcal_mol"] == METAL_SULFUR_EPSILON_KCAL_MOL
+    assert interaction["epsilon_kj_mol"] == METAL_SULFUR_EPSILON_KJ_MOL
     with pytest.raises(NotImplementedError, match="OpenFF/OpenMM construction is not implemented"):
         plan.require_full_construction()
 
@@ -200,6 +214,9 @@ def test_build_plan_writes_topology_cif_and_refuses_overwrite(tmp_path) -> None:
         "sulfur_height_nm": first_placement.anchor_pose.sulfur_height_nm,
         "nearest_metal_atom_indices": list(first_placement.anchor_pose.nearest_metal_atom_indices),
         "attachment_mode": first_placement.anchor_pose.attachment_mode,
+        "metal_sulfur_interaction": (
+            first_placement.anchor_pose.metal_sulfur_interaction.to_summary()
+        ),
     }
     assert summary["box"]["volume_nm3"] == pytest.approx(plan.box_plan.volume_nm3)
     assert summary["box"]["slab_center_nm"] == [0.0, 0.0, 0.0]
@@ -249,7 +266,7 @@ def test_build_import_avoids_heavy_backend_modules() -> None:
     heavy_modules = ("openmm", "openff", "rdkit", "mbuild", "MDAnalysis", "parmed", "pdbfixer")
     code = (
         "import json, sys; "
-        "import sammd, sammd.builders; "
+        "import sammd, sammd.builders, sammd.metal_sulfur; "
         f"heavy_modules = {heavy_modules!r}; "
         "print(json.dumps([name for name in heavy_modules if name in sys.modules]))"
     )

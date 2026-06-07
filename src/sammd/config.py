@@ -418,9 +418,9 @@ surface:
 # terminus, not a pre-deprotonated thiolate. SAMMD uses the sulfur atom for
 # placement on the metal surface.
 #
-# Metal-S attachment is represented/planned internally as a strengthened
-# nonbonded interaction, not as covalent, quantum, or reactive chemistry. This
-# is not exposed as a beginner YAML knob yet.
+# Metal-S attachment is represented/planned internally as a selected post-export
+# pair-specific LJ override, not as covalent, quantum, or reactive chemistry.
+# This strengthened nonbonded interaction is not exposed as a beginner YAML knob yet.
 #
 # residue_name must be a 3-character PDB residue code.
 #

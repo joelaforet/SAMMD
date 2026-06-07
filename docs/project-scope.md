@@ -283,12 +283,17 @@ Default metal-sulfur anchoring should begin as an internal nonbonded proxy:
 
 - Keep the SAM sulfur and surface metal atoms non-covalent in topology.
 - Plan the relevant sulfur-metal interaction strength as backend/internal representation, not a beginner YAML knob.
+- Use a selected post-export OpenMM pair-specific LJ override as the first-release strategy, not an OFFXML/Interchange-only strategy.
+- Pair each planned SAM sulfur with the three nearest metal atoms at the registered Fcc(111) hollow site.
+- Record the canonical first-release override as `mode = "nonbonded_lj_override"`, `site_kind = "fcc_hollow"`, `pairs_per_anchor = 3`, `sigma = 0.22 nm`, and `epsilon = 2.0 kcal/mol` (`8.368 kJ/mol`).
+- Treat the override as strengthened nonbonded LJ attraction for neutral thiols, not covalent, quantum, or reactive chemisorption.
+- Keep the base INTERFACE Fcc metal LJ parameters as the slab nonbonded model; the selected metal-S override is additional backend metadata for specific sulfur-metal pairs.
 - Defer any user-configurable scale factor, such as 4x, 5x, or 6x, until a later advanced attachment API.
 - Preserve a configuration/API path for future explicit bonded anchors.
 
 Future explicit anchor mode should be designed as a replaceable strategy:
 
-- `anchor.mode = "nonbonded"` for MVP.
+- `anchor.mode = "nonbonded_lj_override"` for MVP backend metadata.
 - `anchor.mode = "bonded"` later for metal-sulfur bond, angle, and torsion parameters.
 - A future angle target, such as 23 degrees relative to the surface, should not require rewriting the builder API.
 - `anchor.site = "fcc_hollow"` should be the internal registered Fcc(111) hollow-placement strategy, with Pd(111) as the canonical/default surface and other site labels reserved for a later advanced attachment API.
@@ -355,7 +360,7 @@ The docs should assume undergraduate contributors and make success states explic
 - The slab should be thick enough that the two SAM/slab interfaces are separated by more than the nonbonded cutoff plus a buffer.
 - The lateral box dimensions should be user-tunable; the first demo can start near 5 x 5 nm.
 - The default sulfur site for Pd(111) should be internal `fcc_hollow` builder behavior; user-configurable site type belongs in a future advanced attachment API.
-- Sulfur-metal interaction scaling remains an internal planning/backend detail for v0.1.0; any user-configurable scale factor belongs in a future advanced attachment API.
+- Sulfur-metal interaction metadata remains an internal planning/backend detail for v0.1.0; the default selected-pair strategy is a post-export OpenMM pair-specific LJ override, and any user-configurable scale factor belongs in a future advanced attachment API.
 - TIP3P is the default water model.
 - The default Pd positional restraint force constant is `10000 kJ mol^-1 nm^-2`.
 - The default grafting density is `0.25 nm^2 / molecule`.

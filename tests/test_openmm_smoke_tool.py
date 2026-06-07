@@ -174,3 +174,12 @@ def test_validate_args_rejects_invalid_solvent_count() -> None:
 
     with pytest.raises(SystemExit, match="--solvent-count"):
         smoke.validate_args(args)
+
+
+def test_smoke_tool_defaults_match_canonical_metal_sulfur_strategy() -> None:
+    """Keep the smoke pair override aligned with dependency-free SAM metadata."""
+
+    smoke = load_smoke_tool()
+
+    assert pytest.approx(2.2) == smoke.DEFAULT_PD_S_SIGMA_ANGSTROM
+    assert pytest.approx(2.0) == smoke.DEFAULT_PD_S_EPSILON_KCAL_MOL

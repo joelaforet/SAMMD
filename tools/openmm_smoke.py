@@ -24,6 +24,7 @@ from sammd.builders import build_system
 from sammd.config import SAMMDConfig, load_config
 from sammd.forcefields import get_fcc_metal_parameters
 from sammd.io import safe_write_text
+from sammd.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
 from sammd.openmm_runtime import AnchorScalingMetadata, create_langevin_integrator
 
 KCAL_TO_KJ = 4.184
@@ -42,9 +43,9 @@ DEFAULT_TRAJECTORY_FRAMES = 300
 DEFAULT_TIMESTEP_FS = 2.0
 DEFAULT_FRICTION_PER_PS = 1.0
 DEFAULT_SULFUR_HEIGHT_NM = 0.18
-DEFAULT_PD_S_SIGMA_ANGSTROM = 2.2
+DEFAULT_PD_S_SIGMA_ANGSTROM = METAL_SULFUR_SIGMA_NM * 10.0
 REFERENCE_PD_S_EPSILON_KCAL_MOL = 1.0
-DEFAULT_PD_S_EPSILON_KCAL_MOL = 2.0
+DEFAULT_PD_S_EPSILON_KCAL_MOL = METAL_SULFUR_EPSILON_KCAL_MOL
 OPENFF_FORCE_FIELD = "openff-2.2.1.offxml"
 NAGL_CHARGE_MODEL = "openff-gnn-am1bcc-1.0.0.pt"
 SAM_TAIL_CLEARANCE_NM = 0.95

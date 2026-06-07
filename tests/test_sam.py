@@ -5,6 +5,13 @@ from math import dist, pi, sqrt
 import pytest
 
 from sammd.config import SAMComponentConfig, SAMConfig
+from sammd.metal_sulfur import (
+    METAL_SULFUR_EPSILON_KCAL_MOL,
+    METAL_SULFUR_EPSILON_KJ_MOL,
+    METAL_SULFUR_INTERACTION_MODE,
+    METAL_SULFUR_PAIRS_PER_ANCHOR,
+    METAL_SULFUR_SIGMA_NM,
+)
 from sammd.sam import (
     DEFAULT_SULFUR_HEIGHT_NM,
     plan_anchor_pose,
@@ -137,7 +144,32 @@ def test_placement_uses_internal_fcc_hollow_anchor_strategy() -> None:
 
     assert {placement.site_kind for placement in plan.placements} == {"fcc_hollow"}
     assert {placement.anchor_metadata["site"] for placement in plan.placements} == {"fcc_hollow"}
-    assert {placement.anchor_metadata["mode"] for placement in plan.placements} == {"nonbonded"}
+    assert {placement.anchor_metadata["mode"] for placement in plan.placements} == {
+        METAL_SULFUR_INTERACTION_MODE
+    }
+
+
+def test_placements_record_canonical_metal_sulfur_strategy() -> None:
+    """Record backend-ready metal-S LJ override metadata for every placement."""
+
+    plan = plan_sam_placements(SAMConfig(), _binding_sites(), lateral_area_nm2=1.0, seed=23)
+
+    for placement in plan.placements:
+        interaction = placement.anchor_metadata["metal_sulfur_interaction"]
+
+        assert placement.anchor_pose.attachment_mode == METAL_SULFUR_INTERACTION_MODE
+        assert len(placement.anchor_pose.nearest_metal_atom_indices) == (
+            METAL_SULFUR_PAIRS_PER_ANCHOR
+        )
+        assert len(placement.anchor_metadata["nearest_metal_atom_indices"]) == (
+            METAL_SULFUR_PAIRS_PER_ANCHOR
+        )
+        assert interaction["mode"] == METAL_SULFUR_INTERACTION_MODE
+        assert interaction["site_kind"] == "fcc_hollow"
+        assert interaction["pairs_per_anchor"] == METAL_SULFUR_PAIRS_PER_ANCHOR
+        assert interaction["sigma_nm"] == METAL_SULFUR_SIGMA_NM
+        assert interaction["epsilon_kcal_mol"] == METAL_SULFUR_EPSILON_KCAL_MOL
+        assert interaction["epsilon_kj_mol"] == METAL_SULFUR_EPSILON_KJ_MOL
 
 
 def test_anchor_pose_offsets_sulfur_from_site_plane_and_preserves_metadata() -> None:
@@ -151,7 +183,7 @@ def test_anchor_pose_offsets_sulfur_from_site_plane_and_preserves_metadata() -> 
         assert pose.site_kind == placement.site_kind == "fcc_hollow"
         assert pose.normal == placement.normal
         assert pose.axis_direction == placement.normal
-        assert pose.attachment_mode == "nonbonded"
+        assert pose.attachment_mode == METAL_SULFUR_INTERACTION_MODE
         assert pose.nearest_metal_atom_indices == placement.anchor_metadata[
             "nearest_metal_atom_indices"
         ]

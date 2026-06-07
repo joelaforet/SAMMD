@@ -7,6 +7,7 @@ from math import floor, pi, sqrt, tau
 from random import Random
 
 from sammd.config import SAMComponentConfig, SAMConfig
+from sammd.metal_sulfur import MetalSulfurLJOverrideSpec, default_metal_sulfur_interaction
 from sammd.surfaces import BindingSite
 
 Vector3 = tuple[float, float, float]
@@ -25,7 +26,8 @@ class SAMAnchorPose:
     sulfur_height_nm: float
     site_kind: str
     nearest_metal_atom_indices: tuple[int, ...]
-    attachment_mode: str = "nonbonded"
+    metal_sulfur_interaction: MetalSulfurLJOverrideSpec
+    attachment_mode: str
 
 
 @dataclass(frozen=True)
@@ -88,7 +90,8 @@ def plan_sam_placements(
         msg = "grafting density selects no SAM sites"
         raise ValueError(msg)
 
-    requested_site_kinds = {"fcc_hollow"}
+    metal_sulfur_interaction = default_metal_sulfur_interaction()
+    requested_site_kinds = {metal_sulfur_interaction.site_kind}
     supplied_site_kinds = {site.site_kind for site in binding_sites}
     missing_site_kinds = sorted(requested_site_kinds - supplied_site_kinds)
     if missing_site_kinds:
@@ -120,7 +123,11 @@ def plan_sam_placements(
         for placement_index, (site, component) in enumerate(
             zip(selected_sites, components, strict=True)
         ):
-            anchor_pose = plan_anchor_pose(site, azimuth_rad=sam_azimuth_rad(placement_index))
+            anchor_pose = plan_anchor_pose(
+                site,
+                azimuth_rad=sam_azimuth_rad(placement_index),
+                metal_sulfur_interaction=metal_sulfur_interaction,
+            )
             placements.append(
                 SAMPlacement(
                     component_name=component.name,
@@ -134,6 +141,9 @@ def plan_sam_placements(
                     anchor_metadata={
                         "mode": anchor_pose.attachment_mode,
                         "site": anchor_pose.site_kind,
+                        "metal_sulfur_interaction": (
+                            anchor_pose.metal_sulfur_interaction.to_summary()
+                        ),
                         "nearest_metal_atom_indices": anchor_pose.nearest_metal_atom_indices,
                         "azimuth_rad": anchor_pose.azimuth_rad,
                         "sulfur_height_nm": anchor_pose.sulfur_height_nm,
@@ -163,12 +173,26 @@ def plan_anchor_pose(
     site: BindingSite,
     sulfur_height_nm: float = DEFAULT_SULFUR_HEIGHT_NM,
     azimuth_rad: float = 0.0,
-    attachment_mode: str = "nonbonded",
+    metal_sulfur_interaction: MetalSulfurLJOverrideSpec | None = None,
 ) -> SAMAnchorPose:
     """Plan a sulfur anchor pose from a binding-site plane coordinate."""
 
+    if metal_sulfur_interaction is None:
+        metal_sulfur_interaction = default_metal_sulfur_interaction()
     if sulfur_height_nm <= 0:
         msg = "sulfur_height_nm must be positive"
+        raise ValueError(msg)
+    if site.site_kind != metal_sulfur_interaction.site_kind:
+        msg = (
+            f"metal-S interaction site kind {metal_sulfur_interaction.site_kind!r} "
+            f"does not match binding site {site.site_kind!r}"
+        )
+        raise ValueError(msg)
+    if len(site.nearest_metal_atom_indices) != metal_sulfur_interaction.pairs_per_anchor:
+        msg = (
+            f"metal-S interaction requires {metal_sulfur_interaction.pairs_per_anchor} "
+            "nearest metal atom indices per anchor"
+        )
         raise ValueError(msg)
     sulfur_position_nm = tuple(
         position + normal * sulfur_height_nm
@@ -183,7 +207,8 @@ def plan_anchor_pose(
         sulfur_height_nm=sulfur_height_nm,
         site_kind=site.site_kind,
         nearest_metal_atom_indices=site.nearest_metal_atom_indices,
-        attachment_mode=attachment_mode,
+        metal_sulfur_interaction=metal_sulfur_interaction,
+        attachment_mode=metal_sulfur_interaction.mode,
     )
 
 

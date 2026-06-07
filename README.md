@@ -36,8 +36,8 @@ perform full system construction.
 
 Optional OpenMM runtime helpers live in `sammd.openmm_runtime`. They lazily
 create Langevin integrators, create/configure a new OpenMM `Simulation` from
-existing topology, system, positions, and reporter settings, and apply a
-pair-specific sulfur-metal LJ scaling proxy.
+existing topology, system, positions, and reporter settings, and include an
+experimental sulfur-metal LJ scaling helper for explicit pair lists.
 Users must still supply existing OpenMM topology, system, and positions from
 future construction code or their own backend workflow; SAMMD does not yet
 construct complete OpenMM systems.
@@ -61,6 +61,13 @@ top/bottom SAM placement choices with dependency-free sulfur anchor poses,
 solution molecule counts from an approximate composition-planning volume, and
 build output paths. The YAML intentionally does not define OpenMM simulation
 phases, thermostats, barostats, trajectory writing, or production protocols.
+The first-release metal-S strategy is recorded as dependency-free metadata: each
+neutral thiol sulfur is paired with the three nearest hollow-site metal atoms for
+a future post-export OpenMM pair-specific LJ override (`sigma = 0.22 nm`,
+`epsilon = 2.0 kcal/mol`). The base INTERFACE metal parameters remain the slab
+nonbonded model; the selected metal-S override is an internal strengthened
+nonbonded attraction, not covalent or reactive chemisorption and not a beginner
+YAML knob.
 
 See [docs/project-scope.md](docs/project-scope.md) for the source-of-truth scope
 and scientific defaults.
