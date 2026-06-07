@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Sized
 from dataclasses import dataclass, field
 from math import isfinite
 from pathlib import Path
@@ -213,6 +214,9 @@ def _validate_job(job: PackmolJob) -> None:
 
 
 def _validate_structure(structure: PackmolStructure) -> None:
+    if not isinstance(structure, PackmolStructure):
+        msg = "job structures must be PackmolStructure entries"
+        raise TypeError(msg)
     if not str(structure.name).strip():
         msg = "structure name must be a non-empty string"
         raise ValueError(msg)
@@ -234,10 +238,16 @@ def _validate_structure(structure: PackmolStructure) -> None:
 
 
 def _validate_bounds(bounds_nm: Any) -> None:
+    if not isinstance(bounds_nm, Sized):
+        msg = "box_bounds_nm must contain exactly three axis bounds"
+        raise ValueError(msg)
     if len(bounds_nm) != 3:
         msg = "box_bounds_nm must contain exactly three axis bounds"
         raise ValueError(msg)
     for axis, bounds in zip(("x", "y", "z"), bounds_nm, strict=True):
+        if not isinstance(bounds, Sized):
+            msg = f"box_bounds_nm {axis}-axis bounds must contain exactly two values"
+            raise ValueError(msg)
         if len(bounds) != 2:
             msg = f"box_bounds_nm {axis}-axis bounds must contain exactly two values"
             raise ValueError(msg)
@@ -290,13 +300,20 @@ def _validate_positive_finite_number(value: Any, name: str) -> None:
 
 
 def _validate_vector3(values: Any, name: str) -> Vector3:
+    if not isinstance(values, Sized):
+        msg = f"{name} must contain exactly three values"
+        raise ValueError(msg)
     if len(values) != 3:
         msg = f"{name} must contain exactly three values"
         raise ValueError(msg)
     if any(isinstance(value, bool) for value in values):
         msg = f"{name} values must be finite"
         raise ValueError(msg)
-    vector = tuple(float(value) for value in values)
+    try:
+        vector = tuple(float(value) for value in values)
+    except (TypeError, ValueError) as error:
+        msg = f"{name} values must be numeric"
+        raise TypeError(msg) from error
     if any(not isfinite(value) for value in vector):
         msg = f"{name} values must be finite"
         raise ValueError(msg)

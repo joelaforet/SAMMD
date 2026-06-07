@@ -201,6 +201,30 @@ def test_zero_origin_bounds_accept_plain_dimensions_and_box_plan() -> None:
             PackmolJob(
                 "out.pdb",
                 (PackmolStructure("water", "water.pdb", 1),),
+                True,
+            ),
+            "box_bounds_nm must contain exactly three axis bounds",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                (True, (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "x-axis bounds must contain exactly two values",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
+                (0.0, (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "x-axis bounds must contain exactly two values",
+        ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (PackmolStructure("water", "water.pdb", 1),),
                 ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
                 tolerance_angstrom=nan,
             ),
@@ -278,6 +302,14 @@ def test_invalid_packmol_jobs_fail_clearly(job, message) -> None:
             ),
             "tolerance_angstrom must be a numeric positive finite number",
         ),
+        (
+            PackmolJob(
+                "out.pdb",
+                (object(),),
+                ((0.0, 1.0), (0.0, 1.0), (0.0, 1.0)),
+            ),
+            "job structures must be PackmolStructure entries",
+        ),
     ],
 )
 def test_invalid_packmol_job_types_fail_clearly(job, message) -> None:
@@ -293,6 +325,20 @@ def test_zero_origin_bounds_reject_invalid_dimensions(dimensions) -> None:
 
     with pytest.raises(ValueError, match="dimensions_nm"):
         zero_origin_box_bounds(dimensions)
+
+
+def test_zero_origin_bounds_reject_scalar_dimensions() -> None:
+    """Reject scalar dimensions before raw len failures."""
+
+    with pytest.raises(ValueError, match="dimensions_nm must contain exactly three values"):
+        zero_origin_box_bounds(1.0)
+
+
+def test_zero_origin_bounds_reject_non_numeric_dimensions() -> None:
+    """Reject non-numeric dimensions with a helper-specific error."""
+
+    with pytest.raises(TypeError, match="dimensions_nm values must be numeric"):
+        zero_origin_box_bounds(("wide", 1.0, 1.0))
 
 
 def test_write_packmol_input_refuses_overwrite(tmp_path) -> None:
