@@ -41,7 +41,7 @@ builds the current plan, and writes ``outputs/topology.cif``,
 Open ``outputs/topology.cif`` in a molecule viewer such as PyMOL to inspect the
 configured surface and SAM sulfur anchor placeholders at planned sulfur
 positions. This file is the first build artifact to check before moving on to
-OpenMM simulation setup.
+backend construction and later OpenMM simulation setup.
 
 Build a deterministic plan from Python
 --------------------------------------
@@ -106,6 +106,15 @@ The configuration also reserves names for future backend construction artifacts:
 The YAML intentionally does not define equilibration, production MD,
 thermostats, barostats, or trajectory writing. Those OpenMM concepts are taught
 and controlled separately from the system-building config.
+
+Future direct OpenMM step
+-------------------------
+
+After a future SAMMD backend writes ``positions.cif``, ``interchange.json``, and
+``system.xml``, students will use those build artifacts from their own OpenMM
+Python API script for minimization, equilibration, production, and reporters.
+That direct OpenMM step is not runnable in this lightweight release because the
+backend exports are reserved target artifacts, not current outputs.
 
 Notebook version
 ----------------

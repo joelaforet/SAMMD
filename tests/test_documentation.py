@@ -325,6 +325,56 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
     assert "``topology.cif`` for a full system" not in content
     assert "topology inspection of the deterministic plan" in content
     assert "future backend construction artifacts" in content
+    assert "students will use those build artifacts from their own OpenMM" in content
+    assert "not runnable in this lightweight release" in content
+
+
+def test_tutorial_docs_do_not_teach_current_md_outputs_or_openmm_code() -> None:
+    """Keep beginner tutorials aligned with the lightweight build contract."""
+
+    tutorial_paths = [
+        PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst",
+        PROJECT_ROOT / "docs" / "source" / "tutorials" / "yaml-configuration.rst",
+    ]
+    stale_patterns = [
+        r"trajectory\.dcd",
+        r"thermodynamics\.csv",
+        r"plan\.output_paths\.trajectory",
+        r"plan\.output_paths\.thermodynamics",
+    ]
+    executable_openmm_patterns = [
+        r"^\s*(from\s+openmm\b|import\s+openmm\b)",
+        r"\bSimulation\s*\(",
+    ]
+
+    for path in tutorial_paths:
+        content = path.read_text(encoding="utf-8")
+        for pattern in stale_patterns + executable_openmm_patterns:
+            assert re.search(pattern, content, flags=re.MULTILINE) is None
+
+
+def test_canonical_notebook_outputs_match_current_contract() -> None:
+    """Keep notebook cells from showing stale MD outputs or OpenMM scripts."""
+
+    notebook_path = PROJECT_ROOT / "notebooks" / "canonical_workflow.ipynb"
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    sources = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+
+    stale_patterns = [
+        r"trajectory\.dcd",
+        r"thermodynamics\.csv",
+        r"plan\.output_paths\.trajectory",
+        r"plan\.output_paths\.thermodynamics",
+        r"^\s*(from\s+openmm\b|import\s+openmm\b)",
+        r"\bSimulation\s*\(",
+    ]
+    for pattern in stale_patterns:
+        assert re.search(pattern, sources, flags=re.MULTILINE) is None
+
+    for current_output in ["topology.cif", "build_summary.json", "resolved_config.yaml"]:
+        assert current_output in sources
+    for reserved_output in ["positions.cif", "interchange.json", "system.xml"]:
+        assert reserved_output in sources
 
 
 def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:
