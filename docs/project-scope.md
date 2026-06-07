@@ -29,8 +29,8 @@ Recommended v0.1.0 first-release deliverables:
 - A Pd(111) slab builder and propanethiol SAM placement with tunable grafting density.
 - Mixed SAM support through multiple SAM component definitions with fractions or explicit counts.
 - Centered, double-sided Pd(111) slab geometry with SAMs on both faces and solvent on both sides.
-- OpenFF/SMIRNOFF parameterization for organic SAM, solvent, salts, and reactants where supported by OpenFF.
-- CHARMM-INTERFACE-derived Fcc metal Lennard-Jones parameters converted to an OpenFF-compatible offxml resource.
+- Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices without constructing a parameterized backend system.
+- Static CHARMM-INTERFACE-derived Fcc metal Lennard-Jones parameters packaged or identified as OpenFF-compatible OFFXML resource support.
 - Visualization-friendly build artifacts, centered on mmCIF/PDBx topology-inspection output plus machine-readable build summaries.
 - Pytest coverage for configuration validation, parameter conversion, deterministic builders, and import smoke tests.
 - ReadTheDocs/Sphinx scaffold with a canonical workflow tutorial and YAML configuration tutorial.
@@ -43,6 +43,7 @@ Defer until after v0.1.0:
 - General metal facet support beyond the first Pd(111) path.
 - Explicit metal-sulfur bonded topology terms unless needed to correct SAM geometry.
 - SAMMD-owned OpenMM setup, tutorial simulations, DCD trajectory output, and thermodynamic reporting wrappers. Tutorial-only user code may demonstrate OpenMM usage, but those simulations are not part of the SAMMD v0.1.0 build contract.
+- Full OpenFF/SMIRNOFF parameterization for organic SAM, solvent, salts, and reactants, including OpenFF Interchange or OpenMM backend construction/export.
 - Advanced analysis workflows beyond basic orientation observables.
 
 ## Reference Findings

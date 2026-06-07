@@ -141,6 +141,40 @@ def test_project_scope_keeps_simulation_work_out_of_current_scope() -> None:
         assert re.search(pattern, normalized) is not None
 
 
+def test_project_scope_keeps_parameterization_backend_out_of_first_release() -> None:
+    """Prevent stale v0.1.0 claims of full parameterization/backends."""
+
+    page = PROJECT_ROOT / "docs" / "project-scope.md"
+    content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
+
+    first_release_section = re.search(
+        r"Recommended v0\.1\.0 first-release deliverables:(.*?)Defer until after v0\.1\.0:",
+        content,
+        flags=re.DOTALL,
+    )
+    assert first_release_section is not None
+    first_release_deliverables = first_release_section.group(1)
+
+    stale_patterns = [
+        r"OpenFF/SMIRNOFF parameterization",
+        r"full OpenFF",
+        r"backend construction",
+        r"OpenFF Interchange",
+        r"OpenMM backend",
+    ]
+    for pattern in stale_patterns:
+        assert re.search(pattern, first_release_deliverables, flags=re.IGNORECASE) is None
+
+    assert "record the selected OpenFF small-molecule force field" in content
+    assert "without constructing a parameterized backend system" in content
+    assert "OpenFF-compatible OFFXML resource support" in content
+    assert re.search(
+        r"Full OpenFF/SMIRNOFF parameterization[^.]*backend construction/export",
+        normalized,
+    ) is not None
+
+
 def test_build_contract_documents_first_release_boundary() -> None:
     """Lock the docs page that defines current and reserved build outputs."""
 
