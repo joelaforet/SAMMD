@@ -7,7 +7,7 @@ self-assembled monolayers on metal supports. The student-facing workflow uses a
 version-controllable YAML file to describe the system contents, packing, and
 parameterization choices before any OpenMM simulation protocol is written.
 
-SAMMD builds a physically reasonable starting structure with reproducible force-field assignments for running MD simulations. The metal-S interaction is modeled with a tunable, strengthened nonbonded interaction; it is not a quantum or reactive description of chemisorption.
+SAMMD builds a physically reasonable starting-structure plan with reproducible force-field assignments for future MD simulations. The metal-S interaction is modeled with a tunable, strengthened nonbonded interaction; it is not a quantum or reactive description of chemisorption.
 
 The package includes a generated CHARMM-INTERFACE Fcc metal OFFXML resource for
 OpenFF force-field assembly without making OpenFF a test dependency. Solution
@@ -39,13 +39,15 @@ Undefined stereochemistry follows the safer OpenFF default unless explicitly
 allowed. These helpers require the SAMMD science/pixi environment and do not
 perform full system construction.
 
-Optional OpenMM runtime helpers live in `sammd.openmm_runtime`. They lazily
-create Langevin integrators, create/configure a new OpenMM `Simulation` from
-existing topology, system, positions, and reporter settings, and include an
-experimental sulfur-metal LJ scaling helper for explicit pair lists.
+Internal optional OpenMM runtime utilities exist for development and future
+backend integration. They can lazily create Langevin integrators, configure a
+caller-supplied OpenMM simulation context from existing topology, system,
+positions, and reporter settings, and include an experimental sulfur-metal LJ
+scaling helper for explicit pair lists. These helpers are not a current
+student-facing SAMMD simulation wrapper and are not used by the quick start.
 Users must still supply existing OpenMM topology, system, and positions from
 future construction code or their own backend workflow; SAMMD does not yet
-construct complete OpenMM systems.
+construct complete OpenMM systems or write runnable MD outputs.
 
 A development smoke runner is available at `tools/openmm_smoke.py` for testing
 the science environment against a compact real Pd(111)/propanethiol SAM input

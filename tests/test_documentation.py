@@ -12,6 +12,14 @@ from sammd import build_system, load_config
 from sammd.config import CONFIG_TEMPLATE
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+CURRENT_BEGINNER_DOC_PATHS = [
+    PROJECT_ROOT / "README.md",
+    PROJECT_ROOT / "docs" / "source" / "index.rst",
+    PROJECT_ROOT / "docs" / "source" / "explanation" / "scientific-assumptions.rst",
+    PROJECT_ROOT / "docs" / "source" / "reference" / "build-contract.rst",
+    PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst",
+    PROJECT_ROOT / "docs" / "source" / "tutorials" / "yaml-configuration.rst",
+]
 
 
 def test_docs_scaffold_files_exist() -> None:
@@ -96,8 +104,8 @@ def test_readme_includes_approved_scientific_assumptions_wording() -> None:
     page = PROJECT_ROOT / "README.md"
     content = page.read_text(encoding="utf-8")
     approved_wording = (
-        "SAMMD builds a physically reasonable starting structure with reproducible "
-        "force-field assignments for running MD simulations. The metal-S interaction "
+        "SAMMD builds a physically reasonable starting-structure plan with reproducible "
+        "force-field assignments for future MD simulations. The metal-S interaction "
         "is modeled with a tunable, strengthened nonbonded interaction; it is not a "
         "quantum or reactive description of chemisorption."
     )
@@ -557,6 +565,43 @@ def test_tutorial_docs_do_not_teach_current_md_outputs_or_openmm_code() -> None:
         )
         for pattern in blocked_patterns:
             assert re.search(pattern, content, flags=re.MULTILINE) is None
+
+
+def test_current_beginner_docs_do_not_teach_unavailable_md_outputs_or_wrappers() -> None:
+    """Guard current docs without scanning source/tests or future scope prose."""
+
+    blocked_patterns = [
+        r"\btrajectory\.dcd\b",
+        r"\bthermodynamics\.csv\b",
+        r"^\s*(from\s+openmm\b|import\s+openmm\b)",
+        r"\bSimulation\s*\(",
+        r"\bcreate_openmm_simulation\b",
+        r"\bsammd\.openmm_runtime\b",
+        r"\bOpenMMRuntime\b",
+    ]
+    reporter_names = ["DCDReporter", "StateDataReporter"]
+    future_qualifiers = (
+        "future",
+        "planned",
+        "post-v0.1.0",
+        "post-0.1.0",
+        "after system construction artifacts exist",
+        "after full construction",
+        "not current",
+        "not yet",
+    )
+
+    for path in CURRENT_BEGINNER_DOC_PATHS:
+        content = path.read_text(encoding="utf-8")
+        for pattern in blocked_patterns:
+            assert re.search(pattern, content, flags=re.MULTILINE) is None, path
+
+        for paragraph in re.split(r"\n\s*\n", content):
+            normalized_paragraph = " ".join(paragraph.split())
+            lowered = normalized_paragraph.lower()
+            for reporter_name in reporter_names:
+                if reporter_name in normalized_paragraph:
+                    assert any(qualifier in lowered for qualifier in future_qualifiers), path
 
 
 def test_canonical_notebook_outputs_match_current_contract() -> None:
