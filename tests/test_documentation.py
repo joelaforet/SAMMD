@@ -50,13 +50,13 @@ def test_canonical_notebook_has_expected_sections() -> None:
         if cell.get("cell_type") == "markdown"
     )
     expected_headings = [
-        "# SAMMD canonical lightweight workflow",
+        "# Recommended SAMMD workflow",
         "## Create a template configuration",
         "## Validate, load, and build a plan",
-        "## Write current artifacts",
-        "## Inspect current outputs",
-        "## Reserved future backend artifacts",
-        "## Future OpenMM handoff",
+        "## Write default output files",
+        "## Inspect default outputs",
+        "## Optional OpenMM/OpenFF files",
+        "## Use these files with OpenMM",
     ]
     for heading in expected_headings:
         assert heading in headings
@@ -670,7 +670,7 @@ def test_current_beginner_docs_do_not_teach_unavailable_md_outputs_or_wrappers()
 
 
 def test_canonical_notebook_outputs_match_current_contract() -> None:
-    """Keep notebook cells from showing stale MD outputs or OpenMM scripts."""
+    """Keep notebook cells aligned with default and backend export contracts."""
 
     notebook_path = PROJECT_ROOT / "notebooks" / "canonical_workflow.ipynb"
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
@@ -691,20 +691,27 @@ def test_canonical_notebook_outputs_match_current_contract() -> None:
     for pattern in stale_patterns:
         assert re.search(pattern, sources, flags=re.MULTILINE) is None
 
+    assert "RUN_BACKEND_EXPORT = False" in sources
+    assert "--export-backend" in sources
+    assert "pixi run -e science" in sources
     assert "`Interchange.model_validate_json`" in sources
     assert "`interchange.to_openmm()`" in sources
-    assert "raw OpenMM `Simulation`" in sources
-    assert "SAMMD does not provide OpenMM simulation wrappers" in sources
+    assert "Interchange.model_validate_json(interchange_path.read_text" in sources
+    assert "openmm_system = interchange.to_openmm()" in sources
+    assert "run an OpenMM `Simulation`" in sources
+    assert "This notebook does not create or run an OpenMM simulation" in sources
+    assert "does not work with configurations that include salt" in sources
+    assert "By default, this notebook does not write" in sources
 
     for current_output in ["topology.cif", "build_summary.json", "resolved_config.yaml"]:
         assert current_output in sources
-    for reserved_output in [
+    for backend_output in [
         "positions.cif",
         "interchange.json",
         "system.xml",
         "anchor_metadata.json",
     ]:
-        assert reserved_output in sources
+        assert backend_output in sources
 
 
 def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:
