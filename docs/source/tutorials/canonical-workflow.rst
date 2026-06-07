@@ -1,103 +1,79 @@
-Canonical lightweight workflow
-==============================
+Canonical build-to-OpenMM workflow
+==================================
 
-This tutorial mirrors what SAMMD can do today without OpenMM, OpenFF, RDKit, or
-mBuild. It is meant to be runnable by undergraduate users and honest about the
-current MVP boundary.
+This tutorial shows the current student-facing path: SAMMD builds a checked,
+deterministic starting plan, and OpenMM will run the molecular dynamics after
+future backend artifacts exist. SAMMD builds; OpenMM runs.
 
-Install for development
------------------------
+1. Create config
+----------------
 
-From the repository root, install SAMMD in editable mode with the lightweight
-development dependencies:
-
-.. code-block:: bash
-
-   python -m pip install -e ".[dev]"
-
-Create and validate a configuration
------------------------------------
-
-Start from the template YAML and validate it before building a plan:
+From the repository root, create a starter YAML file:
 
 .. code-block:: bash
 
    sammd init -o sammd.yaml
+
+The template follows the defaults summarized in :doc:`yaml-configuration`. It
+describes the surface, SAM, solution composition, and output names used for the
+build step. It does not describe minimization, equilibration, production MD,
+thermostats, barostats, trajectories, or reporters.
+
+2. Validate config
+------------------
+
+Validate the YAML before building anything:
+
+.. code-block:: bash
+
    sammd validate sammd.yaml
 
-The template follows the defaults summarized in :doc:`yaml-configuration`.
+Validation checks that SAMMD can interpret the file and reports configuration
+errors before any output files are written.
 
-Build the first plan from the command line
-------------------------------------------
+3. Build system/plan
+--------------------
 
-For a first run, no Python script is needed. This command validates the YAML,
-builds the current plan, and writes ``outputs/topology.cif``,
-``outputs/build_summary.json``, and ``outputs/resolved_config.yaml``:
+Build the current deterministic system plan:
 
 .. code-block:: bash
 
    sammd build sammd.yaml --output-dir outputs --overwrite
 
-Open ``outputs/topology.cif`` in a molecule viewer such as PyMOL to inspect the
-configured surface and SAM sulfur anchor placeholders at planned sulfur
-positions. This file is the first build artifact to check before moving on to
-backend construction and later OpenMM simulation setup.
-
-Build a deterministic plan from Python
---------------------------------------
-
-Use Python when you want to inspect the plan object or write custom analysis
-scripts. Save this as ``run_plan.py`` in the same directory as ``sammd.yaml``:
-
-.. code-block:: python
-
-   from sammd import build_system, load_config
-
-   config = load_config("sammd.yaml")
-   plan = build_system(config, output_dir="outputs")
-
-   print(plan.slab.metal, plan.slab.facet)
-   print(plan.slab.lateral_size_nm)
-   print(len(plan.binding_sites))
-   print(len(plan.sam_placements.placements))
-   print(plan.solution.molecule_counts)
-   print(plan.output_paths.topology)
-
-The returned object is a lightweight build plan. It contains the validated
-configuration, a commensurate centered registered Fcc(111) slab defaulting to
-Pd(111), internal ``fcc_hollow`` binding sites chosen by SAMMD's thiol-on-metal
-default, deterministic SAM placement choices, approximate solution counts, and
-resolved build output paths.
-
-Write the topology inspection file
-----------------------------------
-
-.. code-block:: python
-
-   path = plan.write_topology_cif(overwrite=True)
-   print(path)
-
-Run it with:
-
-.. code-block:: bash
-
-   python run_plan.py
-
-This writes the configured ``topology.cif`` path for inspection in tools such as
-PyMOL. Use it to check the surface size, exposed faces, and SAM sulfur anchor
-placement before starting simulation-specific OpenMM work. Full SAM molecule
-coordinates remain future backend work.
-
-Build artifacts
----------------
-
-The current lightweight builder writes these artifacts today:
+Today this command writes exactly three build artifacts:
 
 * ``topology.cif`` for topology inspection of the deterministic plan
 * ``build_summary.json`` for the machine-readable build report
-* ``resolved_config.yaml`` for the exact validated input
+* ``resolved_config.yaml`` for the exact validated input used for the build
 
-The configuration also reserves names for future backend construction artifacts:
+The returned build plan contains the validated configuration, a centered
+registered Fcc(111) slab defaulting to Pd(111), internal ``fcc_hollow`` binding
+sites, deterministic SAM sulfur anchor placeholders, approximate solution
+counts, and resolved output paths. Full SAM molecule coordinates and a
+parameterized backend system remain future backend work.
+
+4. Inspect current outputs
+--------------------------
+
+Open ``outputs/topology.cif`` in a molecule viewer such as PyMOL to inspect the
+configured surface and SAM sulfur anchor placeholders at planned sulfur
+positions. Use it to check the surface size, exposed faces, and placement
+pattern before moving on.
+
+Use ``outputs/build_summary.json`` to confirm the same build choices in a
+machine-readable form. Use ``outputs/resolved_config.yaml`` when you need the
+exact validated YAML that produced the plan.
+
+The current release does not write ``positions.cif``, ``interchange.json``,
+``system.xml``, or ``anchor_metadata.json``. Those names may appear in resolved
+paths or planning metadata, but they are reserved target artifacts, not current
+outputs.
+
+5. Reserved future backend artifacts
+------------------------------------
+
+SAMMD reserves these future backend construction artifacts so the student path
+has stable names when full construction is implemented:
 
 * ``interchange.json`` for the primary portable OpenFF Interchange export
 * ``positions.cif`` for fully constructed, human-inspectable/OpenMM-loadable coordinates
@@ -110,28 +86,32 @@ written with ``Interchange.model_dump_json`` and reloaded with
 release, and pre-1.0 Interchange JSON compatibility is not guaranteed across
 OpenFF Interchange versions.
 
-Engine exports are reserved in the build summary only. OpenMM is the student
-teaching path through the OpenMM Python API, with ``system.xml`` planned only as
-a convenience export. GROMACS, LAMMPS, and Amber are future downstream exports
-from Interchange, not beginner workflow commands.
+6. Future OpenMM handoff
+------------------------
 
-The YAML intentionally does not define equilibration, production MD,
-thermostats, barostats, or trajectory writing. Those OpenMM concepts are taught
-and controlled separately from the system-building config.
+After a future SAMMD backend writes ``interchange.json`` and companion
+artifacts, students will hand those build artifacts to their own OpenMM Python
+API script. The intended teaching path is:
 
-Future direct OpenMM step
--------------------------
+* load the portable OpenFF Interchange data from ``interchange.json``
+* export or obtain an OpenMM ``System`` from that Interchange object
+* load positions from ``positions.cif`` for the constructed coordinates
+* optionally use ``system.xml`` only as a convenience OpenMM system export
+* run minimization, equilibration, production, and reporters in OpenMM
 
-After a future SAMMD backend writes the primary ``interchange.json`` export and
-its companion structure/convenience artifacts, students will use those build
-artifacts from their own OpenMM Python API script for minimization,
-equilibration, production, and reporters. That direct OpenMM step is not
-runnable in this lightweight release because ``positions.cif``,
-``interchange.json``, ``system.xml``, and ``anchor_metadata.json`` are reserved
-target artifacts, not current outputs.
+That handoff is not runnable in this lightweight release because
+``positions.cif``, ``interchange.json``, ``system.xml``, and
+``anchor_metadata.json`` are reserved target artifacts, not current outputs. The
+important boundary is unchanged: SAMMD builds; OpenMM runs.
+
+7. Other engines
+----------------
+
+OpenMM is the student teaching path. GROMACS, LAMMPS, and Amber are future
+downstream exports from Interchange, not beginner workflow commands.
 
 Notebook version
 ----------------
 
-The same workflow is available as ``notebooks/canonical_workflow.ipynb`` for
-interactive critique and future expansion.
+The related notebook ``notebooks/canonical_workflow.ipynb`` demonstrates the
+current lightweight build and inspection contract interactively.

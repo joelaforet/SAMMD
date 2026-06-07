@@ -459,15 +459,29 @@ def test_developer_guide_cli_map_includes_build() -> None:
 
 
 def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
-    """Ensure beginner docs do not overstate current topology.cif output."""
+    """Ensure beginner docs separate current outputs from reserved artifacts."""
 
     page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst"
     content = page.read_text(encoding="utf-8")
     normalized = " ".join(content.split())
 
+    expected_sections = [
+        "1. Create config",
+        "2. Validate config",
+        "3. Build system/plan",
+        "4. Inspect current outputs",
+        "5. Reserved future backend artifacts",
+        "6. Future OpenMM handoff",
+        "7. Other engines",
+    ]
+    for section in expected_sections:
+        assert section in content
+    assert "SAMMD builds; OpenMM runs" in content
     assert "``topology.cif`` for a full system" not in content
     assert "topology inspection of the deterministic plan" in content
-    assert "future backend construction artifacts" in content
+    assert "Today this command writes exactly three build artifacts" in content
+    assert "``resolved_config.yaml`` for the exact validated input used for the build" in content
+    assert "reserved target artifacts, not current outputs" in normalized
     assert "``interchange.json`` for the primary portable OpenFF Interchange export" in normalized
     assert (
         "``system.xml`` for an OpenMM convenience export, not the primary portable artifact"
@@ -477,14 +491,29 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
     assert "``Interchange.model_dump_json``" in content
     assert "``Interchange.model_validate_json``" in content
     assert "pre-1.0 Interchange JSON compatibility is not guaranteed" in normalized
-    assert "Engine exports are reserved in the build summary only" in normalized
     assert "OpenMM is the student teaching path" in normalized
-    assert "``system.xml`` planned only as a convenience export" in normalized
+    assert "optionally use ``system.xml`` only as a convenience OpenMM system export" in normalized
     assert "GROMACS, LAMMPS, and Amber are future downstream exports" in normalized
     assert "not beginner workflow commands" in normalized
-    assert "students will use those build artifacts from their own OpenMM" in normalized
-    assert "not runnable in this lightweight release" in normalized
-    assert "reserved target artifacts, not current outputs" in normalized
+    assert "students will hand those build artifacts to their own OpenMM Python API script" in normalized
+    assert "That handoff is not runnable in this lightweight release" in normalized
+
+    current_outputs_section = re.search(
+        r"Today this command writes exactly three build artifacts:(.*?)The returned build plan",
+        content,
+        flags=re.DOTALL,
+    )
+    assert current_outputs_section is not None
+    current_outputs = current_outputs_section.group(1)
+    for current_output in ["topology.cif", "build_summary.json", "resolved_config.yaml"]:
+        assert current_output in current_outputs
+    for reserved_output in [
+        "positions.cif",
+        "interchange.json",
+        "system.xml",
+        "anchor_metadata.json",
+    ]:
+        assert reserved_output not in current_outputs
 
 
 def test_tutorial_docs_do_not_teach_current_md_outputs_or_openmm_code() -> None:
