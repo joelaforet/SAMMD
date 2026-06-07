@@ -1080,13 +1080,10 @@ def build_openmm_smoke_system(
 
 
 def derive_box_dimensions(plan: Any, solvent_padding_nm: float) -> Vector3:
-    """Return periodic box lengths for slab, SAM, and two solvent regions."""
+    """Return periodic box lengths from the SAMMD build box plan."""
 
-    return (
-        plan.slab.lateral_size_nm[0],
-        plan.slab.lateral_size_nm[1],
-        plan.slab.slab_extent_nm[2] + 2.0 * (SAM_TAIL_CLEARANCE_NM + solvent_padding_nm),
-    )
+    _ = solvent_padding_nm
+    return plan.box_plan.dimensions_nm
 
 
 def set_periodic_box(modules: Any, topology: Any, system: Any, dimensions_nm: Vector3) -> None:

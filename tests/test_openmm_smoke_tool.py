@@ -132,6 +132,7 @@ def test_packmol_input_packs_solvent_around_fixed_solute() -> None:
     plan = build_system(config)
     box = smoke.derive_box_dimensions(plan, 3.0)
 
+    assert box == plan.box_plan.dimensions_nm
     text = smoke.build_packmol_input(
         solute_path=Path("fixed_pd_sam.pdb"),
         solvent_path=Path("ethanol.pdb"),

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from sammd.builders import DEFAULT_SOLVENT_PADDING_NM, build_system
+from sammd.builders import DEFAULT_SAM_EXTENDED_LENGTH_NM, DEFAULT_SOLVENT_PADDING_NM, build_system
 from sammd.config import CONFIG_TEMPLATE, SAMMDConfig
 from sammd.solvation import round_half_up
 from sammd.surfaces import plan_pd111_slab
@@ -54,8 +54,8 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
         plan.require_full_construction()
 
 
-def test_planning_box_uses_adjusted_commensurate_lateral_dimensions() -> None:
-    """Base count volume on the effective slab cell rather than requested dimensions."""
+def test_box_plan_uses_adjusted_commensurate_lateral_dimensions() -> None:
+    """Base the unified box on the effective slab cell rather than requested dimensions."""
 
     requested_lateral_size = (5.0, 5.0)
     config = SAMMDConfig(surface={"lateral_size": requested_lateral_size})
@@ -64,25 +64,79 @@ def test_planning_box_uses_adjusted_commensurate_lateral_dimensions() -> None:
     plan = build_system(config)
 
     assert plan.slab.requested_lateral_size_nm == requested_lateral_size
-    assert plan.composition_planning_box.lateral_size_nm == slab.lateral_size_nm
-    assert plan.composition_planning_box.lateral_size_nm != requested_lateral_size
+    assert plan.box_plan.lateral_size_nm == slab.lateral_size_nm
+    assert plan.box_plan.lateral_size_nm != requested_lateral_size
     assert plan.sam_placements.lateral_area_nm2 == pytest.approx(
         slab.lateral_size_nm[0] * slab.lateral_size_nm[1]
     )
 
 
-def test_default_solvation_counts_are_deterministic() -> None:
-    """Convert the default derived planning box into stable molecule counts."""
+def test_default_box_plan_uses_sam_tip_padding_and_centered_slab() -> None:
+    """Compute z bounds from centered slab faces, SAM length, and solvent padding."""
 
     plan = build_system(SAMMDConfig())
-    count_planning_volume_nm3 = plan.composition_planning_box.count_planning_volume_nm3
+    expected_z_min = (
+        plan.slab.bottom_z_nm
+        - DEFAULT_SAM_EXTENDED_LENGTH_NM
+        - DEFAULT_SOLVENT_PADDING_NM
+    )
+    expected_z_max = (
+        plan.slab.top_z_nm + DEFAULT_SAM_EXTENDED_LENGTH_NM + DEFAULT_SOLVENT_PADDING_NM
+    )
+    expected_z = expected_z_max - expected_z_min
+
+    assert plan.box_plan.slab_center_nm == (0.0, 0.0, 0.0)
+    assert plan.box_plan.bounds_nm[2] == pytest.approx((expected_z_min, expected_z_max))
+    assert plan.box_plan.dimensions_nm == pytest.approx(
+        (plan.slab.lateral_size_nm[0], plan.slab.lateral_size_nm[1], expected_z)
+    )
+    assert plan.box_plan.sam_extended_length_nm == DEFAULT_SAM_EXTENDED_LENGTH_NM
+    assert plan.box_plan.sam_length_estimates[0].source == "minimum_default"
+
+
+def test_default_solvation_counts_are_deterministic() -> None:
+    """Convert the default unified box volume into stable molecule counts."""
+
+    plan = build_system(SAMMDConfig())
+    count_planning_volume_nm3 = plan.box_plan.volume_nm3
     expected_ethanol = round_half_up(
         0.789 * count_planning_volume_nm3 * 1.0e-24 * 1000.0 / 46.06844 * 6.02214076e23
     )
 
-    assert plan.composition_planning_box.solvent_padding_nm == DEFAULT_SOLVENT_PADDING_NM
+    assert plan.box_plan.solvent_padding_nm == DEFAULT_SOLVENT_PADDING_NM
+    assert plan.solution.box_volume_nm3 == pytest.approx(plan.box_plan.volume_nm3)
     assert plan.solution.solvent_components[0].count == expected_ethanol
     assert plan.solution.reactants[0].count == 1
+
+
+def test_configured_sam_length_override_changes_box_and_solution_counts() -> None:
+    """Use optional configured SAM length before the dependency-free heuristic."""
+
+    default_plan = build_system(SAMMDConfig())
+    longer_plan = build_system(
+        SAMMDConfig(
+            sam={
+                "components": [
+                    {
+                        "name": "propanethiol",
+                        "residue_name": "PTL",
+                        "smiles": "CCCS",
+                        "fraction": 1.0,
+                        "extended_length_nm": 1.75,
+                    }
+                ]
+            }
+        )
+    )
+
+    assert longer_plan.box_plan.sam_extended_length_nm == 1.75
+    assert longer_plan.box_plan.sam_length_estimates[0].source == "configured"
+    assert longer_plan.box_plan.dimensions_nm[2] > default_plan.box_plan.dimensions_nm[2]
+    assert longer_plan.solution.box_volume_nm3 == pytest.approx(longer_plan.box_plan.volume_nm3)
+    assert (
+        longer_plan.solution.solvent_components[0].count
+        > default_plan.solution.solvent_components[0].count
+    )
 
 
 def test_build_plan_writes_topology_cif_and_refuses_overwrite(tmp_path) -> None:
@@ -101,12 +155,18 @@ def test_build_plan_writes_topology_cif_and_refuses_overwrite(tmp_path) -> None:
     assert resolved_config_path == tmp_path / "resolved_config.yaml"
     assert text.startswith("data_sammd_topology")
     assert "_cell.length_a" in text
+    assert f"_cell.length_c {plan.box_plan.dimensions_nm[2] * 10.0:.6f}" in text
     assert "_atom_site.Cartn_x" in text
     assert text.count("HETATM") == len(plan.slab.positions_nm) + len(
         plan.sam_placements.placements
     )
     assert " PTL " in text
     assert summary["experiment"]["name"] == "propanethiol_cinnamaldehyde_pd111"
+    assert summary["box"]["volume_nm3"] == pytest.approx(plan.box_plan.volume_nm3)
+    assert summary["box"]["slab_center_nm"] == [0.0, 0.0, 0.0]
+    assert summary["solution"]["count_planning_volume_nm3"] == pytest.approx(
+        plan.box_plan.volume_nm3
+    )
     assert summary["solution"]["molecule_counts"]["cinnamaldehyde"] == 1
     with pytest.raises(FileExistsError, match="refusing to overwrite"):
         plan.write_topology_cif()

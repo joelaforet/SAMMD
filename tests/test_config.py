@@ -40,6 +40,7 @@ def test_resolved_defaults_match_approved_student_schema() -> None:
     assert config.surface.lateral_size == (2.0, 2.0)
     assert config.sam.grafting_density == 0.25
     assert config.sam.components[0].residue_name == "PTL"
+    assert config.sam.components[0].extended_length_nm is None
     assert config.reactants[0].residue_name == "CIN"
     assert config.reactants[0].count == 1
     assert config.reactants[0].concentration is None
@@ -80,6 +81,19 @@ def test_yaml_template_describes_current_build_contract() -> None:
     assert "system.xml" in CONFIG_TEMPLATE
 
 
+def test_sam_extended_length_override_is_optional_and_positive() -> None:
+    """Allow advanced users to override approximate SAM length for box planning."""
+
+    data = _template_data()
+    data["sam"]["components"][0]["extended_length_nm"] = 1.25
+
+    assert load_config_dict(data).sam.components[0].extended_length_nm == 1.25
+
+    data["sam"]["components"][0]["extended_length_nm"] = 0.0
+    with pytest.raises(ValidationError, match="greater than 0"):
+        load_config_dict(data)
+
+
 def test_yaml_template_describes_neutral_thiols_and_internal_nonbonded_attachment() -> None:
     """Keep beginner SAM wording aligned with the current validation contract."""
 
@@ -91,6 +105,11 @@ def test_yaml_template_describes_neutral_thiols_and_internal_nonbonded_attachmen
     assert "nonbonded interaction" in normalized
     assert "not as covalent, quantum, or reactive chemistry" in normalized
     assert "not exposed as a beginner YAML knob yet" in normalized
+    assert "optional advanced override" in normalized
+    assert "fully extended SAM" in normalized
+    assert "length from sulfur anchor to tail tip" in normalized
+    assert "distance from fully extended SAM tips" in normalized
+    assert "box boundary" in normalized
 
 
 def test_beginner_template_defers_sam_attachment_knobs() -> None:

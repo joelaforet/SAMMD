@@ -275,7 +275,7 @@ The Pd slab should be restrained by default. We are not simulating SAM assembly 
 
 The slab must be thick enough that the two decorated interfaces do not see each other through the nonbonded cutoff. With a typical 0.9-1.2 nm cutoff and Pd(111) layer spacing of roughly `a / sqrt(3)`, a safe starting point is 8-10 Pd(111) layers. This should be configurable, validated against the chosen cutoff, and documented with a warning if the requested slab is too thin.
 
-For the first notebook/demo, a practical starting system is roughly 5 x 5 nm in the lateral plane, 8 Pd layers, SAMs on both faces, and at least 3 nm solvent padding on each side before PBC wrapping. This is large enough for a full SAM coating and multiple cinnamaldehyde reactants (`C1=CC=C(C=C1)/C=C/C=O`) while still being plausible for prototype runs.
+For the first notebook/demo, a practical starting system is roughly 5 x 5 nm in the lateral plane, 8 Pd layers, SAMs on both faces, and at least 3 nm solvent padding from the fully extended SAM tips to the box boundary on each side before PBC wrapping. This is large enough for a full SAM coating and multiple cinnamaldehyde reactants (`C1=CC=C(C=C1)/C=C/C=O`) while still being plausible for prototype runs.
 
 Default metal-sulfur anchoring should begin as an internal nonbonded proxy:
 

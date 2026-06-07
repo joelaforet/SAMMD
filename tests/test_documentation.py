@@ -295,8 +295,10 @@ def test_yaml_configuration_docs_clarify_beginner_schema_boundary() -> None:
     assert "strengthened nonbonded interaction" in normalized
     assert "not as covalent, quantum," in normalized
     assert "not yet a student-facing YAML knob" in normalized
-    assert "requested z-padding/count-planning value" in normalized
-    assert "Final box construction details are owned by later build stages" in normalized
+    assert "optional ``extended_length_nm``" in normalized
+    assert "fully extended SAM length used for box planning" in normalized
+    assert "requested z distance from fully extended SAM tips to the box boundary" in normalized
+    assert "same planned box volume is used for solvent, reactant, and salt counts" in normalized
 
 
 def test_developer_guide_cli_map_includes_build() -> None:

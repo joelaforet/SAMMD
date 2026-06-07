@@ -63,6 +63,7 @@ class SAMComponentConfig(SAMMDBaseModel):
     smiles: str = Field(min_length=1)
     fraction: float | None = Field(default=None, gt=0, le=1)
     count: int | None = Field(default=None, gt=0)
+    extended_length_nm: float | None = Field(default=None, gt=0)
 
     @field_validator("residue_name")
     @classmethod
@@ -424,6 +425,10 @@ surface:
 #
 # For mixed SAMs, list multiple components and make fractions sum to 1.0.
 #
+# extended_length_nm is an optional advanced override for the fully extended SAM
+# length from sulfur anchor to tail tip. If omitted, SAMMD uses a lightweight,
+# conservative SMILES heuristic with a 0.95 nm minimum default.
+#
 sam:
   grafting_density: 0.25  # nm^2 / molecule
 
@@ -486,13 +491,13 @@ reactants:
 # ============================================================================
 # Solvent is packed above and around the slab/SAM/reactant system.
 #
-# padding is a requested z-padding/count-planning knob for solvent above the
-# slab. Final box construction details are owned by later build stages.
+# padding is the requested z distance from fully extended SAM tips to the box
+# boundary. The same planned box volume is used for solvent/reactant/salt counts.
 #
 # residue_name must be a 3-character PDB residue code.
 #
 solvent:
-  padding: 3.0  # nm, requested z-padding/count-planning value
+  padding: 3.0  # nm, distance from fully extended SAM tips to box boundary
 
   components:
     - name: ethanol
@@ -505,7 +510,7 @@ solvent:
 # Example water solvent:
 #
 # solvent:
-#   padding: 3.0  # nm, requested z-padding/count-planning value
+#   padding: 3.0  # nm, distance from fully extended SAM tips to box boundary
 #   components:
 #     - name: water
 #       residue_name: HOH

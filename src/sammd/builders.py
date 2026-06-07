@@ -23,24 +23,36 @@ from sammd.solvation import SolutionPlan, plan_solution_composition
 from sammd.surfaces import BindingSite, SurfaceSlab, generate_binding_sites, plan_pd111_slab
 
 DEFAULT_SOLVENT_PADDING_NM = 3.0
+DEFAULT_SAM_EXTENDED_LENGTH_NM = 0.95
 SLAB_CUTOFF_BUFFER_NM = 0.5
 OPENMM_CONSTRUCTION_IMPLEMENTED = False
 
 
 @dataclass(frozen=True)
-class CompositionPlanningBox:
-    """Approximate MVP volume used only for solution composition counts.
+class SAMLengthEstimate:
+    """Approximate fully extended SAM length used for deterministic box planning."""
 
-    These dimensions are not final simulation cell vectors. The volume includes the
-    commensurate slab thickness plus solvent padding and intentionally omits SAM and
-    packed molecule extents until full backend construction is implemented.
-    """
+    component_name: str
+    residue_name: str
+    smiles: str
+    configured_length_nm: float | None
+    heuristic_length_nm: float
+    length_nm: float
+    source: str
+
+
+@dataclass(frozen=True)
+class BoxPlan:
+    """Unified orthorhombic build box for counts and topology metadata."""
 
     lateral_size_nm: tuple[float, float]
-    slab_thickness_nm: float
+    dimensions_nm: tuple[float, float, float]
+    bounds_nm: tuple[tuple[float, float], tuple[float, float], tuple[float, float]]
+    volume_nm3: float
     solvent_padding_nm: float
-    approximate_dimensions_nm: tuple[float, float, float]
-    count_planning_volume_nm3: float
+    sam_extended_length_nm: float
+    slab_center_nm: tuple[float, float, float]
+    sam_length_estimates: tuple[SAMLengthEstimate, ...]
 
 
 @dataclass(frozen=True)
@@ -53,7 +65,7 @@ class SAMMDBuildPlan:
     sam_placements: SAMPlacementPlan
     solution: SolutionPlan
     output_paths: OutputPaths
-    composition_planning_box: CompositionPlanningBox
+    box_plan: BoxPlan
     openmm_construction_implemented: bool = OPENMM_CONSTRUCTION_IMPLEMENTED
 
     @property
@@ -100,7 +112,7 @@ class SAMMDBuildPlan:
             destination,
             _topology_atom_records(self),
             data_name="sammd_topology",
-            cell_lengths_nm=self.composition_planning_box.approximate_dimensions_nm,
+            cell_lengths_nm=self.box_plan.dimensions_nm,
             overwrite=overwrite,
         )
 
@@ -123,6 +135,27 @@ class SAMMDBuildPlan:
                 "molecules_per_side": self.sam_placements.selected_sites_per_side,
                 "components": [
                     component.model_dump(mode="json") for component in self.config.sam.components
+                ],
+            },
+            "box": {
+                "lateral_size_nm": list(self.box_plan.lateral_size_nm),
+                "dimensions_nm": list(self.box_plan.dimensions_nm),
+                "bounds_nm": [list(bounds) for bounds in self.box_plan.bounds_nm],
+                "volume_nm3": self.box_plan.volume_nm3,
+                "solvent_padding_nm": self.box_plan.solvent_padding_nm,
+                "sam_extended_length_nm": self.box_plan.sam_extended_length_nm,
+                "slab_center_nm": list(self.box_plan.slab_center_nm),
+                "sam_length_estimates": [
+                    {
+                        "component_name": estimate.component_name,
+                        "residue_name": estimate.residue_name,
+                        "smiles": estimate.smiles,
+                        "configured_length_nm": estimate.configured_length_nm,
+                        "heuristic_length_nm": estimate.heuristic_length_nm,
+                        "length_nm": estimate.length_nm,
+                        "source": estimate.source,
+                    }
+                    for estimate in self.box_plan.sam_length_estimates
                 ],
             },
             "solution": {
@@ -210,16 +243,14 @@ def build_system(
         slab_layers,
     )
     binding_sites = generate_binding_sites(slab)
-    composition_planning_box = _derive_composition_planning_box(loaded_config, slab)
+    box_plan = _derive_box_plan(loaded_config, slab)
     sam_placements = plan_sam_placements(
         loaded_config.sam,
         binding_sites,
-        composition_planning_box.lateral_size_nm[0] * composition_planning_box.lateral_size_nm[1],
+        box_plan.lateral_size_nm[0] * box_plan.lateral_size_nm[1],
         seed=active_seed,
     )
-    solution = plan_solution_composition(
-        loaded_config, composition_planning_box.count_planning_volume_nm3
-    )
+    solution = plan_solution_composition(loaded_config, box_plan.volume_nm3)
     output_paths = plan_output_paths(
         loaded_config,
         loaded_config.outputs.directory if output_dir is None else output_dir,
@@ -232,7 +263,7 @@ def build_system(
         sam_placements=sam_placements,
         solution=solution,
         output_paths=output_paths,
-        composition_planning_box=composition_planning_box,
+        box_plan=box_plan,
     )
 
 
@@ -284,25 +315,86 @@ def _auto_slab_layers(config: SAMMDConfig) -> int:
     return layers
 
 
-def _derive_composition_planning_box(
-    config: SAMMDConfig, slab: SurfaceSlab
-) -> CompositionPlanningBox:
-    """Derive approximate dimensions used only for solution count planning."""
+def _derive_box_plan(config: SAMMDConfig, slab: SurfaceSlab) -> BoxPlan:
+    """Derive the single deterministic box used for counts and metadata."""
 
     padding_nm = getattr(config.solvent, "padding", DEFAULT_SOLVENT_PADDING_NM)
-    box_z_nm = slab.slab_extent_nm[2] + 2.0 * padding_nm
-    approximate_dimensions_nm = (
-        slab.lateral_size_nm[0],
-        slab.lateral_size_nm[1],
-        box_z_nm,
+    sam_length_estimates = tuple(
+        _estimate_sam_length(component) for component in config.sam.components
     )
-    count_planning_volume_nm3 = (
-        approximate_dimensions_nm[0] * approximate_dimensions_nm[1] * approximate_dimensions_nm[2]
+    sam_extended_length_nm = max(estimate.length_nm for estimate in sam_length_estimates)
+    z_min = slab.bottom_z_nm - sam_extended_length_nm - padding_nm
+    z_max = slab.top_z_nm + sam_extended_length_nm + padding_nm
+    box_z_nm = z_max - z_min
+    dimensions_nm = (slab.lateral_size_nm[0], slab.lateral_size_nm[1], box_z_nm)
+    bounds_nm = (
+        (-dimensions_nm[0] / 2.0, dimensions_nm[0] / 2.0),
+        (-dimensions_nm[1] / 2.0, dimensions_nm[1] / 2.0),
+        (z_min, z_max),
     )
-    return CompositionPlanningBox(
+    volume_nm3 = dimensions_nm[0] * dimensions_nm[1] * dimensions_nm[2]
+    return BoxPlan(
         lateral_size_nm=slab.lateral_size_nm,
-        slab_thickness_nm=slab.slab_extent_nm[2],
+        dimensions_nm=dimensions_nm,
+        bounds_nm=bounds_nm,
+        volume_nm3=volume_nm3,
         solvent_padding_nm=padding_nm,
-        approximate_dimensions_nm=approximate_dimensions_nm,
-        count_planning_volume_nm3=count_planning_volume_nm3,
+        sam_extended_length_nm=sam_extended_length_nm,
+        slab_center_nm=(0.0, 0.0, 0.0),
+        sam_length_estimates=sam_length_estimates,
     )
+
+
+def _estimate_sam_length(component: Any) -> SAMLengthEstimate:
+    """Estimate fully extended SAM length without chemistry toolkit dependencies."""
+
+    heuristic_length_nm = _estimate_smiles_extended_length_nm(component.smiles)
+    configured_length_nm = component.extended_length_nm
+    if configured_length_nm is not None:
+        length_nm = configured_length_nm
+        source = "configured"
+    elif heuristic_length_nm > DEFAULT_SAM_EXTENDED_LENGTH_NM:
+        length_nm = heuristic_length_nm
+        source = "smiles_heuristic"
+    else:
+        length_nm = DEFAULT_SAM_EXTENDED_LENGTH_NM
+        source = "minimum_default"
+    return SAMLengthEstimate(
+        component_name=component.name,
+        residue_name=component.residue_name,
+        smiles=component.smiles,
+        configured_length_nm=configured_length_nm,
+        heuristic_length_nm=heuristic_length_nm,
+        length_nm=length_nm,
+        source=source,
+    )
+
+
+def _estimate_smiles_extended_length_nm(smiles: str) -> float:
+    """Return a conservative heavy-atom path estimate from a simple SMILES scan."""
+
+    heavy_atoms = 0
+    index = 0
+    organic_subset = {"B", "C", "N", "O", "P", "S", "F", "I"}
+    aromatic_subset = {"b", "c", "n", "o", "p", "s"}
+    while index < len(smiles):
+        char = smiles[index]
+        if char == "[":
+            end = smiles.find("]", index + 1)
+            token = smiles[index + 1 : end if end != -1 else len(smiles)]
+            if token and not token.startswith("H"):
+                heavy_atoms += 1
+            index = len(smiles) if end == -1 else end + 1
+            continue
+        if char in organic_subset or char in aromatic_subset:
+            if index + 1 < len(smiles) and smiles[index : index + 2] in {"Cl", "Br"}:
+                index += 2
+            else:
+                index += 1
+            heavy_atoms += 1
+            continue
+        index += 1
+    if heavy_atoms <= 1:
+        return 0.0
+    # Approximate an all-trans heavy-atom chain; branching/rings make this conservative.
+    return 0.15 + 0.154 * (heavy_atoms - 1)
