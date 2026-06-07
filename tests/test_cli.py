@@ -44,6 +44,14 @@ def test_validate_cli_accepts_template() -> None:
         assert "Configuration valid" in result.output
 
 
+def test_cli_contract_exposes_only_config_builder_commands() -> None:
+    """Keep simulation wrappers out of the first-release CLI surface."""
+
+    assert set(main.commands) == {"build", "init", "validate"}
+    for command_name in ("simulate", "equilibrate", "production", "run"):
+        assert command_name not in main.commands
+
+
 def test_build_cli_writes_topology_and_summary() -> None:
     """Build a lightweight plan from the CLI without requiring user Python code."""
 
@@ -64,6 +72,9 @@ def test_build_cli_writes_topology_and_summary() -> None:
         assert Path("outputs/topology.cif").is_file()
         assert Path("outputs/build_summary.json").is_file()
         assert Path("outputs/resolved_config.yaml").is_file()
+        assert not Path("outputs/positions.cif").exists()
+        assert not Path("outputs/interchange.json").exists()
+        assert not Path("outputs/system.xml").exists()
 
 
 def test_build_cli_respects_no_overwrite_unless_requested() -> None:

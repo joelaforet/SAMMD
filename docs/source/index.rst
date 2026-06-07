@@ -26,6 +26,7 @@ student-written OpenMM simulation scripts.
    :caption: Reference
 
    reference/api
+   reference/build-contract
 
 .. toctree::
    :maxdepth: 2

@@ -22,6 +22,7 @@ def test_docs_scaffold_files_exist() -> None:
         "docs/requirements.txt",
         "docs/source/conf.py",
         "docs/source/index.rst",
+        "docs/source/reference/build-contract.rst",
         "docs/source/tutorials/canonical-workflow.rst",
         "docs/source/tutorials/yaml-configuration.rst",
         "docs/source/contributor/developer-guide.rst",
@@ -76,6 +77,25 @@ def test_project_scope_page_uses_published_safe_link() -> None:
     content = page.read_text(encoding="utf-8")
     assert "../../project-scope.md" not in content
     assert "https://github.com/joelaforet/SAMMD/blob/main/docs/project-scope.md" in content
+
+
+def test_build_contract_documents_first_release_boundary() -> None:
+    """Lock the docs page that defines current and reserved build outputs."""
+
+    page = PROJECT_ROOT / "docs" / "source" / "reference" / "build-contract.rst"
+    content = page.read_text(encoding="utf-8")
+
+    assert "sammd init" in content
+    assert "sammd validate CONFIG" in content
+    assert "sammd build CONFIG --output-dir DIR --overwrite" in content
+    assert "topology.cif" in content
+    assert "positions.cif" in content
+    assert "interchange.json" in content
+    assert "system.xml" in content
+    assert "Full OpenFF/OpenMM construction" in content
+    assert "does not own" in content.lower()
+    assert "equilibration" in content.lower()
+    assert "production simulation" in content.lower()
 
 
 def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:

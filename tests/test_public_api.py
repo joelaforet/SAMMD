@@ -23,6 +23,28 @@ def test_public_imports() -> None:
     assert "plan_sam_placements" not in sammd.__all__
 
 
+def test_public_api_contract_excludes_simulation_wrappers() -> None:
+    """First-release SAMMD API stops at config loading and build planning."""
+
+    import sammd
+
+    assert set(sammd.__all__) == {
+        "SAMMDConfig",
+        "__version__",
+        "build_system",
+        "load_config",
+        "load_config_dict",
+    }
+    for public_name in (
+        "equilibrate",
+        "minimize",
+        "production",
+        "run_md",
+        "simulate",
+    ):
+        assert not hasattr(sammd, public_name)
+
+
 def test_build_system_returns_lightweight_plan() -> None:
     """Keep docs workflow importable while backend construction is deferred."""
 
