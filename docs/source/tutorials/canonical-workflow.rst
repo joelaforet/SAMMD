@@ -88,14 +88,17 @@ before starting simulation-specific OpenMM work.
 Build artifacts
 ---------------
 
-The configuration resolves names for system-building artifacts:
+The current lightweight builder writes these artifacts today:
 
-* ``topology.cif`` for a full system topology and starting coordinates
-* ``positions.cif`` for build-time coordinates
+* ``topology.cif`` for topology inspection of the deterministic plan
+* ``build_summary.json`` for the machine-readable build report
+* ``resolved_config.yaml`` for the exact validated input
+
+The configuration also reserves names for future backend construction artifacts:
+
+* ``positions.cif`` for fully constructed build-time coordinates
 * ``interchange.json`` for OpenFF Interchange export
 * ``system.xml`` for an OpenMM system
-* ``build_summary.json`` for the machine-readable build report written today
-* ``resolved_config.yaml`` for the exact validated input written today
 
 The YAML intentionally does not define equilibration, production MD,
 thermostats, barostats, or trajectory writing. Those OpenMM concepts are taught

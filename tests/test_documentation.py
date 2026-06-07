@@ -96,6 +96,19 @@ def test_build_contract_documents_first_release_boundary() -> None:
     assert "does not own" in content.lower()
     assert "equilibration" in content.lower()
     assert "production simulation" in content.lower()
+    assert "* - ``SAMMDBuildPlan``" not in content
+    assert "not a top-level public import" in " ".join(content.split())
+
+
+def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
+    """Ensure beginner docs do not overstate current topology.cif output."""
+
+    page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst"
+    content = page.read_text(encoding="utf-8")
+
+    assert "``topology.cif`` for a full system" not in content
+    assert "topology inspection of the deterministic plan" in content
+    assert "future backend construction artifacts" in content
 
 
 def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:

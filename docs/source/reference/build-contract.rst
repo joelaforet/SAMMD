@@ -47,15 +47,14 @@ The supported first-release Python surface is:
    * - ``build_system(config, output_dir=None, seed=None)``
      - Return a lightweight ``SAMMDBuildPlan`` from a ``SAMMDConfig``, YAML path,
        or parsed mapping.
-   * - ``SAMMDBuildPlan``
-     - Expose deterministic slab, SAM placement, solution composition, output
-       paths, ``build_summary()``, and artifact writers for the current plan.
 
-``SAMMDBuildPlan`` is the returned build result for the first release. It is not
-an OpenMM ``System``, an OpenFF ``Interchange``, or a simulation wrapper. Code
-that needs full backend construction should treat
-``full_construction_available`` as false until the OpenFF/OpenMM construction
-backend lands.
+The object returned by ``build_system`` is documented as ``SAMMDBuildPlan``. It
+exposes deterministic slab, SAM placement, solution composition, output paths,
+``build_summary()``, and artifact writers for the current plan, but it is not a
+top-level public import in ``sammd.__all__``. ``SAMMDBuildPlan`` is not an OpenMM
+``System``, an OpenFF ``Interchange``, or a simulation wrapper. Code that needs
+full backend construction should treat ``full_construction_available`` as false
+until the OpenFF/OpenMM construction backend lands.
 
 Artifact contract
 -----------------
