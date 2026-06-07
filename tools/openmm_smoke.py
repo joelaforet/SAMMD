@@ -42,6 +42,8 @@ DEFAULT_MINIMIZE_ITERATIONS = 0
 DEFAULT_TRAJECTORY_FRAMES = 300
 DEFAULT_TIMESTEP_FS = 2.0
 DEFAULT_FRICTION_PER_PS = 1.0
+DEFAULT_TEMPERATURE_K = 300.0
+DEFAULT_PRESSURE_BAR = 1.0
 DEFAULT_SULFUR_HEIGHT_NM = 0.18
 DEFAULT_PD_S_SIGMA_ANGSTROM = METAL_SULFUR_SIGMA_NM * 10.0
 REFERENCE_PD_S_EPSILON_KCAL_MOL = 1.0
@@ -336,8 +338,8 @@ def main(argv: list[str] | None = None) -> int:
         sulfur_height_nm=args.sulfur_height_nm,
         solvent_padding_nm=args.solvent_padding_nm,
         packmol_working_dir=paths.packmol_dir,
-        pressure_bar=config.simulation.pressure_bar,
-        temperature_k=config.simulation.temperature_k,
+        pressure_bar=smoke_pressure_bar(config),
+        temperature_k=smoke_temperature_k(config),
         pd_s_sigma_nm=args.pd_s_sigma_angstrom * 0.1,
         pd_s_epsilon_kcal_mol=args.pd_s_epsilon_kcal_mol,
     )
@@ -367,7 +369,7 @@ def main(argv: list[str] | None = None) -> int:
         modules,
         smoke_build,
         platform_name=args.platform,
-        temperature_k=config.simulation.temperature_k,
+        temperature_k=smoke_temperature_k(config),
         timestep_fs=args.timestep_fs,
         friction_per_ps=args.friction_per_ps,
     )
@@ -402,7 +404,7 @@ def main(argv: list[str] | None = None) -> int:
     minimized_positions = simulation.context.getState(getPositions=True).getPositions()
     write_pdbx(paths.minimized_positions, modules.app, smoke_build.topology, minimized_positions)
 
-    simulation.context.setVelocitiesToTemperature(config.simulation.temperature_k, args.seed)
+    simulation.context.setVelocitiesToTemperature(smoke_temperature_k(config), args.seed)
     if schedule.total_steps > 0:
         simulation.step(schedule.total_steps)
     final = read_energy(modules, simulation, include_kinetic=True)
@@ -634,6 +636,20 @@ def load_smoke_config(args: argparse.Namespace) -> SAMMDConfig:
             },
         }
     )
+
+
+def smoke_temperature_k(config: SAMMDConfig) -> float:
+    """Return smoke-run temperature, supporting current configs without simulation blocks."""
+
+    simulation = getattr(config, "simulation", None)
+    return getattr(simulation, "temperature_k", DEFAULT_TEMPERATURE_K)
+
+
+def smoke_pressure_bar(config: SAMMDConfig) -> float:
+    """Return smoke-run pressure, supporting current configs without simulation blocks."""
+
+    simulation = getattr(config, "simulation", None)
+    return getattr(simulation, "pressure_bar", DEFAULT_PRESSURE_BAR)
 
 
 def resolve_solvent_count(solvent_count: str, plan: Any, solvent_name: str) -> int:

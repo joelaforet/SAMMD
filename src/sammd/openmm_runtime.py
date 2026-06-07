@@ -44,6 +44,16 @@ class AnchorScalingMetadata:
     epsilon_delta_kj_mol: tuple[float, ...] = ()
 
 
+@dataclass(frozen=True)
+class PairOverrideMetadata:
+    """Summary of selected pair-specific OpenMM nonbonded overrides."""
+
+    pairs_requested: int
+    pairs_added: int
+    sigma_nm: tuple[float, ...]
+    epsilon_kj_mol: tuple[float, ...]
+
+
 def require_openmm() -> OpenMMModules:
     """Import OpenMM lazily and raise a clear setup error when unavailable.
 
@@ -286,6 +296,50 @@ def add_sulfur_metal_lj_scaling(
         force_index=force_index,
         sigma_nm=tuple(sigma_values),
         epsilon_delta_kj_mol=tuple(epsilon_delta_values),
+    )
+
+
+def add_sulfur_metal_lj_exceptions(
+    system: Any,
+    pairs: list[tuple[int, int]] | tuple[tuple[int, int], ...],
+    *,
+    sigma_nm: float,
+    epsilon_kj_mol: float,
+    unit_module: Any | None = None,
+) -> PairOverrideMetadata:
+    """Replace selected sulfur-metal nonbonded pairs with explicit LJ exceptions.
+
+    This matches the direct OpenMM smoke workflow semantics. It is deliberately
+    OpenMM-specific and should be recorded as post-Interchange export metadata.
+    """
+
+    _validate_positive_finite(sigma_nm, "sigma_nm")
+    _validate_positive_finite(epsilon_kj_mol, "epsilon_kj_mol")
+    validated_pairs = _validate_pairs(system, pairs)
+    nonbonded_force = _find_nonbonded_force(system)
+    if nonbonded_force is None:
+        msg = "system must contain an OpenMM NonbondedForce for sulfur-metal LJ exceptions"
+        raise ValueError(msg)
+    unit = unit_module if unit_module is not None else require_openmm().unit
+
+    sigmas: list[float] = []
+    epsilons: list[float] = []
+    for sulfur_index, metal_index in validated_pairs:
+        nonbonded_force.addException(
+            sulfur_index,
+            metal_index,
+            0.0 * unit.elementary_charge**2,
+            sigma_nm * unit.nanometer,
+            epsilon_kj_mol * unit.kilojoule_per_mole,
+            replace=True,
+        )
+        sigmas.append(sigma_nm)
+        epsilons.append(epsilon_kj_mol)
+    return PairOverrideMetadata(
+        pairs_requested=len(validated_pairs),
+        pairs_added=len(validated_pairs),
+        sigma_nm=tuple(sigmas),
+        epsilon_kj_mol=tuple(epsilons),
     )
 
 

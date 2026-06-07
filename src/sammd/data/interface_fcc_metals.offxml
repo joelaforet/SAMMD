@@ -5,7 +5,7 @@
   <!-- Nonbonded settings are SAMMD SMIRNOFF export defaults for OpenFF compatibility. -->
   <Author>SAMMD contributors</Author>
   <Date>2026-06-03</Date>
-  <vdW version="0.4" potential="Lennard-Jones-12-6" combining_rules="Lorentz-Berthelot" scale12="0.0" scale13="0.0" scale14="0.5" scale15="1.0" cutoff="9.0 * angstrom" switch_width="1.0 * angstrom" method="cutoff">
+  <vdW version="0.4" potential="Lennard-Jones-12-6" combining_rules="Lorentz-Berthelot" scale12="0.0" scale13="0.0" scale14="0.5" scale15="1.0" cutoff="9.0 * angstrom" switch_width="1.0 * angstrom" periodic_method="cutoff" nonperiodic_method="no-cutoff">
     <Atom smirks="[#47:1]" id="Ag" epsilon="4.56 * kilocalorie_per_mole" rmin_half="1.4775 * angstrom"/>
     <Atom smirks="[#13:1]" id="Al" epsilon="4.02 * kilocalorie_per_mole" rmin_half="1.4625 * angstrom"/>
     <Atom smirks="[#79:1]" id="Au" epsilon="5.29 * kilocalorie_per_mole" rmin_half="1.4755 * angstrom"/>

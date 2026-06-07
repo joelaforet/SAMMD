@@ -55,7 +55,8 @@ class SmirnoffVdwExportSettings:
     scale15: str = "1.0"
     cutoff: str = "9.0 * angstrom"
     switch_width: str = "1.0 * angstrom"
-    method: str = "cutoff"
+    periodic_method: str = "cutoff"
+    nonperiodic_method: str = "no-cutoff"
 
 
 SMIRNOFF_VDW_EXPORT_SETTINGS = SmirnoffVdwExportSettings()
@@ -147,7 +148,9 @@ def generate_interface_metal_offxml() -> str:
         f'combining_rules="Lorentz-Berthelot" scale12="{settings.scale12}" '
         f'scale13="{settings.scale13}" scale14="{settings.scale14}" '
         f'scale15="{settings.scale15}" cutoff="{settings.cutoff}" '
-        f'switch_width="{settings.switch_width}" method="{settings.method}">',
+        f'switch_width="{settings.switch_width}" '
+        f'periodic_method="{settings.periodic_method}" '
+        f'nonperiodic_method="{settings.nonperiodic_method}">',
     ]
     for symbol in sorted(FCC_METAL_LJ_REGISTRY):
         parameters = FCC_METAL_LJ_REGISTRY[symbol]

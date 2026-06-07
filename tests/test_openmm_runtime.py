@@ -10,6 +10,7 @@ from sammd.config import ReporterConfig
 from sammd.io import OutputPaths
 from sammd.openmm_runtime import (
     add_position_restraints,
+    add_sulfur_metal_lj_exceptions,
     add_sulfur_metal_lj_scaling,
     create_langevin_integrator,
     create_openmm_simulation,
@@ -37,6 +38,9 @@ class FakeUnit:
     def __rtruediv__(self, value):
         return FakeUnitValue(value, f"1/{self.name}")
 
+    def __pow__(self, power):
+        return FakeUnit(f"{self.name}^{power}")
+
 
 class FakeUnitModule:
     """Minimal OpenMM unit namespace."""
@@ -46,6 +50,7 @@ class FakeUnitModule:
     femtoseconds = FakeUnit("femtoseconds")
     nanometer = FakeUnit("nanometer")
     kilojoule_per_mole = FakeUnit("kilojoule_per_mole")
+    elementary_charge = FakeUnit("elementary_charge")
 
 
 class FakeOpenMM:
@@ -139,6 +144,10 @@ class NonbondedForce:
 
     def getExceptionParameters(self, index):  # noqa: N802
         return self.exceptions[index]
+
+    def addException(self, atom1, atom2, chargeprod, sigma, epsilon, replace=False):  # noqa: N802
+        self.exceptions.append((atom1, atom2, chargeprod, sigma, epsilon, replace))
+        return len(self.exceptions) - 1
 
 
 class FakeApp:
@@ -256,6 +265,29 @@ def test_add_position_restraints_constructs_expected_force() -> None:
     assert force.per_particle_parameters == ["x0", "y0", "z0"]
     assert force.particles == [(0, [0.1, 0.2, 0.3]), (2, [0.4, 0.5, 0.6])]
     assert system.forces == [force]
+
+
+def test_add_sulfur_metal_lj_exceptions_replaces_selected_pairs() -> None:
+    """Use smoke-equivalent selected-pair NonbondedForce exceptions."""
+
+    system = FakeSystem(particle_count=3)
+    nonbonded = NonbondedForce(parameters=[(0, 0, 0), (0, 0, 0), (0, 0, 0)])
+    system.addForce(nonbonded)
+
+    metadata = add_sulfur_metal_lj_exceptions(
+        system,
+        [(1, 0), (1, 2)],
+        sigma_nm=0.22,
+        epsilon_kj_mol=8.368,
+        unit_module=FakeUnitModule,
+    )
+
+    assert metadata.pairs_requested == 2
+    assert metadata.pairs_added == 2
+    assert metadata.sigma_nm == (0.22, 0.22)
+    assert metadata.epsilon_kj_mol == (8.368, 8.368)
+    assert nonbonded.exceptions[0][-1] is True
+    assert nonbonded.exceptions[1][-1] is True
 
 
 def test_add_position_restraints_validates_inputs() -> None:

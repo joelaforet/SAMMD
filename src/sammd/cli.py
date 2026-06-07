@@ -1,5 +1,6 @@
 """Command-line interface for SAMMD scaffolding."""
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -72,7 +73,12 @@ def validate(config: Path) -> None:
     is_flag=True,
     help="Replace existing build artifacts.",
 )
-def build(config: Path, output_dir: Path | None, overwrite: bool) -> None:
+@click.option(
+    "--export-backend",
+    is_flag=True,
+    help="Write OpenFF Interchange and OpenMM backend artifacts using optional science deps.",
+)
+def build(config: Path, output_dir: Path | None, overwrite: bool, export_backend: bool) -> None:
     """Build the current plan and write topology.cif plus reports."""
 
     plan = build_system(config, output_dir=output_dir)
@@ -91,12 +97,36 @@ def build(config: Path, output_dir: Path | None, overwrite: bool) -> None:
 
     try:
         topology = plan.write_topology_cif(overwrite=overwrite)
-        build_summary = plan.write_build_summary(overwrite=overwrite)
         resolved_config = plan.write_resolved_config(overwrite=overwrite)
+        backend_files = None
+        if export_backend:
+            from sammd.interchange_backend import backend_build_summary, export_interchange_backend
+
+            backend_result = export_interchange_backend(plan, overwrite=overwrite)
+            backend_files = backend_result.files
+            build_summary = plan.write_build_summary(overwrite=overwrite)
+            build_summary.write_text(
+                json.dumps(
+                    backend_build_summary(plan, backend_result),
+                    indent=2,
+                    ensure_ascii=False,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        else:
+            build_summary = plan.write_build_summary(overwrite=overwrite)
     except FileExistsError as exc:
+        raise click.ClickException(str(exc)) from exc
+    except (ImportError, RuntimeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
     _step("WRITE", f"Wrote topology CIF: {topology}", "blue")
     _step("WRITE", f"Wrote build summary: {build_summary}", "blue")
     _step("WRITE", f"Wrote resolved config: {resolved_config}", "blue")
+    if backend_files is not None:
+        _step("WRITE", f"Wrote positions CIF: {backend_files['positions']}", "blue")
+        _step("WRITE", f"Wrote Interchange JSON: {backend_files['openff_interchange']}", "blue")
+        _step("WRITE", f"Wrote OpenMM system XML: {backend_files['openmm_system']}", "blue")
+        _step("WRITE", f"Wrote anchor metadata: {backend_files['anchor_metadata']}", "blue")
     _step("NEXT", "Inspect topology.cif before moving on to OpenMM simulation setup.", "magenta")
