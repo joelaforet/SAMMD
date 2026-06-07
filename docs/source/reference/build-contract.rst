@@ -66,6 +66,27 @@ on top of the base INTERFACE metal LJ model, not covalent, quantum, or reactive
 chemisorption. The first release records the strategy and selected pair indices
 but does not implement full OpenFF/Interchange construction or OpenMM export.
 
+Validation gates
+----------------
+
+The internal ``sammd.validation`` module provides dependency-free gates for the
+current lightweight build plan and topology CIF text. These gates check surface
+atom metadata lengths, non-empty top and bottom binding-site labels, SAM counts,
+solution-volume/box-volume agreement, finite positive box dimensions/bounds and
+volume consistency, slab/box lateral-size agreement, SAM anchor metadata,
+metal-S pair counts and slab-local indices, canonical metal-S strategy metadata,
+current/reserved output suffixes, and lightweight topology CIF atom counts and
+cell lengths.
+
+These gates intentionally do not require OpenMM, OpenFF, or full backend
+artifacts. Missing reserved target artifacts such as ``positions.cif``,
+``interchange.json``, and ``system.xml`` are not failures in the current release.
+
+Future backend validation gates should cover full constructed atom counts,
+topology/positions/system agreement, no severe overlaps, charge and parameter
+assignment completeness, applied metal-S overrides, export reloadability, finite
+minimized coordinates, and lowered minimization energy.
+
 Artifact contract
 -----------------
 

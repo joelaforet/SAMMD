@@ -13,7 +13,7 @@ Core workflow
 .. autoclass:: sammd.builders.SAMMDBuildPlan
    :members:
 
-.. autoclass:: sammd.builders.CompositionPlanningBox
+.. autoclass:: sammd.builders.BoxPlan
    :members:
 
 Configuration model
