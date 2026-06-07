@@ -84,6 +84,7 @@ def validate_output_paths(paths: Any) -> ValidationReport:
         "positions": ".cif",
         "openff_interchange": ".json",
         "openmm_system": ".xml",
+        "anchor_metadata": ".json",
         "build_summary": ".json",
         "resolved_config": ".yaml",
         "trajectory": ".dcd",

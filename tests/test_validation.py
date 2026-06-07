@@ -69,7 +69,10 @@ def test_bad_sam_nearest_metal_pairs_fail_validation(tmp_path: Path) -> None:
 def test_bad_output_suffix_fails_validation(tmp_path: Path) -> None:
     """Current and reserved path fields use stable artifact suffixes."""
 
-    paths = OutputPaths(topology=tmp_path / "topology.txt")
+    paths = OutputPaths(
+        topology=tmp_path / "topology.txt",
+        anchor_metadata=tmp_path / "anchor_metadata.yaml",
+    )
 
     report = validate_output_paths(paths)
 
@@ -77,7 +80,10 @@ def test_bad_output_suffix_fails_validation(tmp_path: Path) -> None:
 
 
     assert not report.passed
-    assert gate.details["failures"] == {"topology": "expected .cif, found .txt"}
+    assert gate.details["failures"] == {
+        "topology": "expected .cif, found .txt",
+        "anchor_metadata": "expected .json, found .yaml",
+    }
 
 
 def test_topology_cif_atom_count_mismatch_fails_validation(tmp_path: Path) -> None:
