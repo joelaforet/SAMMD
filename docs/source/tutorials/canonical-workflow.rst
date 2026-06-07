@@ -93,11 +93,17 @@ After a future SAMMD backend writes ``interchange.json`` and companion
 artifacts, students will hand those build artifacts to their own OpenMM Python
 API script. The intended teaching path is:
 
-* load the portable OpenFF Interchange data from ``interchange.json``
-* export or obtain an OpenMM ``System`` from that Interchange object
+* reload the portable OpenFF Interchange data from ``interchange.json`` with
+  ``Interchange.model_validate_json``
+* export an OpenMM ``System`` from that Interchange object with
+  ``interchange.to_openmm()``
 * load positions from ``positions.cif`` for the constructed coordinates
 * optionally use ``system.xml`` only as a convenience OpenMM system export
-* run minimization, equilibration, production, and reporters in OpenMM
+* create and run a raw OpenMM ``Simulation`` for minimization, equilibration,
+  production, and reporters
+
+SAMMD does not provide OpenMM simulation wrappers for this handoff. Students use
+the OpenMM Python API directly after SAMMD produces the future build artifacts.
 
 That handoff is not runnable in this lightweight release because
 ``positions.cif``, ``interchange.json``, ``system.xml``, and

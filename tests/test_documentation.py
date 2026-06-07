@@ -490,9 +490,12 @@ def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
     assert "``anchor_metadata.json`` for SAM anchor metadata export" in normalized
     assert "``Interchange.model_dump_json``" in content
     assert "``Interchange.model_validate_json``" in content
+    assert "``interchange.to_openmm()``" in content
     assert "pre-1.0 Interchange JSON compatibility is not guaranteed" in normalized
     assert "OpenMM is the student teaching path" in normalized
     assert "optionally use ``system.xml`` only as a convenience OpenMM system export" in normalized
+    assert "create and run a raw OpenMM ``Simulation``" in normalized
+    assert "SAMMD does not provide OpenMM simulation wrappers" in normalized
     assert "GROMACS, LAMMPS, and Amber are future downstream exports" in normalized
     assert "not beginner workflow commands" in normalized
     assert "students will hand those build artifacts to their own OpenMM Python API script" in normalized
@@ -533,6 +536,12 @@ def test_tutorial_docs_do_not_teach_current_md_outputs_or_openmm_code() -> None:
         r"^\s*(from\s+openmm\b|import\s+openmm\b)",
         r"\bSimulation\s*\(",
     ]
+    sammd_openmm_wrapper_patterns = [
+        r"\bcreate_openmm_simulation\b",
+        r"\bsammd\.openmm_runtime\b",
+        r"\bOpenMMRuntime\b",
+        r"\bSAMMD OpenMM simulation wrapper",
+    ]
     executable_non_openmm_engine_patterns = [
         r"^\s*(gmx|gmx_mpi|mdrun|lmp|lmp_mpi|sander|pmemd)\b",
         r"^\s*(from\s+parmed\b|import\s+parmed\b)",
@@ -541,7 +550,10 @@ def test_tutorial_docs_do_not_teach_current_md_outputs_or_openmm_code() -> None:
     for path in tutorial_paths:
         content = path.read_text(encoding="utf-8")
         blocked_patterns = (
-            stale_patterns + executable_openmm_patterns + executable_non_openmm_engine_patterns
+            stale_patterns
+            + executable_openmm_patterns
+            + sammd_openmm_wrapper_patterns
+            + executable_non_openmm_engine_patterns
         )
         for pattern in blocked_patterns:
             assert re.search(pattern, content, flags=re.MULTILINE) is None
@@ -561,9 +573,18 @@ def test_canonical_notebook_outputs_match_current_contract() -> None:
         r"plan\.output_paths\.thermodynamics",
         r"^\s*(from\s+openmm\b|import\s+openmm\b)",
         r"\bSimulation\s*\(",
+        r"\bcreate_openmm_simulation\b",
+        r"\bsammd\.openmm_runtime\b",
+        r"\bOpenMMRuntime\b",
+        r"\bSAMMD OpenMM simulation wrapper",
     ]
     for pattern in stale_patterns:
         assert re.search(pattern, sources, flags=re.MULTILINE) is None
+
+    assert "`Interchange.model_validate_json`" in sources
+    assert "`interchange.to_openmm()`" in sources
+    assert "raw OpenMM `Simulation`" in sources
+    assert "SAMMD does not provide OpenMM simulation wrappers" in sources
 
     for current_output in ["topology.cif", "build_summary.json", "resolved_config.yaml"]:
         assert current_output in sources
