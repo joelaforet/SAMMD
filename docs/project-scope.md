@@ -40,7 +40,7 @@ Defer until after v0.1.0:
 - Full production CLI for build/run/submit workflows.
 - SLURM or other HPC orchestration.
 - Umbrella sampling automation.
-- General metal facet support beyond the first Pd(111) path.
+- General surface support beyond registered Fcc(111) metals, including non-111 facets.
 - Explicit metal-sulfur bonded topology terms unless needed to correct SAM geometry.
 - SAMMD-owned OpenMM setup, tutorial simulations, DCD trajectory output, and thermodynamic reporting wrappers. Tutorial-only user code may demonstrate OpenMM usage, but those simulations are not part of the SAMMD v0.1.0 build contract.
 - Full OpenFF/SMIRNOFF parameterization for organic SAM, solvent, salts, and reactants, including OpenFF Interchange or OpenMM backend construction/export.
@@ -289,7 +289,7 @@ Future explicit anchor mode should be designed as a replaceable strategy:
 - `anchor.mode = "nonbonded"` for MVP.
 - `anchor.mode = "bonded"` later for metal-sulfur bond, angle, and torsion parameters.
 - A future angle target, such as 23 degrees relative to the surface, should not require rewriting the builder API.
-- `anchor.site = "fcc_hollow"` should be the internal Pd(111) default strategy, with other site labels reserved for a later advanced attachment API.
+- `anchor.site = "fcc_hollow"` should be the internal registered Fcc(111) hollow-placement strategy, with Pd(111) as the canonical/default surface and other site labels reserved for a later advanced attachment API.
 
 Solvent and reactant composition should be converted from user-facing units:
 

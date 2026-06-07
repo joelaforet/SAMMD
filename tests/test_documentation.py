@@ -232,6 +232,8 @@ def test_project_scope_keeps_anchor_site_out_of_current_template_scope() -> None
     normalized = " ".join(content.split())
 
     stale_phrases = [
+        "General metal facet support beyond the first Pd(111) path.",
+        '`anchor.site = "fcc_hollow"` should be the internal Pd(111) default strategy',
         "YAML template defaults include `fcc_hollow`",
         "The default sulfur site for Pd(111) should be `fcc_hollow`, "
         "but site type must be configurable.",
@@ -240,7 +242,11 @@ def test_project_scope_keeps_anchor_site_out_of_current_template_scope() -> None
     for phrase in stale_phrases:
         assert phrase not in content
 
+    assert "General surface support beyond registered Fcc(111) metals" in normalized
+    assert "including non-111 facets" in normalized
     assert "internal modeling hypothesis that defaults to Pd(111)" in normalized
+    assert "internal registered Fcc(111) hollow-placement strategy" in normalized
+    assert "Pd(111) as the canonical/default surface" in normalized
     assert "internal builder default rather than a beginner template field" in normalized
     assert "user-configurable site type belongs in a future advanced attachment API" in normalized
 
