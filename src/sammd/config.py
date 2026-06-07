@@ -365,11 +365,12 @@ CONFIG_TEMPLATE = """# =========================================================
 #
 #      sammd validate config.yaml
 #
-# 4. Build and parameterize your molecular system:
+# 4. Validate and build the current inspection artifacts:
 #
 #      sammd build config.yaml --output-dir outputs/my_system --overwrite
 #
-# 5. Use the exported OpenMM/OpenFF files in your own OpenMM simulation script.
+# 5. Inspect topology.cif, build_summary.json, and resolved_config.yaml.
+#    OpenMM/OpenFF backend exports are reserved target work.
 #
 # This file defines the molecular system only.
 # It does NOT define equilibration, production MD, thermostats, barostats,
@@ -571,7 +572,7 @@ packing:
 # ============================================================================
 # Parameterization
 # ============================================================================
-# Force-field choices for the system builder.
+# Force-field choices recorded and validated by the current lightweight builder.
 #
 # The small-molecule force field is used for SAM molecules, reactants,
 # solvent molecules, and salts.
@@ -592,10 +593,17 @@ parameterization:
 # ============================================================================
 # Outputs
 # ============================================================================
-# Files written by the system builder.
+# Current files written by the lightweight system builder:
+#   - topology.cif
+#   - build_summary.json
+#   - resolved_config.yaml
 #
-# These files are inputs for later OpenMM scripts.
-# They are not trajectory outputs from an MD simulation.
+# Reserved future backend artifact names:
+#   - positions.cif
+#   - interchange.json
+#   - system.xml
+#
+# None of these are trajectory outputs from an MD simulation.
 #
 outputs:
   directory: outputs/propanethiol_cinnamaldehyde_pd111

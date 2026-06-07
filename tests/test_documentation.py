@@ -196,6 +196,30 @@ def test_build_contract_documents_first_release_boundary() -> None:
     assert "not a top-level public import" in " ".join(content.split())
 
 
+def test_yaml_configuration_docs_keep_backend_exports_reserved() -> None:
+    """Keep YAML tutorial aligned with current lightweight build behavior."""
+
+    page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "yaml-configuration.rst"
+    content = page.read_text(encoding="utf-8")
+    normalized = " ".join(content.split())
+
+    assert "used while building the system" not in content
+    assert "defines system construction and parameterization only" not in content
+    assert "future backend export" in content
+    assert "validates and records these choices" in content
+    assert "current build artifacts such as ``topology.cif``" in normalized
+    assert "future backend artifact names such as ``positions.cif``" in normalized
+
+
+def test_developer_guide_cli_map_includes_build() -> None:
+    """Keep contributor package map aligned with available CLI commands."""
+
+    page = PROJECT_ROOT / "docs" / "source" / "contributor" / "developer-guide.rst"
+    content = page.read_text(encoding="utf-8")
+
+    assert "``sammd init``, ``sammd validate``, and ``sammd build``" in content
+
+
 def test_canonical_workflow_separates_current_and_reserved_artifacts() -> None:
     """Ensure beginner docs do not overstate current topology.cif output."""
 

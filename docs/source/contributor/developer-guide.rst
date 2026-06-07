@@ -8,7 +8,7 @@ Current package map
    Pydantic v2 models, YAML loading, CLI template text, and validation rules.
 
 ``sammd.cli``
-   Lightweight ``sammd init`` and ``sammd validate`` commands.
+   Lightweight ``sammd init``, ``sammd validate``, and ``sammd build`` commands.
 
 ``sammd.surfaces``
    Pd(111) lattice metadata, commensurate slab planning, and hollow binding-site

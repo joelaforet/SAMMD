@@ -43,14 +43,16 @@ Important sections
    Defines PACKMOL packing options such as tolerance and maximum loop count.
 
 ``parameterization``
-   Selects the OpenFF small-molecule force field, charge model, INTERFACE metal
-   force-field resource, and nonbonded cutoff used while building the system.
+   Records the OpenFF small-molecule force field, charge model, INTERFACE metal
+   force-field resource, and nonbonded cutoff selected for future backend export.
+   The current lightweight builder validates and records these choices without
+   constructing a parameterized backend system.
 
 ``outputs``
-   Names build artifacts such as ``topology.cif``, ``positions.cif``,
-   ``interchange.json``, ``system.xml``, ``build_summary.json``, and
-   ``resolved_config.yaml``. These are inputs for later OpenMM scripts, not MD
-   trajectory outputs.
+   Names current build artifacts such as ``topology.cif``,
+   ``build_summary.json``, and ``resolved_config.yaml``. It also reserves future
+   backend artifact names such as ``positions.cif``, ``interchange.json``, and
+   ``system.xml``. These are not MD trajectory outputs.
 
 Resolved defaults to notice
 ---------------------------
@@ -65,9 +67,10 @@ Resolved defaults to notice
 Current limitations
 -------------------
 
-This config defines system construction and parameterization only. OpenMM
-simulation protocols, thermostats, barostats, equilibration stages, and
-trajectory saving are intentionally kept out of this release's YAML file.
+This config defines system construction choices and records parameterization
+selections for future backend export. OpenMM simulation protocols, thermostats,
+barostats, equilibration stages, and trajectory saving are intentionally kept
+out of this release's YAML file.
 
 Beginner glossary
 -----------------
