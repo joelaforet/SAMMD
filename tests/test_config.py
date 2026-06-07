@@ -20,7 +20,7 @@ def _template_data() -> dict:
 def test_yaml_template_loads(tmp_path: Path) -> None:
     """Load the commented YAML template from disk."""
 
-    config_path = tmp_path / "sammd.yaml"
+    config_path = tmp_path / "config.yaml"
     config_path.write_text(CONFIG_TEMPLATE, encoding="utf-8")
 
     config = load_config(config_path)
@@ -28,24 +28,26 @@ def test_yaml_template_loads(tmp_path: Path) -> None:
     assert isinstance(config, SAMMDConfig)
 
 
-def test_resolved_defaults() -> None:
-    """Validate canonical MVP defaults from the project scope."""
+def test_resolved_defaults_match_approved_student_schema() -> None:
+    """Validate the approved YAML-first defaults."""
 
     config = load_config_dict(_template_data())
 
+    assert config.experiment.name == "propanethiol_cinnamaldehyde_pd111"
+    assert config.experiment.seed == 2026
     assert config.surface.metal == "Pd"
     assert config.surface.facet == "111"
-    assert config.sam.anchor.site == "fcc_hollow"
-    assert config.solvent.water_model == "TIP3P"
-    assert config.surface.slab.positional_restraint.value == 10000.0
-    assert config.surface.slab.positional_restraint.unit == "kJ mol^-1 nm^-2"
-    assert config.sam.grafting_density.value == 0.25
-    assert config.sam.grafting_density.unit == "nm^2 / molecule"
-    assert config.output.topology == "topology.cif"
-    assert config.output.trajectory == "trajectory.dcd"
-    assert config.output.thermodynamics == "thermodynamics.csv"
-    assert config.sam.anchor.nonbonded.scale_factor == 4.0
-    assert config.reactants[0].smiles == "C1=CC=C(C=C1)/C=C/C=O"
+    assert config.surface.lateral_size == (2.0, 2.0)
+    assert config.sam.grafting_density == 0.25
+    assert config.sam.components[0].residue_name == "PTL"
+    assert config.reactants[0].residue_name == "CIN"
+    assert config.reactants[0].count == 1
+    assert config.reactants[0].concentration is None
+    assert config.solvent.padding == 3.0
+    assert config.solvent.components[0].residue_name == "EOH"
+    assert config.solvent.components[0].density == 0.789
+    assert config.parameterization.nonbonded_cutoff == 1.0
+    assert config.outputs.files.openff_interchange == "interchange.json"
 
 
 def test_mixed_sam_fraction_validation() -> None:
@@ -53,8 +55,8 @@ def test_mixed_sam_fraction_validation() -> None:
 
     data = _template_data()
     data["sam"]["components"] = [
-        {"name": "a", "smiles": "CCCS", "fraction": 0.25},
-        {"name": "b", "smiles": "CCCCS", "fraction": 0.75},
+        {"name": "a", "residue_name": "AAA", "smiles": "CCCS", "fraction": 0.25},
+        {"name": "b", "residue_name": "BBB", "smiles": "CCCCS", "fraction": 0.75},
     ]
 
     assert len(load_config_dict(data).sam.components) == 2
@@ -69,32 +71,71 @@ def test_mixed_sam_count_validation() -> None:
 
     data = _template_data()
     data["sam"]["components"] = [
-        {"name": "a", "smiles": "CCCS", "count": 4},
-        {"name": "b", "smiles": "CCCCS", "count": 6},
+        {"name": "a", "residue_name": "AAA", "smiles": "CCCS", "count": 4},
+        {"name": "b", "residue_name": "BBB", "smiles": "CCCCS", "count": 6},
     ]
     assert [component.count for component in load_config_dict(data).sam.components] == [4, 6]
 
     data["sam"]["components"] = [
-        {"name": "a", "smiles": "CCCS", "fraction": 0.5},
-        {"name": "b", "smiles": "CCCCS", "count": 6},
+        {"name": "a", "residue_name": "AAA", "smiles": "CCCS", "fraction": 0.5},
+        {"name": "b", "residue_name": "BBB", "smiles": "CCCCS", "count": 6},
     ]
     with pytest.raises(ValidationError, match="must not mix fraction and count"):
         load_config_dict(data)
 
 
-def test_sam_count_sum_validation_helper() -> None:
-    """Validate explicit component counts against a supplied site count."""
+def test_reactant_requires_count_or_concentration() -> None:
+    """Require exactly one reactant amount mode."""
 
     data = _template_data()
-    data["sam"]["components"] = [
-        {"name": "a", "smiles": "CCCS", "count": 4},
-        {"name": "b", "smiles": "CCCCS", "count": 6},
-    ]
-    sam = load_config_dict(data).sam
+    data["reactants"][0].pop("count")
+    data["reactants"][0]["concentration"] = 50.0
+    assert load_config_dict(data).reactants[0].concentration == 50.0
 
-    sam.validate_component_counts(total_sites=10)
-    with pytest.raises(ValueError, match="counts sum to 10, but total_sites is 9"):
-        sam.validate_component_counts(total_sites=9)
+    data["reactants"][0]["count"] = 1
+    with pytest.raises(ValidationError, match="exactly one of count or concentration"):
+        load_config_dict(data)
+
+
+def test_salt_schema_uses_explicit_ion_stoichiometry() -> None:
+    """Accept separate cation/anion definitions with residue names."""
+
+    data = _template_data()
+    data["salts"] = [
+        {
+            "name": "sodium_sulfate",
+            "concentration": 0.05,
+            "cation": {
+                "name": "sodium",
+                "residue_name": "SOD",
+                "smiles": "[Na+]",
+                "count_per_formula_unit": 2,
+            },
+            "anion": {
+                "name": "sulfate",
+                "residue_name": "SUL",
+                "smiles": "O=S(=O)([O-])[O-]",
+                "count_per_formula_unit": 1,
+            },
+        }
+    ]
+
+    salt = load_config_dict(data).salts[0]
+
+    assert salt.cation.residue_name == "SOD"
+    assert salt.cation.count_per_formula_unit == 2
+    assert salt.anion.residue_name == "SUL"
+
+
+@pytest.mark.parametrize("residue_name", ["ptl", "PT", "PTL1", "P-L"])
+def test_residue_names_are_strict_three_character_codes(residue_name: str) -> None:
+    """Reject residue names that will make topology selection ambiguous."""
+
+    data = _template_data()
+    data["sam"]["components"][0]["residue_name"] = residue_name
+
+    with pytest.raises(ValidationError, match="residue_name must be exactly 3"):
+        load_config_dict(data)
 
 
 def test_unknown_nested_keys_are_forbidden() -> None:
@@ -106,76 +147,34 @@ def test_unknown_nested_keys_are_forbidden() -> None:
         load_config_dict(data)
 
     data = _template_data()
-    data["reporters"]["extra"] = "bad"
+    data["parameterization"]["extra"] = "bad"
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         load_config_dict(data)
 
 
-def test_cosolvent_density_validation() -> None:
-    """Require density for mole-fraction co-solvents."""
+def test_solvent_density_and_molar_mass_validation() -> None:
+    """Require physical metadata for non-water solvent count planning."""
 
     data = _template_data()
     data["solvent"]["components"] = [
-        {"name": "water", "mole_fraction": 0.5},
-        {"name": "ethanol", "smiles": "CCO", "mole_fraction": 0.5},
+        {"name": "ethanol", "residue_name": "EOH", "smiles": "CCO", "mole_fraction": 1.0}
     ]
-    with pytest.raises(ValidationError, match="co-solvent 'ethanol' must define density_g_ml"):
+    with pytest.raises(ValidationError, match="must define density"):
         load_config_dict(data)
 
-    data["solvent"]["components"][1]["density_g_ml"] = 0.789
-    assert load_config_dict(data).solvent.components[1].density_g_ml == 0.789
+    data["solvent"]["components"][0]["density"] = 0.789
+    assert load_config_dict(data).solvent.components[0].density == 0.789
 
-
-def test_unknown_cosolvent_requires_molar_mass() -> None:
-    """Require unknown mole-fraction co-solvents to define molar mass."""
-
-    data = _template_data()
     data["solvent"]["components"] = [
-        {"name": "water", "mole_fraction": 0.5},
         {
             "name": "custom-solvent",
+            "residue_name": "CUS",
             "smiles": "CO",
-            "mole_fraction": 0.5,
-            "density_g_ml": 0.79,
-        },
+            "mole_fraction": 1.0,
+            "density": 0.79,
+        }
     ]
-    with pytest.raises(ValidationError, match="must define molar_mass_g_mol"):
-        load_config_dict(data)
-
-    data["solvent"]["components"][1]["molar_mass_g_mol"] = 32.04
-    assert load_config_dict(data).solvent.components[1].molar_mass_g_mol == 32.04
-
-
-def test_slab_thickness_validation() -> None:
-    """Require Pd(111) slab thickness to exceed cutoff plus buffer."""
-
-    config = load_config_dict(_template_data())
-    assert config.surface.slab.layers == 8
-
-    data = _template_data()
-    data["surface"]["slab"]["layers"] = 4
-    with pytest.raises(ValidationError, match="slab thickness must exceed"):
-        load_config_dict(data)
-
-    data = _template_data()
-    data["surface"]["slab"]["layers"] = 7
-    data["simulation"]["nonbonded_cutoff_nm"] = 1.0
-    data["simulation"]["slab_cutoff_buffer_nm"] = 0.5
-    with pytest.raises(ValidationError, match=r"got 1\.348 nm and require more than 1\.500 nm"):
-        load_config_dict(data)
-
-
-def test_expected_unit_validation() -> None:
-    """Reject arbitrary unit strings for known physical defaults."""
-
-    data = _template_data()
-    data["sam"]["grafting_density"]["unit"] = "angstrom^2 / molecule"
-    with pytest.raises(ValidationError, match="grafting_density unit must be"):
-        load_config_dict(data)
-
-    data = _template_data()
-    data["surface"]["slab"]["positional_restraint"]["unit"] = "kcal mol^-1 angstrom^-2"
-    with pytest.raises(ValidationError, match="positional_restraint unit must be"):
+    with pytest.raises(ValidationError, match="must define molar_mass"):
         load_config_dict(data)
 
 
@@ -183,11 +182,11 @@ def test_expected_unit_validation() -> None:
     ("path", "value", "message"),
     [
         (("surface", "metal"), "Fe", "Input should be 'Pd'"),
-        (("sam", "anchor", "site"), "unknown", "Input should be"),
-        (("sam", "grafting_density", "value"), -0.1, "greater than 0"),
+        (("surface", "lateral_size"), [-1.0, 2.0], "lateral_size"),
+        (("sam", "grafting_density"), -0.1, "greater than 0"),
         (("solvent", "components", 0, "mole_fraction"), 0.0, "greater than 0"),
-        (("reactants", 0, "concentration_millimolar"), -1.0, "greater than 0"),
-        (("reporters", "fields"), ["step", "bad_field"], "unsupported reporter fields"),
+        (("reactants", 0, "initial_height_above_sam"), -1.0, "greater than 0"),
+        (("parameterization", "nonbonded_cutoff"), 0.0, "greater than 0"),
     ],
 )
 def test_invalid_config_choices_fail_clearly(

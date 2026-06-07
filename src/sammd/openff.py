@@ -119,11 +119,9 @@ def molecules_from_config(
 ) -> OpenFFMoleculePreparationResult:
     """Prepare OpenFF molecules for supported molecule-bearing config sections.
 
-    SAM components, non-water solvent components with explicit SMILES, and reactants are
-    converted. Water is reported as skipped because it is represented by the configured water
-    model rather than an OpenFF small molecule here. Solvent components without SMILES and salts
-    are reported as unsupported because the MVP configs do not contain enough chemistry to build
-    OpenFF molecules for those entries.
+    SAM components, solvent components with explicit SMILES, reactants, and salt ions are
+    converted. Solvent components without SMILES are reported as unsupported unless they are
+    named water, which is treated as a skipped built-in solvent model.
 
     Parameters
     ----------
@@ -194,13 +192,16 @@ def molecules_from_config(
         )
 
     for salt in getattr(config, "salts", []):
-        result.unsupported.append(
-            OpenFFMoleculePreparationIssue(
-                section="salts",
-                name=f"{salt.cation}/{salt.anion}",
-                reason="salt config uses ion labels, not chemically complete OpenFF SMILES",
+        for ion_role in ("cation", "anion"):
+            ion = getattr(salt, ion_role)
+            result.molecules["salts"].append(
+                molecule_from_smiles(
+                    ion.smiles,
+                    name=ion.name,
+                    n_conformers=n_conformers,
+                    allow_undefined_stereo=allow_undefined_stereo,
+                )
             )
-        )
 
     return result
 

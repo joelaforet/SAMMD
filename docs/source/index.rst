@@ -1,14 +1,18 @@
 SAMMD documentation
 ===================
 
-SAMMD is a configuration-first prototype for planning self-assembled monolayer
-MD systems. The current milestone validates YAML inputs, creates deterministic
-Pd(111)/SAM/solution build plans, writes a slab-only ``planned_slab.cif`` file,
-and exposes lightweight orientation analysis helpers.
+SAMMD is a configuration-first package for building self-assembled monolayer MD
+systems. The YAML file describes the surface, SAM chemistry, reactants, solvent,
+salts, packing, parameterization, and build outputs. OpenMM simulation protocols
+are intentionally taught and controlled separately.
 
-Full OpenFF/OpenMM construction is intentionally deferred. Future milestones are
-expected to produce full ``topology.cif``, ``trajectory.dcd``, and
-``thermodynamics.csv`` artifacts from the same configuration style.
+If you are new to Python or molecular dynamics, start with
+:doc:`tutorials/canonical-workflow`. The command-line path gets you to a first
+``topology.cif`` file before you need to write a Python script.
+
+The current teaching workflow starts with validation and deterministic build
+planning, then progresses toward OpenFF/OpenMM-backed system construction and
+student-written OpenMM simulation scripts.
 
 .. toctree::
    :maxdepth: 2

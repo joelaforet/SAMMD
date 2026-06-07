@@ -4,7 +4,7 @@ from math import dist
 
 import pytest
 
-from sammd.config import AnchorConfig, SAMComponentConfig, SAMConfig
+from sammd.config import SAMComponentConfig, SAMConfig
 from sammd.sam import plan_sam_placements
 from sammd.surfaces import generate_binding_sites, plan_pd111_slab
 
@@ -45,8 +45,8 @@ def test_fraction_mode_assignment_sums_exactly_and_is_seeded() -> None:
 
     sam_config = SAMConfig(
         components=[
-            SAMComponentConfig(name="a", smiles="CCCS", fraction=0.25),
-            SAMComponentConfig(name="b", smiles="CCCCS", fraction=0.75),
+            SAMComponentConfig(name="a", residue_name="AAA", smiles="CCCS", fraction=0.25),
+            SAMComponentConfig(name="b", residue_name="BBB", smiles="CCCCS", fraction=0.75),
         ]
     )
 
@@ -90,14 +90,14 @@ def test_count_mode_assignment_validates_total_counts() -> None:
 
     valid_config = SAMConfig(
         components=[
-            SAMComponentConfig(name="a", smiles="CCCS", count=2),
-            SAMComponentConfig(name="b", smiles="CCCCS", count=2),
+            SAMComponentConfig(name="a", residue_name="AAA", smiles="CCCS", count=2),
+            SAMComponentConfig(name="b", residue_name="BBB", smiles="CCCCS", count=2),
         ]
     )
     invalid_config = SAMConfig(
         components=[
-            SAMComponentConfig(name="a", smiles="CCCS", count=2),
-            SAMComponentConfig(name="b", smiles="CCCCS", count=1),
+            SAMComponentConfig(name="a", residue_name="AAA", smiles="CCCS", count=2),
+            SAMComponentConfig(name="b", residue_name="BBB", smiles="CCCCS", count=1),
         ]
     )
 
@@ -125,37 +125,11 @@ def test_top_and_bottom_surfaces_are_both_planned() -> None:
     }
 
 
-def test_anchor_site_mismatch_fails_clearly() -> None:
-    """Reject SAM configs that request a site kind absent from supplied sites."""
+def test_placement_uses_internal_fcc_hollow_anchor_strategy() -> None:
+    """Keep anchor details out of the student config while preserving metadata."""
 
-    sam_config = SAMConfig(anchor=AnchorConfig(site="bridge"))
+    plan = plan_sam_placements(SAMConfig(), _mixed_binding_sites(), lateral_area_nm2=1.0, seed=23)
 
-    with pytest.raises(ValueError, match=r"bridge.*supplied binding sites contain: fcc_hollow"):
-        plan_sam_placements(sam_config, _binding_sites(), lateral_area_nm2=1.0, seed=19)
-
-
-def test_mixed_supplied_sites_filter_to_requested_anchor_site() -> None:
-    """Prevent placement onto a supplied site kind that was not requested."""
-
-    sam_config = SAMConfig(anchor=AnchorConfig(site="hcp_hollow"))
-
-    plan = plan_sam_placements(sam_config, _mixed_binding_sites(), lateral_area_nm2=1.0, seed=23)
-
-    assert {placement.site_kind for placement in plan.placements} == {"hcp_hollow"}
-    assert {placement.anchor_metadata["site"] for placement in plan.placements} == {"hcp_hollow"}
-
-
-def test_component_specific_mixed_anchor_sites_fail_before_assignment() -> None:
-    """Reject mixed anchor site requests until per-site-kind placement is implemented."""
-
-    sam_config = SAMConfig(
-        anchor=AnchorConfig(site="fcc_hollow"),
-        components=[
-            SAMComponentConfig(
-                name="a", smiles="CCCS", fraction=1.0, anchor=AnchorConfig(site="hcp_hollow")
-            )
-        ],
-    )
-
-    with pytest.raises(ValueError, match="mixed SAM anchor site kinds are not supported"):
-        plan_sam_placements(sam_config, _mixed_binding_sites(), lateral_area_nm2=1.0, seed=29)
+    assert {placement.site_kind for placement in plan.placements} == {"fcc_hollow"}
+    assert {placement.anchor_metadata["site"] for placement in plan.placements} == {"fcc_hollow"}
+    assert {placement.anchor_metadata["mode"] for placement in plan.placements} == {"nonbonded"}

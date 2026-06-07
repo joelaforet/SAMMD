@@ -45,7 +45,7 @@ def test_canonical_notebook_has_expected_sections() -> None:
         "## Create a template configuration",
         "## Validate, load, and build a plan",
         "## Inspect the plan summary",
-        "## Write planned_slab.cif",
+        "## Write topology.cif",
         "## Toy orientation analysis",
     ]
     for heading in expected_headings:
@@ -87,7 +87,7 @@ def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:
 
     config = load_config(config_path)
     plan = build_system(config, output_dir=output_dir)
-    planned_slab_path = plan.write_planned_slab_mmcif(overwrite=True)
+    topology_path = plan.write_topology_cif(overwrite=True)
 
     toy_coordinates = [
         (-0.30, 0.00, 0.00),
@@ -104,12 +104,12 @@ def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:
         reactant_label="toy cinnamaldehyde",
     )
 
-    assert planned_slab_path.is_file()
+    assert topology_path.is_file()
     assert plan.slab.metal == "Pd"
     assert plan.slab.facet == "111"
     assert len(plan.binding_sites) > 0
     assert len(plan.sam_placements.placements) > 0
-    assert plan.solution.molecule_counts["water"] > 0
+    assert plan.solution.molecule_counts["ethanol"] > 0
     assert plan.output_paths.topology == output_dir / "topology.cif"
     assert not plan.full_construction_available
     assert 0.0 <= orientation.angle_degrees <= 180.0

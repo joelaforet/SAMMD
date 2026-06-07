@@ -45,15 +45,16 @@ def test_auto_solvent_count_uses_sammd_solution_plan() -> None:
     smoke = load_smoke_tool()
     config = SAMMDConfig.model_validate(
         {
-            "surface": {"slab": {"lateral_size_nm": [2.0, 2.0]}},
+            "surface": {"lateral_size": [2.0, 2.0]},
             "solvent": {
                 "components": [
                     {
                         "name": "ethanol",
+                        "residue_name": "EOH",
                         "smiles": "CCO",
                         "mole_fraction": 1.0,
-                        "density_g_ml": smoke.ETHANOL_DENSITY_G_ML,
-                        "molar_mass_g_mol": smoke.ETHANOL_MASS_G_MOL,
+                        "density": smoke.ETHANOL_DENSITY_G_ML,
+                        "molar_mass": smoke.ETHANOL_MASS_G_MOL,
                     }
                 ]
             },
@@ -126,7 +127,7 @@ def test_packmol_input_packs_solvent_around_fixed_solute() -> None:
 
     smoke = load_smoke_tool()
     config = SAMMDConfig.model_validate(
-        {"surface": {"slab": {"lateral_size_nm": [2.0, 2.0]}}}
+        {"surface": {"lateral_size": [2.0, 2.0]}}
     )
     plan = build_system(config)
     box = smoke.derive_box_dimensions(plan, 3.0)

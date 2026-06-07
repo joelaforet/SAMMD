@@ -18,54 +18,93 @@ Important sections
 
 ``surface``
    Selects the supported MVP surface. Today this is ``metal: Pd`` and
-   ``facet: "111"``. The nested ``slab`` section controls layer count, requested
-   lateral dimensions, centered placement, double-sided geometry, and Pd
-   positional restraint metadata. The builder adjusts lateral dimensions to a
-   commensurate Pd(111) lattice.
+   ``facet: "111"``. Users provide only the lateral ``x`` and ``y`` size. SAMMD
+   chooses the slab thickness automatically from the metal geometry and
+   nonbonded cutoff.
 
 ``sam``
-   Defines grafting density, anchor model, binding site, and one or more SAM
-   components. Current lightweight builds support ``fcc_hollow`` and
-   ``hcp_hollow`` anchors. Components may use fractions that sum to 1.0 or
-   explicit counts, but not both.
+   Defines grafting density and one or more thiol-containing SAM components.
+   Components need a human-readable name, a three-character ``residue_name``, a
+   SMILES string, and either fractions that sum to 1.0 or explicit counts.
 
 ``solvent``
-   Defines water model, padding used for approximate count planning, and solvent
-   mole fractions normalized over solvent components only. Water defaults to
-   TIP3P-like density metadata. Co-solvents need density and molar mass unless a
-   supported built-in value exists.
+   Defines z-direction padding above the slab and solvent mole fractions
+   normalized over solvent components only. Each component needs a
+   three-character ``residue_name``. Non-water solvents need density and molar
+   mass unless SAMMD has a supported built-in value.
 
 ``salts`` and ``reactants``
-   Define ion molarity and reactant millimolar concentrations. The MVP converts
-   concentrations into molecule or ion counts using an approximate planning
-   volume, not a final packed box.
+   Define optional ions and reactants. Reactants use exactly one of ``count`` or
+   ``concentration``. Reactant concentration is mM. Salt concentration is M, and
+   salts define separate cation and anion entries with explicit stoichiometry so
+   each ion can have its own residue name.
 
-``output``
-   Names future ``topology.cif``, ``trajectory.dcd``, and
-   ``thermodynamics.csv`` artifacts. The current build plan can write only
-   ``planned_slab.cif``.
+``packing``
+   Defines PACKMOL packing options such as tolerance and maximum loop count.
 
-``reporters``
-   Selects thermodynamic reporter fields that will be used when OpenMM reporting
-   is implemented.
+``parameterization``
+   Selects the OpenFF small-molecule force field, charge model, INTERFACE metal
+   force-field resource, and nonbonded cutoff used while building the system.
 
-``simulation``
-   Stores timestep, temperature, pressure, nonbonded cutoff, slab cutoff buffer,
-   and deterministic seed. The slab must be thicker than cutoff plus buffer.
+``outputs``
+   Names build artifacts such as ``topology.cif``, ``positions.cif``,
+   ``interchange.json``, ``system.xml``, ``build_summary.json``, and
+   ``resolved_config.yaml``. These are inputs for later OpenMM scripts, not MD
+   trajectory outputs.
 
 Resolved defaults to notice
 ---------------------------
 
-* The slab defaults to 8 centered, double-sided Pd(111) layers
-* The requested lateral size defaults to ``[5.0, 5.0]`` nm
+* The surface defaults to a ``[2.0, 2.0]`` nm Pd(111) lateral size
+* Slab thickness is hidden and chosen automatically
 * The SAM defaults to propanethiol ``CCCS`` at ``0.25 nm^2 / molecule``
-* The solvent defaults to pure water with 3.0 nm padding
-* The default reactant is cinnamaldehyde at 0.05 M
+* The solvent defaults to ethanol ``CCO`` with 3.0 nm z padding
+* The default reactant is one cinnamaldehyde molecule
 * The default seed is 2026 for reproducible placement planning
 
 Current limitations
 -------------------
 
-The schema already contains future-facing choices, but the MVP builder rejects
-one-sided slabs, off-center slabs, bridge/atop anchors, and full topology writing
-with clear errors.
+This config defines system construction and parameterization only. OpenMM
+simulation protocols, thermostats, barostats, equilibration stages, and
+trajectory saving are intentionally kept out of this release's YAML file.
+
+Beginner glossary
+-----------------
+
+``SAM``
+   Self-assembled monolayer: molecules attached to a surface in an organized
+   layer.
+
+``MD``
+   Molecular dynamics: a simulation method that moves atoms over time using a
+   force field.
+
+``Pd(111) slab``
+   A flat palladium surface model. ``111`` names the crystal face being exposed.
+
+``grafting density``
+   How much surface area is assigned to each attached SAM molecule. Smaller
+   values place more molecules on the surface.
+
+``SMILES``
+   A short text string that describes a molecule, for example ``CCO`` for
+   ethanol.
+
+``mole fraction``
+   The fraction of one solvent component within the solvent mixture. Solvent
+   mole fractions should add to 1.0.
+
+``topology``
+   The atoms, bonds, residue names, and starting coordinates for a full system.
+   The ``residue_name`` fields in the YAML control how components appear in
+   topology files and molecular viewers.
+
+``trajectory``
+   Saved frames from an MD simulation. This YAML file does not configure
+   trajectories; students will learn OpenMM simulation control separately.
+
+``topology.cif``
+   The first structure file to inspect after ``sammd build``. It shows the
+   configured surface and SAM anchor placements; trajectory frames are produced
+   later by OpenMM simulation scripts.

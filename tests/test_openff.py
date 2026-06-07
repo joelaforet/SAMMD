@@ -109,15 +109,16 @@ def test_molecules_from_config_groups_supported_sections(monkeypatch: pytest.Mon
     result = openff_adapter.molecules_from_config(SAMMDConfig(), n_conformers=0)
 
     assert result.molecules["sam"] == [{"smiles": "CCCS", "name": "propanethiol"}]
-    assert result.molecules["solvent"] == []
+    assert result.molecules["solvent"] == [{"smiles": "CCO", "name": "ethanol"}]
     assert result.molecules["reactants"] == [
         {"smiles": "C1=CC=C(C=C1)/C=C/C=O", "name": "cinnamaldehyde"}
     ]
     assert result.molecules["salts"] == []
-    assert [(entry.section, entry.name) for entry in result.skipped] == [("solvent", "water")]
+    assert result.skipped == []
     assert result.unsupported == []
     assert calls == [
         ("CCCS", "propanethiol", 0, False),
+        ("CCO", "ethanol", 0, False),
         ("C1=CC=C(C=C1)/C=C/C=O", "cinnamaldehyde", 0, False),
     ]
 
@@ -133,7 +134,12 @@ def test_molecules_from_config_reports_solvent_without_smiles(
         {
             "solvent": {
                 "components": [
-                    {"name": "ethanol", "mole_fraction": 1.0, "density_g_ml": 0.789}
+                    {
+                        "name": "ethanol",
+                        "residue_name": "EOH",
+                        "mole_fraction": 1.0,
+                        "density": 0.789,
+                    }
                 ]
             }
         }
@@ -148,22 +154,51 @@ def test_molecules_from_config_reports_solvent_without_smiles(
     assert "no SMILES" in result.unsupported[0].reason
 
 
-def test_molecules_from_config_reports_salts_as_unsupported(
+def test_molecules_from_config_prepares_salt_ions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Report configured salts as unsupported OpenFF molecule inputs."""
+    """Prepare separate OpenFF molecules for cation and anion species."""
 
     openff_adapter = importlib.import_module("sammd.openff")
-    monkeypatch.setattr(openff_adapter, "molecule_from_smiles", lambda *args, **kwargs: args[0])
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_molecule_from_smiles(smiles: str, name: str | None = None, **kwargs):
+        calls.append((smiles, name))
+        return {"smiles": smiles, "name": name}
+
+    monkeypatch.setattr(openff_adapter, "molecule_from_smiles", fake_molecule_from_smiles)
     config = load_config_dict(
-        {"salts": [{"cation": "Na+", "anion": "Cl-", "concentration_molar": 0.15}]}
+        {
+            "salts": [
+                {
+                    "name": "sodium_chloride",
+                    "concentration": 0.15,
+                    "cation": {
+                        "name": "sodium",
+                        "residue_name": "SOD",
+                        "smiles": "[Na+]",
+                        "count_per_formula_unit": 1,
+                    },
+                    "anion": {
+                        "name": "chloride",
+                        "residue_name": "CLA",
+                        "smiles": "[Cl-]",
+                        "count_per_formula_unit": 1,
+                    },
+                }
+            ]
+        }
     )
 
     result = openff_adapter.molecules_from_config(config, n_conformers=0)
 
-    assert result.molecules["salts"] == []
-    assert [(entry.section, entry.name) for entry in result.unsupported] == [("salts", "Na+/Cl-")]
-    assert "ion labels" in result.unsupported[0].reason
+    assert result.molecules["salts"] == [
+        {"smiles": "[Na+]", "name": "sodium"},
+        {"smiles": "[Cl-]", "name": "chloride"},
+    ]
+    assert ("[Na+]", "sodium") in calls
+    assert ("[Cl-]", "chloride") in calls
+    assert result.unsupported == []
 
 
 def test_molecule_from_propanethiol_smiles_when_openff_available() -> None:

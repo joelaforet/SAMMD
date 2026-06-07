@@ -16,13 +16,16 @@ Vector3 = tuple[float, float, float]
 
 @dataclass(frozen=True)
 class OutputPaths:
-    """Resolved output artifact paths for visualization and runtime reporting."""
+    """Resolved output artifact paths for system building."""
 
-    topology: Path
-    trajectory: Path
-    thermodynamics: Path
-    checkpoint: Path | None = None
-    state: Path | None = None
+    topology: Path | None = None
+    positions: Path | None = None
+    openff_interchange: Path | None = None
+    openmm_system: Path | None = None
+    build_summary: Path | None = None
+    resolved_config: Path | None = None
+    trajectory: Path | None = None
+    thermodynamics: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -55,23 +58,29 @@ def plan_output_paths(config: Any, base_dir: str | Path = ".") -> OutputPaths:
         Resolved paths with validated visualization and reporter suffixes.
     """
 
-    output_config = getattr(config, "output", config)
+    output_config = getattr(config, "outputs", config)
+    files = getattr(output_config, "files", output_config)
     root = Path(base_dir)
-    topology = _resolve_output_path(root, output_config.topology)
-    trajectory = _resolve_output_path(root, output_config.trajectory)
-    thermodynamics = _resolve_output_path(root, output_config.thermodynamics)
-    checkpoint = _resolve_optional_output_path(root, getattr(output_config, "checkpoint", None))
-    state = _resolve_optional_output_path(root, getattr(output_config, "state", None))
+    topology = _resolve_output_path(root, files.topology)
+    positions = _resolve_output_path(root, files.positions)
+    openff_interchange = _resolve_output_path(root, files.openff_interchange)
+    openmm_system = _resolve_output_path(root, files.openmm_system)
+    build_summary = _resolve_output_path(root, files.build_summary)
+    resolved_config = _resolve_output_path(root, files.resolved_config)
 
     _validate_suffix(topology, ".cif", "topology")
-    _validate_suffix(trajectory, ".dcd", "trajectory")
-    _validate_suffix(thermodynamics, ".csv", "thermodynamics")
+    _validate_suffix(positions, ".cif", "positions")
+    _validate_suffix(openff_interchange, ".json", "OpenFF Interchange")
+    _validate_suffix(openmm_system, ".xml", "OpenMM system")
+    _validate_suffix(build_summary, ".json", "build summary")
+    _validate_suffix(resolved_config, ".yaml", "resolved config")
     return OutputPaths(
         topology=topology,
-        trajectory=trajectory,
-        thermodynamics=thermodynamics,
-        checkpoint=checkpoint,
-        state=state,
+        positions=positions,
+        openff_interchange=openff_interchange,
+        openmm_system=openmm_system,
+        build_summary=build_summary,
+        resolved_config=resolved_config,
     )
 
 

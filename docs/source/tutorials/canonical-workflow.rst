@@ -27,8 +27,26 @@ Start from the template YAML and validate it before building a plan:
 
 The template follows the defaults summarized in :doc:`yaml-configuration`.
 
+Build the first plan from the command line
+------------------------------------------
+
+For a first run, no Python script is needed. This command validates the YAML,
+builds the current plan, and writes ``outputs/topology.cif``,
+``outputs/build_summary.json``, and ``outputs/resolved_config.yaml``:
+
+.. code-block:: bash
+
+   sammd build sammd.yaml --output-dir outputs --overwrite
+
+Open ``outputs/topology.cif`` in a molecule viewer such as PyMOL to inspect the
+configured surface and SAM anchor placements. This file is the first build
+artifact to check before moving on to OpenMM simulation setup.
+
 Build a deterministic plan from Python
 --------------------------------------
+
+Use Python when you want to inspect the plan object or write custom analysis
+scripts. Save this as ``run_plan.py`` in the same directory as ``sammd.yaml``:
 
 .. code-block:: python
 
@@ -46,33 +64,42 @@ Build a deterministic plan from Python
 
 The returned object is a lightweight build plan. It contains the validated
 configuration, a commensurate centered Pd(111) slab, fcc or hcp hollow binding
-sites, deterministic SAM placement choices, approximate solution counts, and
-resolved output paths.
+sites chosen by SAMMD's thiol-on-metal defaults, deterministic SAM placement
+choices, approximate solution counts, and resolved build output paths.
 
-Write the planned slab visualization file
------------------------------------------
+Write the topology inspection file
+----------------------------------
 
 .. code-block:: python
 
-   path = plan.write_planned_slab_mmcif(overwrite=True)
+   path = plan.write_topology_cif(overwrite=True)
    print(path)
 
-This writes ``planned_slab.cif`` next to the future topology path. The file is a
-slab-only visualization scaffold for inspection in tools such as PyMOL. It is
-not a complete topology and does not include SAM, solvent, salt, or reactant
-molecules.
+Run it with:
 
-Future backend artifacts
-------------------------
+.. code-block:: bash
 
-The configuration already resolves names for future production artifacts:
+   python run_plan.py
+
+This writes the configured ``topology.cif`` path for inspection in tools such as
+PyMOL. Use it to check the surface size, exposed faces, and SAM anchor placement
+before starting simulation-specific OpenMM work.
+
+Build artifacts
+---------------
+
+The configuration resolves names for system-building artifacts:
 
 * ``topology.cif`` for a full system topology and starting coordinates
-* ``trajectory.dcd`` for OpenMM trajectory frames
-* ``thermodynamics.csv`` for OpenMM reporter output
+* ``positions.cif`` for build-time coordinates
+* ``interchange.json`` for OpenFF Interchange export
+* ``system.xml`` for an OpenMM system
+* ``build_summary.json`` for the machine-readable build report written today
+* ``resolved_config.yaml`` for the exact validated input written today
 
-Those files are not generated yet because full OpenFF/OpenMM construction is
-deferred beyond this milestone.
+The YAML intentionally does not define equilibration, production MD,
+thermostats, barostats, or trajectory writing. Those OpenMM concepts are taught
+and controlled separately from the system-building config.
 
 Notebook version
 ----------------

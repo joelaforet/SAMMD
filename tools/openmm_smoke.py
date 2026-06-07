@@ -613,26 +613,23 @@ def load_smoke_config(args: argparse.Namespace) -> SAMMDConfig:
     return SAMMDConfig.model_validate(
         {
             "surface": {
-                "slab": {
-                    "lateral_size_nm": [args.lateral_size_nm, args.lateral_size_nm],
-                }
+                "lateral_size": [args.lateral_size_nm, args.lateral_size_nm],
             },
             "solvent": {
-                "padding_nm": args.solvent_padding_nm,
+                "padding": args.solvent_padding_nm,
                 "components": [
                     {
                         "name": SOLVENT_NAME,
+                        "residue_name": SOLVENT_RESIDUE_NAME,
                         "smiles": SOLVENT_SMILES,
                         "mole_fraction": 1.0,
-                        "density_g_ml": ETHANOL_DENSITY_G_ML,
-                        "molar_mass_g_mol": ETHANOL_MASS_G_MOL,
+                        "density": ETHANOL_DENSITY_G_ML,
+                        "molar_mass": ETHANOL_MASS_G_MOL,
                     }
                 ],
             },
-            "reporters": {"interval_steps": args.report_interval or 1},
-            "simulation": {
+            "experiment": {
                 "seed": args.seed,
-                "timestep_fs": args.timestep_fs,
             },
         }
     )
@@ -918,10 +915,10 @@ def build_openmm_smoke_system(
     system = openmm.System()
     nonbonded = openmm.NonbondedForce()
     nonbonded.setNonbondedMethod(openmm.NonbondedForce.PME)
-    nonbonded.setCutoffDistance(plan.config.simulation.nonbonded_cutoff_nm * unit.nanometer)
+    nonbonded.setCutoffDistance(plan.config.parameterization.nonbonded_cutoff * unit.nanometer)
     nonbonded.setUseSwitchingFunction(True)
     nonbonded.setSwitchingDistance(
-        0.9 * plan.config.simulation.nonbonded_cutoff_nm * unit.nanometer
+        0.9 * plan.config.parameterization.nonbonded_cutoff * unit.nanometer
     )
     nonbonded.setUseDispersionCorrection(True)
     bond_force = openmm.HarmonicBondForce()

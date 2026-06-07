@@ -4,7 +4,7 @@ from math import inf, nan
 
 import pytest
 
-from sammd.config import OutputConfig, SAMMDConfig
+from sammd.config import OutputFilesConfig, OutputsConfig, SAMMDConfig
 from sammd.io import (
     AtomRecord,
     format_mmcif,
@@ -38,44 +38,52 @@ def test_output_paths_default_under_base_directory(tmp_path) -> None:
     paths = plan_output_paths(SAMMDConfig(), tmp_path)
 
     assert paths.topology == tmp_path / "topology.cif"
-    assert paths.trajectory == tmp_path / "trajectory.dcd"
-    assert paths.thermodynamics == tmp_path / "thermodynamics.csv"
-    assert paths.checkpoint is None
-    assert paths.state is None
+    assert paths.positions == tmp_path / "positions.cif"
+    assert paths.openff_interchange == tmp_path / "interchange.json"
+    assert paths.openmm_system == tmp_path / "system.xml"
+    assert paths.build_summary == tmp_path / "build_summary.json"
+    assert paths.resolved_config == tmp_path / "resolved_config.yaml"
 
 
 def test_output_paths_support_user_overrides(tmp_path) -> None:
     """Resolve configured relative and optional runtime output paths."""
 
-    config = OutputConfig(
-        topology="viz/system.cif",
-        trajectory="traj/run.dcd",
-        thermodynamics="reports/state.csv",
-        checkpoint="restart.chk",
-        state="restart.xml",
+    config = OutputsConfig(
+        files=OutputFilesConfig(
+            topology="viz/system.cif",
+            positions="coords/positions.cif",
+            openff_interchange="interchange/system.json",
+            openmm_system="openmm/system.xml",
+            build_summary="reports/build_summary.json",
+            resolved_config="reports/resolved_config.yaml",
+        )
     )
 
     paths = plan_output_paths(config, tmp_path)
 
     assert paths.topology == tmp_path / "viz/system.cif"
-    assert paths.trajectory == tmp_path / "traj/run.dcd"
-    assert paths.thermodynamics == tmp_path / "reports/state.csv"
-    assert paths.checkpoint == tmp_path / "restart.chk"
-    assert paths.state == tmp_path / "restart.xml"
+    assert paths.positions == tmp_path / "coords/positions.cif"
+    assert paths.openff_interchange == tmp_path / "interchange/system.json"
+    assert paths.openmm_system == tmp_path / "openmm/system.xml"
+    assert paths.build_summary == tmp_path / "reports/build_summary.json"
+    assert paths.resolved_config == tmp_path / "reports/resolved_config.yaml"
 
 
 @pytest.mark.parametrize(
-    ("kwargs", "message"),
+        ("kwargs", "message"),
     [
         ({"topology": "topology.pdb"}, "topology output"),
-        ({"trajectory": "trajectory.xtc"}, "trajectory output"),
-        ({"thermodynamics": "thermodynamics.txt"}, "thermodynamics output"),
+        ({"positions": "positions.pdb"}, "positions output"),
+        ({"openff_interchange": "interchange.xml"}, "OpenFF Interchange output"),
+        ({"openmm_system": "system.json"}, "OpenMM system output"),
+        ({"build_summary": "build_summary.txt"}, "build summary output"),
+        ({"resolved_config": "resolved_config.json"}, "resolved config output"),
     ],
 )
 def test_output_path_suffix_validation_rejects_wrong_extensions(tmp_path, kwargs, message) -> None:
     """Reject practical output suffix mistakes before runtime construction."""
 
-    config = OutputConfig(**kwargs)
+    config = OutputsConfig(files=OutputFilesConfig(**kwargs))
 
     with pytest.raises(ValueError, match=message):
         plan_output_paths(config, tmp_path)

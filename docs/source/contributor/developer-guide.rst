@@ -21,7 +21,7 @@ Current package map
    Approximate solvent, salt, and reactant molecule-count planning.
 
 ``sammd.io`` and ``sammd.reporting``
-   Output path planning, slab-only mmCIF writing, and future reporter field
+   Output path planning, topology CIF writing helpers, and future reporter field
    metadata.
 
 ``sammd.forcefields``

@@ -3,21 +3,19 @@
 [![CI](https://github.com/joelaforet/SAMMD/actions/workflows/ci.yml/badge.svg)](https://github.com/joelaforet/SAMMD/actions/workflows/ci.yml)
 
 SAMMD is a Python package for reproducible molecular dynamics setup of
-self-assembled monolayers on metal supports. The MVP workflow now provides a
-validated YAML configuration schema, a minimal CLI, lightweight INTERFACE metal
-parameter metadata, reporter configuration helpers, and deterministic build-plan
-composition without requiring OpenMM/OpenFF build steps during unit tests.
+self-assembled monolayers on metal supports. The student-facing workflow uses a
+version-controllable YAML file to describe the system contents, packing, and
+parameterization choices before any OpenMM simulation protocol is written.
 
-The package also includes a generated CHARMM-INTERFACE Fcc metal OFFXML resource
-for future OpenFF force field assembly without making OpenFF a test dependency.
-Solution composition planning is available for converting solvent volume
-fractions plus salt/reactant molarities into deterministic molecule counts while
-remaining independent of PACKMOL and OpenFF during MVP scaffolding.
+The package includes a generated CHARMM-INTERFACE Fcc metal OFFXML resource for
+OpenFF force-field assembly without making OpenFF a test dependency. Solution
+composition planning converts solvent mole fractions, explicit salt
+stoichiometry, and reactant counts or concentrations into deterministic molecule
+counts.
 
-Visualization output planning now resolves deterministic mmCIF/PDBx topology,
-DCD trajectory, and OpenMM thermodynamics CSV artifact paths. A lightweight
-mmCIF writer can emit planned scaffold atoms for PyMOL inspection, while full
-trajectory production still awaits OpenMM builder integration.
+Build output planning resolves deterministic topology, position, OpenFF
+Interchange, OpenMM system, build summary, and resolved-config artifact paths. The
+build command writes an inspectable `topology.cif` for molecule-viewer checks.
 
 Lightweight orientation analysis primitives are available in `sammd.analysis` for
 future trajectory observables. They calculate reactant centers of mass, target
@@ -27,9 +25,9 @@ requiring MDAnalysis, OpenMM, OpenFF, or RDKit.
 
 Optional OpenFF adapter helpers live in `sammd.openff` for future backend
 parameterization work. They lazily create OpenFF molecules from configured SAM
-components, simple SMILES-bearing solvents, and reactants, report unsupported
-solvent and salt entries that cannot be converted, and can load base OpenFF
-force fields together with the packaged INTERFACE Fcc metal OFFXML resource.
+components, SMILES-bearing solvents, reactants, and separate salt ions, and can
+load base OpenFF force fields together with the packaged INTERFACE Fcc metal
+OFFXML resource.
 Undefined stereochemistry follows the safer OpenFF default unless explicitly
 allowed. These helpers require the SAMMD science/pixi environment and do not
 perform full system construction.
@@ -54,13 +52,12 @@ slab, chain B contains one propanethiolate residue per SAM molecule, chain C
 contains cinnamaldehyde, and chain D+ contains one ethanol residue per molecule
 with wrapping every 9999 residues.
 
-`build_system()` currently returns a lightweight plan rather than OpenFF/OpenMM
-objects. The plan contains the validated config, a centered double-sided
-commensurate Pd(111) slab, fcc/hcp hollow binding sites, seeded top/bottom SAM
-placement choices, solution molecule counts from an approximate composition
-planning volume, and output paths. Bridge/atop sites and one-sided or off-center
-slabs remain future build-planner work. Full backend construction is the next
-milestone.
+`build_system()` currently returns a deterministic build plan. The plan contains
+the validated config, an automatically thickened centered Pd(111) slab, internal
+fcc hollow thiol binding sites, seeded top/bottom SAM placement choices,
+solution molecule counts from an approximate composition-planning volume, and
+build output paths. The YAML intentionally does not define OpenMM simulation
+phases, thermostats, barostats, trajectory writing, or production protocols.
 
 See [docs/project-scope.md](docs/project-scope.md) for the source-of-truth scope
 and scientific defaults.
@@ -74,7 +71,12 @@ future ReadTheDocs builds. The interactive MVP walkthrough is available at
 ```bash
 sammd init -o sammd.yaml
 sammd validate sammd.yaml
+sammd build sammd.yaml --output-dir outputs --overwrite
 ```
+
+The build command writes `outputs/topology.cif`, `outputs/build_summary.json`, and
+`outputs/resolved_config.yaml`. Open `outputs/topology.cif` in a molecule viewer
+to inspect the configured surface and SAM anchor placements before moving on.
 
 ```python
 from sammd import build_system, load_config
@@ -84,12 +86,12 @@ plan = build_system(config, output_dir="outputs")
 
 print(plan.slab.metal, plan.slab.facet)
 print(plan.solution.molecule_counts)
-plan.write_planned_slab_mmcif()  # Writes outputs/planned_slab.cif by default
+plan.write_topology_cif()  # Writes outputs/topology.cif by default
 ```
 
-The emitted mmCIF is a slab-only visualization scaffold, not a complete system
-topology or final simulation cell. The configured `topology.cif` path remains
-reserved for the future full topology artifact.
+The config also names build artifacts such as `positions.cif`,
+`interchange.json`, `system.xml`, `build_summary.json`, and
+`resolved_config.yaml` for backend system-building work.
 
 ## Developer checks
 

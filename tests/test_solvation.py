@@ -2,16 +2,12 @@
 
 import pytest
 
-from sammd.config import (
-    SaltConfig,
-    SAMMDConfig,
-    SolventComponentConfig,
-    SolventConfig,
-)
+from sammd.config import IonConfig, SaltConfig, SAMMDConfig, SolventComponentConfig, SolventConfig
 from sammd.solvation import (
     AVOGADRO_CONSTANT_MOL_INV,
     L_TO_ML,
     NM3_TO_L,
+    IonSpec,
     ReactantSpec,
     SaltSpec,
     SolventComponentSpec,
@@ -21,26 +17,19 @@ from sammd.solvation import (
 )
 
 
-def test_water_only_default_gives_positive_count() -> None:
-    """Plan the exact TIP3P water count for a known box volume."""
+def test_default_ethanol_gives_positive_count() -> None:
+    """Plan the default ethanol count for a known box volume."""
 
     box_volume_nm3 = 125.0
-    density_g_ml = 0.997
-    molar_mass_g_mol = 18.01528
     expected_count = round_half_up(
-        density_g_ml
-        * box_volume_nm3
-        * NM3_TO_L
-        * L_TO_ML
-        / molar_mass_g_mol
-        * AVOGADRO_CONSTANT_MOL_INV
+        0.789 * box_volume_nm3 * NM3_TO_L * L_TO_ML / 46.06844 * AVOGADRO_CONSTANT_MOL_INV
     )
 
     plan = plan_solution_composition(SAMMDConfig(), box_volume_nm3=box_volume_nm3)
 
-    assert plan.solvent_components[0].name == "water"
+    assert plan.solvent_components[0].name == "ethanol"
+    assert plan.solvent_components[0].residue_name == "EOH"
     assert plan.solvent_components[0].count == expected_count
-    assert plan.solvent_components[0].metadata["water_model"] == "TIP3P"
 
 
 def test_water_ethanol_mole_fraction_counts() -> None:
@@ -65,12 +54,15 @@ def test_water_ethanol_mole_fraction_counts() -> None:
     config = SAMMDConfig(
         solvent=SolventConfig(
             components=[
-                SolventComponentConfig(name="water", mole_fraction=water_mole_fraction),
+                SolventComponentConfig(
+                    name="water", residue_name="HOH", smiles="O", mole_fraction=water_mole_fraction
+                ),
                 SolventComponentConfig(
                     name="ethanol",
+                    residue_name="EOH",
                     smiles="CCO",
                     mole_fraction=ethanol_mole_fraction,
-                    density_g_ml=0.789,
+                    density=0.789,
                 ),
             ]
         )
@@ -87,49 +79,64 @@ def test_water_ethanol_mole_fraction_counts() -> None:
 def test_missing_cosolvent_density_fails_clearly() -> None:
     """Reject schema-bypassed mole-fraction co-solvents without density."""
 
-    with pytest.raises(ValueError, match="requires density_g_ml"):
+    with pytest.raises(ValueError, match="requires density"):
         plan_solution_components(
             box_volume_nm3=125.0,
-            solvent_components=[SolventComponentSpec(name="methanol", mole_fraction=1.0)],
+            solvent_components=[
+                SolventComponentSpec(name="methanol", residue_name="MET", mole_fraction=1.0)
+            ],
         )
 
 
-def test_nacl_molarity_produces_equal_ion_counts() -> None:
-    """Plan matched Na+ and Cl- counts for neutral NaCl."""
+def test_salt_stoichiometry_produces_ion_counts() -> None:
+    """Plan explicit cation and anion counts for non-1:1 salts."""
 
     box_volume_nm3 = 125.0
-    concentration_molar = 0.1
-    expected_count = round_half_up(
-        concentration_molar * box_volume_nm3 * NM3_TO_L * AVOGADRO_CONSTANT_MOL_INV
+    concentration = 0.1
+    formula_units = round_half_up(
+        concentration * box_volume_nm3 * NM3_TO_L * AVOGADRO_CONSTANT_MOL_INV
     )
-    config = SAMMDConfig(salts=[SaltConfig(concentration_molar=concentration_molar)])
+    config = SAMMDConfig(
+        salts=[
+            SaltConfig(
+                name="sodium_sulfate",
+                concentration=concentration,
+                cation=IonConfig(
+                    name="sodium",
+                    residue_name="SOD",
+                    smiles="[Na+]",
+                    count_per_formula_unit=2,
+                ),
+                anion=IonConfig(
+                    name="sulfate",
+                    residue_name="SUL",
+                    smiles="O=S(=O)([O-])[O-]",
+                    count_per_formula_unit=1,
+                ),
+            )
+        ]
+    )
 
     plan = plan_solution_composition(config, box_volume_nm3=box_volume_nm3)
 
-    assert plan.salts[0].cation == "Na+"
-    assert plan.salts[0].anion == "Cl-"
-    assert plan.salts[0].cation_count == plan.salts[0].anion_count
-    assert plan.salts[0].cation_count == expected_count
+    assert plan.salts[0].name == "sodium_sulfate"
+    assert plan.salts[0].cation == "sodium"
+    assert plan.salts[0].anion == "sulfate"
+    assert plan.salts[0].cation_count == 2 * formula_units
+    assert plan.salts[0].anion_count == formula_units
+    assert plan.salts[0].metadata["cation_residue_name"] == "SOD"
+    assert plan.salts[0].metadata["anion_residue_name"] == "SUL"
 
 
-def test_cinnamaldehyde_default_count_is_deterministic() -> None:
-    """Plan the default cinnamaldehyde reactant with deterministic rounding."""
+def test_default_reactant_count_is_direct() -> None:
+    """Default config places one cinnamaldehyde reactant by explicit count."""
 
-    box_volume_nm3 = 125.0
-    concentration_millimolar = 50.0
-    expected_count = round_half_up(
-        concentration_millimolar
-        / 1000.0
-        * box_volume_nm3
-        * NM3_TO_L
-        * AVOGADRO_CONSTANT_MOL_INV
-    )
-
-    plan = plan_solution_composition(SAMMDConfig(), box_volume_nm3=box_volume_nm3)
+    plan = plan_solution_composition(SAMMDConfig(), box_volume_nm3=125.0)
 
     assert plan.reactants[0].name == "cinnamaldehyde"
-    assert plan.reactants[0].count == expected_count
-    assert plan.reactants[0].concentration_millimolar == concentration_millimolar
+    assert plan.reactants[0].residue_name == "CIN"
+    assert plan.reactants[0].count == 1
+    assert plan.reactants[0].concentration_millimolar is None
 
 
 @pytest.mark.parametrize(
@@ -151,9 +158,17 @@ def test_zero_concentration_can_produce_zero_count() -> None:
 
     plan = plan_solution_components(
         box_volume_nm3=1.0,
-        solvent_components=[SolventComponentSpec(name="water", mole_fraction=1.0)],
-        salts=[SaltSpec(concentration_molar=0.0)],
-        reactants=[ReactantSpec(name="trace", smiles="C", concentration_millimolar=0.0)],
+        solvent_components=[
+            SolventComponentSpec(name="water", residue_name="HOH", mole_fraction=1.0)
+        ],
+        salts=[
+            SaltSpec(
+                concentration=0.0,
+                cation=IonSpec("sodium", "SOD", "[Na+]", 1),
+                anion=IonSpec("chloride", "CLA", "[Cl-]", 1),
+            )
+        ],
+        reactants=[ReactantSpec(name="trace", residue_name="TRC", smiles="C", concentration=0.0)],
     )
 
     assert plan.salts[0].cation_count == 0
@@ -162,27 +177,26 @@ def test_zero_concentration_can_produce_zero_count() -> None:
     assert plan.warnings
 
 
-def test_generic_reactant_formula_count() -> None:
+def test_generic_reactant_concentration_count() -> None:
     """Plan an exact generic reactant count for a known box and molarity."""
 
     box_volume_nm3 = 250.0
-    concentration_millimolar = 200.0
+    concentration = 200.0
     expected_count = round_half_up(
-        concentration_millimolar
-        / 1000.0
-        * box_volume_nm3
-        * NM3_TO_L
-        * AVOGADRO_CONSTANT_MOL_INV
+        concentration / 1000.0 * box_volume_nm3 * NM3_TO_L * AVOGADRO_CONSTANT_MOL_INV
     )
 
     plan = plan_solution_components(
         box_volume_nm3=box_volume_nm3,
-        solvent_components=[SolventComponentSpec(name="water", mole_fraction=1.0)],
+        solvent_components=[
+            SolventComponentSpec(name="water", residue_name="HOH", mole_fraction=1.0)
+        ],
         reactants=[
             ReactantSpec(
                 name="generic",
+                residue_name="GEN",
                 smiles="C",
-                concentration_millimolar=concentration_millimolar,
+                concentration=concentration,
             )
         ],
     )
@@ -194,11 +208,12 @@ def test_mole_fraction_tolerance_matches_config_schema() -> None:
     """Accept the same near-one mole-fraction total in config and raw planner."""
 
     components = [
-        SolventComponentConfig(name="water", mole_fraction=0.5),
+        SolventComponentConfig(name="water", residue_name="HOH", smiles="O", mole_fraction=0.5),
         SolventComponentConfig(
             name="ethanol",
+            residue_name="EOH",
             mole_fraction=0.4999995,
-            density_g_ml=0.789,
+            density=0.789,
         ),
     ]
     config = SAMMDConfig(solvent=SolventConfig(components=components))
@@ -225,13 +240,14 @@ def test_invalid_box_volume_fails(box_volume_nm3: float) -> None:
 @pytest.mark.parametrize(
     "components",
     [
-        [SolventComponentSpec(name="water", mole_fraction=0.75)],
+        [SolventComponentSpec(name="water", residue_name="HOH", mole_fraction=0.75)],
         [
-            SolventComponentSpec(name="water", mole_fraction=0.75),
+            SolventComponentSpec(name="water", residue_name="HOH", mole_fraction=0.75),
             SolventComponentSpec(
                 name="ethanol",
+                residue_name="EOH",
                 mole_fraction=0.5,
-                density_g_ml=0.789,
+                density=0.789,
             ),
         ],
     ],
@@ -253,8 +269,10 @@ def test_nonzero_reactant_concentration_places_one_molecule_and_warns() -> None:
 
     plan = plan_solution_components(
         box_volume_nm3=1.0,
-        solvent_components=[SolventComponentSpec(name="water", mole_fraction=1.0)],
-        reactants=[ReactantSpec(name="trace", smiles="C", concentration_millimolar=1.0)],
+        solvent_components=[
+            SolventComponentSpec(name="water", residue_name="HOH", mole_fraction=1.0)
+        ],
+        reactants=[ReactantSpec(name="trace", residue_name="TRC", smiles="C", concentration=1.0)],
     )
 
     assert plan.reactants[0].count == 1

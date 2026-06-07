@@ -1,22 +1,19 @@
-"""Validated YAML configuration for SAMMD MVP workflows."""
+"""Validated YAML configuration for SAMMD system-building workflows."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-AnchorMode = Literal["nonbonded", "bonded"]
-AnchorSite = Literal["fcc_hollow", "hcp_hollow", "bridge", "atop"]
 Facet = Literal["111"]
 Metal = Literal["Pd"]
-WaterModel = Literal["TIP3P"]
-EXPECTED_GRAFTING_DENSITY_UNIT = "nm^2 / molecule"
-EXPECTED_PD_RESTRAINT_UNIT = "kJ mol^-1 nm^-2"
-KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL = {"ethanol": 46.06844}
 MOLE_FRACTION_TOLERANCE = 1.0e-6
+KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL = {"ethanol": 46.06844}
+RESIDUE_NAME_PATTERN = re.compile(r"^[A-Z0-9]{3}$")
 
 
 class SAMMDBaseModel(BaseModel):
@@ -25,74 +22,47 @@ class SAMMDBaseModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class UnitValue(SAMMDBaseModel):
-    """Numeric value paired with a human-readable unit string."""
+class ExperimentConfig(SAMMDBaseModel):
+    """Human-readable metadata for one buildable system."""
 
-    value: float = Field(gt=0)
-    unit: str = Field(min_length=1)
-
-
-class SlabConfig(SAMMDBaseModel):
-    """Metal slab geometry and restraint defaults."""
-
-    layers: int = Field(default=8, gt=0)
-    lateral_size_nm: tuple[float, float] = (5.0, 5.0)
-    centered: bool = True
-    double_sided: bool = True
-    positional_restraint: UnitValue = Field(
-        default_factory=lambda: UnitValue(value=10000.0, unit=EXPECTED_PD_RESTRAINT_UNIT)
-    )
-
-    @model_validator(mode="after")
-    def _validate_restraint_unit(self) -> SlabConfig:
-        """Validate the expected Pd positional restraint unit."""
-
-        if self.positional_restraint.unit != EXPECTED_PD_RESTRAINT_UNIT:
-            msg = f"positional_restraint unit must be '{EXPECTED_PD_RESTRAINT_UNIT}'"
-            raise ValueError(msg)
-        return self
-
-    @field_validator("lateral_size_nm")
-    @classmethod
-    def _validate_lateral_size(cls, value: tuple[float, float]) -> tuple[float, float]:
-        """Validate positive lateral box dimensions."""
-
-        if len(value) != 2 or any(dimension <= 0 for dimension in value):
-            msg = "lateral_size_nm must contain two positive dimensions"
-            raise ValueError(msg)
-        return value
+    name: str = Field(default="propanethiol_cinnamaldehyde_pd111", min_length=1)
+    description: str = "Cinnamaldehyde near a propanethiol SAM on Pd(111)"
+    seed: int = Field(default=2026, ge=0)
 
 
 class SurfaceConfig(SAMMDBaseModel):
-    """Metal surface configuration."""
+    """Metal surface exposed to the SAM."""
 
     metal: Metal = "Pd"
     facet: Facet = "111"
-    slab: SlabConfig = Field(default_factory=SlabConfig)
+    lateral_size: tuple[float, float] = (2.0, 2.0)
 
+    @field_validator("lateral_size")
+    @classmethod
+    def _validate_lateral_size(cls, value: tuple[float, float]) -> tuple[float, float]:
+        """Validate positive lateral surface dimensions."""
 
-class AnchorNonbondedConfig(SAMMDBaseModel):
-    """Nonbonded sulfur-metal anchor proxy configuration."""
-
-    scale_factor: float = Field(default=4.0, gt=0)
-
-
-class AnchorConfig(SAMMDBaseModel):
-    """SAM anchor strategy and adsorption site configuration."""
-
-    mode: AnchorMode = "nonbonded"
-    site: AnchorSite = "fcc_hollow"
-    nonbonded: AnchorNonbondedConfig = Field(default_factory=AnchorNonbondedConfig)
+        if len(value) != 2 or any(dimension <= 0 for dimension in value):
+            msg = "lateral_size must contain two positive dimensions"
+            raise ValueError(msg)
+        return value
 
 
 class SAMComponentConfig(SAMMDBaseModel):
     """Single SAM molecular component definition."""
 
     name: str = Field(min_length=1)
+    residue_name: str
     smiles: str = Field(min_length=1)
     fraction: float | None = Field(default=None, gt=0, le=1)
     count: int | None = Field(default=None, gt=0)
-    anchor: AnchorConfig | None = None
+
+    @field_validator("residue_name")
+    @classmethod
+    def _validate_residue_name(cls, value: str) -> str:
+        """Require a PDB-style three-character residue code."""
+
+        return validate_residue_name(value)
 
     @model_validator(mode="after")
     def _validate_composition_mode(self) -> SAMComponentConfig:
@@ -107,13 +77,15 @@ class SAMComponentConfig(SAMMDBaseModel):
 class SAMConfig(SAMMDBaseModel):
     """SAM composition and grafting-density configuration."""
 
-    grafting_density: UnitValue = Field(
-        default_factory=lambda: UnitValue(value=0.25, unit=EXPECTED_GRAFTING_DENSITY_UNIT)
-    )
-    anchor: AnchorConfig = Field(default_factory=AnchorConfig)
+    grafting_density: float = Field(default=0.25, gt=0)
     components: list[SAMComponentConfig] = Field(
         default_factory=lambda: [
-            SAMComponentConfig(name="propanethiol", smiles="CCCS", fraction=1.0)
+            SAMComponentConfig(
+                name="propanethiol",
+                residue_name="PTL",
+                smiles="CCCS",
+                fraction=1.0,
+            )
         ],
         min_length=1,
     )
@@ -122,28 +94,19 @@ class SAMConfig(SAMMDBaseModel):
     def _validate_mixed_composition(self) -> SAMConfig:
         """Validate that mixed SAMs use fractions or counts consistently."""
 
-        if self.grafting_density.unit != EXPECTED_GRAFTING_DENSITY_UNIT:
-            msg = f"grafting_density unit must be '{EXPECTED_GRAFTING_DENSITY_UNIT}'"
-            raise ValueError(msg)
         fraction_count = sum(component.fraction is not None for component in self.components)
         explicit_count = sum(component.count is not None for component in self.components)
         if fraction_count and explicit_count:
             msg = "SAM components must not mix fraction and count composition modes"
             raise ValueError(msg)
         total_fraction = sum(component.fraction or 0.0 for component in self.components)
-        if fraction_count and abs(total_fraction - 1.0) > 1e-6:
+        if fraction_count and abs(total_fraction - 1.0) > MOLE_FRACTION_TOLERANCE:
             msg = "SAM component fractions must sum to 1.0"
             raise ValueError(msg)
         return self
 
     def validate_component_counts(self, total_sites: int) -> None:
-        """Validate explicit SAM component counts against selected grafting sites.
-
-        Parameters
-        ----------
-        total_sites
-            Number of selected grafting sites available for one decorated composition.
-        """
+        """Validate explicit SAM component counts against a supplied site count."""
 
         if total_sites <= 0:
             msg = "total_sites must be positive"
@@ -158,23 +121,66 @@ class SAMConfig(SAMMDBaseModel):
             raise ValueError(msg)
 
 
+class ReactantConfig(SAMMDBaseModel):
+    """Reactant molecule placed near the SAM surface."""
+
+    name: str = Field(min_length=1)
+    residue_name: str
+    smiles: str = Field(min_length=1)
+    count: int | None = Field(default=None, gt=0)
+    concentration: float | None = Field(default=None, gt=0)
+    initial_height_above_sam: float = Field(default=0.3, gt=0)
+
+    @field_validator("residue_name")
+    @classmethod
+    def _validate_residue_name(cls, value: str) -> str:
+        """Require a PDB-style three-character residue code."""
+
+        return validate_residue_name(value)
+
+    @model_validator(mode="after")
+    def _validate_amount_mode(self) -> ReactantConfig:
+        """Require exactly one reactant amount control."""
+
+        if (self.count is None) == (self.concentration is None):
+            msg = "each reactant must define exactly one of count or concentration"
+            raise ValueError(msg)
+        return self
+
+
 class SolventComponentConfig(SAMMDBaseModel):
     """Solvent component specified by solvent-only mole fraction."""
 
     name: str = Field(min_length=1)
+    residue_name: str
     smiles: str | None = None
     mole_fraction: float = Field(gt=0, le=1)
-    density_g_ml: float | None = Field(default=None, gt=0)
-    molar_mass_g_mol: float | None = Field(default=None, gt=0)
+    density: float | None = Field(default=None, gt=0)
+    molar_mass: float | None = Field(default=None, gt=0)
+
+    @field_validator("residue_name")
+    @classmethod
+    def _validate_residue_name(cls, value: str) -> str:
+        """Require a PDB-style three-character residue code."""
+
+        return validate_residue_name(value)
 
 
 class SolventConfig(SAMMDBaseModel):
-    """Solvent model and composition configuration."""
+    """Solvent composition and z-direction padding."""
 
-    water_model: WaterModel = "TIP3P"
-    padding_nm: float = Field(default=3.0, gt=0)
+    padding: float = Field(default=3.0, gt=0)
     components: list[SolventComponentConfig] = Field(
-        default_factory=lambda: [SolventComponentConfig(name="water", mole_fraction=1.0)],
+        default_factory=lambda: [
+            SolventComponentConfig(
+                name="ethanol",
+                residue_name="EOH",
+                smiles="CCO",
+                mole_fraction=1.0,
+                density=0.789,
+                molar_mass=46.06844,
+            )
+        ],
         min_length=1,
     )
 
@@ -187,51 +193,102 @@ class SolventConfig(SAMMDBaseModel):
             msg = "solvent component mole fractions must sum to 1.0"
             raise ValueError(msg)
         for component in self.components:
-            if component.name.lower() != "water" and component.density_g_ml is None:
-                msg = f"co-solvent '{component.name}' must define density_g_ml"
+            if component.name.lower() == "water":
+                continue
+            if component.density is None:
+                msg = f"solvent component '{component.name}' must define density"
                 raise ValueError(msg)
             if (
-                component.name.lower() != "water"
-                and component.molar_mass_g_mol is None
+                component.molar_mass is None
                 and component.name.lower() not in KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL
             ):
                 msg = (
-                    f"co-solvent '{component.name}' must define molar_mass_g_mol or use a "
+                    f"solvent component '{component.name}' must define molar_mass or use a "
                     "supported built-in name"
                 )
                 raise ValueError(msg)
         return self
 
 
-class SaltConfig(SAMMDBaseModel):
-    """Salt composition specified by molar concentration."""
-
-    cation: str = Field(default="Na+", min_length=1)
-    anion: str = Field(default="Cl-", min_length=1)
-    concentration_molar: float = Field(default=0.0, ge=0)
-    neutralize: bool = True
-
-
-class ReactantConfig(SAMMDBaseModel):
-    """Reactant molecule specified by SMILES and target concentration."""
+class IonConfig(SAMMDBaseModel):
+    """One ionic species in an explicitly stoichiometric salt."""
 
     name: str = Field(min_length=1)
+    residue_name: str
     smiles: str = Field(min_length=1)
-    concentration_millimolar: float = Field(gt=0)
+    count_per_formula_unit: int = Field(gt=0)
+
+    @field_validator("residue_name")
+    @classmethod
+    def _validate_residue_name(cls, value: str) -> str:
+        """Require a PDB-style three-character residue code."""
+
+        return validate_residue_name(value)
 
 
-class OutputConfig(SAMMDBaseModel):
-    """Default visualization and reporter output paths."""
+class SaltConfig(SAMMDBaseModel):
+    """Dissolved salt with explicit cation/anion stoichiometry."""
+
+    name: str = Field(min_length=1)
+    concentration: float = Field(gt=0)
+    cation: IonConfig
+    anion: IonConfig
+
+
+class PackmolConfig(SAMMDBaseModel):
+    """PACKMOL settings used during molecule packing."""
+
+    tolerance: float = Field(default=1.8, gt=0)
+    nloop: int = Field(default=200, gt=0)
+
+
+class PackingConfig(SAMMDBaseModel):
+    """Packing backend configuration."""
+
+    packmol: PackmolConfig = Field(default_factory=PackmolConfig)
+
+
+class MetalForceFieldConfig(SAMMDBaseModel):
+    """Metal force-field selection."""
+
+    type: Literal["interface"] = "interface"
+    resource: str = "interface_fcc_metals.offxml"
+
+
+class ParameterizationConfig(SAMMDBaseModel):
+    """Force-field choices for system building and parameterization."""
+
+    small_molecule_force_field: str = "openff-2.2.1.offxml"
+    charge_model: str = "openff-gnn-am1bcc-1.0.0.pt"
+    metal_force_field: MetalForceFieldConfig = Field(default_factory=MetalForceFieldConfig)
+    nonbonded_cutoff: float = Field(default=1.0, gt=0)
+
+
+class OutputFilesConfig(SAMMDBaseModel):
+    """File names written by the system builder."""
 
     topology: str = "topology.cif"
-    trajectory: str = "trajectory.dcd"
-    thermodynamics: str = "thermodynamics.csv"
-    checkpoint: str | None = None
-    state: str | None = None
+    positions: str = "positions.cif"
+    openff_interchange: str = "interchange.json"
+    openmm_system: str = "system.xml"
+    build_summary: str = "build_summary.json"
+    resolved_config: str = "resolved_config.yaml"
+
+
+class OutputsConfig(SAMMDBaseModel):
+    """Output directory and system-build artifact file names."""
+
+    directory: str = "outputs/propanethiol_cinnamaldehyde_pd111"
+    files: OutputFilesConfig = Field(default_factory=OutputFilesConfig)
 
 
 class ReporterConfig(SAMMDBaseModel):
-    """Thermodynamic reporter field selection."""
+    """OpenMM StateDataReporter field selection helper.
+
+    This model is intentionally not part of the top-level YAML system-building
+    schema. It remains available for OpenMM teaching utilities and runtime helper
+    tests that configure reporters from Python.
+    """
 
     interval_steps: int = Field(default=1000, gt=0)
     test_all_fields: bool = False
@@ -268,160 +325,309 @@ class ReporterConfig(SAMMDBaseModel):
         return value
 
 
-class SimulationConfig(SAMMDBaseModel):
-    """Lightweight simulation defaults used before backend construction."""
-
-    timestep_fs: float = Field(default=2.0, gt=0)
-    temperature_k: float = Field(default=300.0, gt=0)
-    pressure_bar: float = Field(default=1.0, gt=0)
-    nonbonded_cutoff_nm: float = Field(default=1.0, gt=0)
-    slab_cutoff_buffer_nm: float = Field(default=0.5, ge=0)
-    seed: int = Field(default=2026, ge=0)
-
-
 class SAMMDConfig(SAMMDBaseModel):
-    """Top-level SAMMD configuration model."""
+    """Top-level SAMMD system-building configuration model."""
 
+    experiment: ExperimentConfig = Field(default_factory=ExperimentConfig)
     surface: SurfaceConfig = Field(default_factory=SurfaceConfig)
     sam: SAMConfig = Field(default_factory=SAMConfig)
-    solvent: SolventConfig = Field(default_factory=SolventConfig)
-    salts: list[SaltConfig] = Field(default_factory=list)
     reactants: list[ReactantConfig] = Field(
         default_factory=lambda: [
             ReactantConfig(
                 name="cinnamaldehyde",
+                residue_name="CIN",
                 smiles="C1=CC=C(C=C1)/C=C/C=O",
-                concentration_millimolar=50.0,
+                count=1,
+                initial_height_above_sam=0.3,
             )
         ]
     )
-    output: OutputConfig = Field(default_factory=OutputConfig)
-    reporters: ReporterConfig = Field(default_factory=ReporterConfig)
-    simulation: SimulationConfig = Field(default_factory=SimulationConfig)
-
-    @model_validator(mode="after")
-    def _validate_slab_thickness(self) -> SAMMDConfig:
-        """Require the Pd(111) slab to exceed the cutoff plus buffer."""
-
-        from sammd.surfaces import get_fcc_surface_metadata
-
-        surface_metadata = get_fcc_surface_metadata(self.surface.metal, self.surface.facet)
-        thickness_nm = surface_metadata.slab_thickness_nm(self.surface.slab.layers)
-        minimum_thickness_nm = (
-            self.simulation.nonbonded_cutoff_nm + self.simulation.slab_cutoff_buffer_nm
-        )
-        if thickness_nm <= minimum_thickness_nm:
-            msg = (
-                "Pd(111) slab thickness must exceed nonbonded_cutoff_nm plus "
-                f"slab_cutoff_buffer_nm; got {thickness_nm:.3f} nm and require more than "
-                f"{minimum_thickness_nm:.3f} nm"
-            )
-            raise ValueError(msg)
-        return self
+    solvent: SolventConfig = Field(default_factory=SolventConfig)
+    salts: list[SaltConfig] = Field(default_factory=list)
+    packing: PackingConfig = Field(default_factory=PackingConfig)
+    parameterization: ParameterizationConfig = Field(default_factory=ParameterizationConfig)
+    outputs: OutputsConfig = Field(default_factory=OutputsConfig)
 
 
-CONFIG_TEMPLATE = """# SAMMD MVP configuration template
-# Defaults follow docs/project-scope.md and avoid backend-specific build settings.
+CONFIG_TEMPLATE = """# ============================================================================
+# SAMMD: Created by Joseph R. Laforet Jr.
+# Self-Assembled Monolayers studied with Molecular Dynamics
+# ============================================================================
+
+# ============================================================================
+# SAMMD System Configuration Template
+# ============================================================================
+#
+# INSTRUCTIONS:
+# 1. Save this file as config.yaml in your project directory.
+# 2. Edit the values for your surface, SAM, solvent, salts, and reactants.
+# 3. Validate your configuration:
+#
+#      sammd validate config.yaml
+#
+# 4. Build and parameterize your molecular system:
+#
+#      sammd build config.yaml --output-dir outputs/my_system --overwrite
+#
+# 5. Use the exported OpenMM/OpenFF files in your own OpenMM simulation script.
+#
+# This file defines the molecular system only.
+# It does NOT define equilibration, production MD, thermostats, barostats,
+# trajectory saving, or OpenMM simulation phases.
+#
+# ============================================================================
+
+# ============================================================================
+# Experiment Metadata
+# ============================================================================
+experiment:
+  name: propanethiol_cinnamaldehyde_pd111
+  description: Cinnamaldehyde near a propanethiol SAM on Pd(111)
+  seed: 2026
+
+
+# ============================================================================
+# Metal Surface
+# ============================================================================
+# SAMMD currently supports Pd(111).
+#
+# The slab thickness is chosen automatically from the metal geometry and
+# nonbonded cutoff so that periodic metal surfaces do not interact through
+# the slab in the z direction.
+#
 surface:
   metal: Pd
   facet: "111"
-  slab:
-    layers: 8
-    lateral_size_nm: [5.0, 5.0]
-    centered: true
-    double_sided: true
-    positional_restraint:
-      value: 10000.0
-      unit: kJ mol^-1 nm^-2
+  lateral_size: [2.0, 2.0]  # nm, x and y size of the surface
 
+
+# ============================================================================
+# Self-Assembled Monolayer
+# ============================================================================
+# Each SAM molecule must contain a thiol group. SAMMD uses the sulfur atom
+# to attach the molecule to the metal surface.
+#
+# residue_name must be a 3-character PDB residue code.
+#
+# For mixed SAMs, list multiple components and make fractions sum to 1.0.
+#
 sam:
-  grafting_density:
-    value: 0.25
-    unit: nm^2 / molecule
-  anchor:
-    mode: nonbonded
-    site: fcc_hollow
-    nonbonded:
-      scale_factor: 4.0
+  grafting_density: 0.25  # nm^2 / molecule
+
   components:
     - name: propanethiol
+      residue_name: PTL
       smiles: CCCS
       fraction: 1.0
 
-solvent:
-  water_model: TIP3P
-  padding_nm: 3.0
-  components:
-    - name: water
-      mole_fraction: 1.0
+# Example mixed SAM:
+#
+# sam:
+#   grafting_density: 0.25  # nm^2 / molecule
+#   components:
+#     - name: propanethiol
+#       residue_name: PTL
+#       smiles: CCCS
+#       fraction: 0.75
+#     - name: mercaptoethanol
+#       residue_name: MCE
+#       smiles: OCCS
+#       fraction: 0.25
 
-salts: []
 
+# ============================================================================
+# Reactants
+# ============================================================================
+# Molecules that will be placed near the SAM surface.
+#
+# residue_name must be a 3-character PDB residue code.
+#
+# Use exactly ONE of:
+#   - count
+#   - concentration
+#
+# concentration is interpreted as millimolar.
+#
+# initial_height_above_sam controls the starting distance above the SAM.
+# This is only an initial placement choice. It is not a restraint.
+#
 reactants:
   - name: cinnamaldehyde
+    residue_name: CIN
     smiles: C1=CC=C(C=C1)/C=C/C=O
-    concentration_millimolar: 50.0
+    count: 1
+    initial_height_above_sam: 0.3  # nm
 
-output:
-  topology: topology.cif
-  trajectory: trajectory.dcd
-  thermodynamics: thermodynamics.csv
+# Example concentration-based reactant:
+#
+# reactants:
+#   - name: cinnamaldehyde
+#     residue_name: CIN
+#     smiles: C1=CC=C(C=C1)/C=C/C=O
+#     concentration: 50.0  # mM
+#     initial_height_above_sam: 0.3  # nm
 
-reporters:
-  interval_steps: 1000
-  test_all_fields: false
-  fields:
-    - step
-    - time
-    - potential_energy
-    - kinetic_energy
-    - total_energy
-    - temperature
-    - volume
-    - density
-    - speed
-    - elapsed_time
 
-simulation:
-  timestep_fs: 2.0
-  temperature_k: 300.0
-  pressure_bar: 1.0
-  nonbonded_cutoff_nm: 1.0
-  slab_cutoff_buffer_nm: 0.5
-  seed: 2026
+# ============================================================================
+# Solvent
+# ============================================================================
+# Solvent is packed above and around the slab/SAM/reactant system.
+#
+# padding is the solvent padding above the slab in the z direction.
+# The simulation box is always periodic in this release.
+#
+# residue_name must be a 3-character PDB residue code.
+#
+solvent:
+  padding: 3.0  # nm, z-direction solvent padding above the slab
+
+  components:
+    - name: ethanol
+      residue_name: EOH
+      smiles: CCO
+      mole_fraction: 1.0
+      density: 0.789  # g/mL
+      molar_mass: 46.06844  # g/mol
+
+# Example water solvent:
+#
+# solvent:
+#   padding: 3.0  # nm, z-direction solvent padding above the slab
+#   components:
+#     - name: water
+#       residue_name: HOH
+#       smiles: O
+#       mole_fraction: 1.0
+#       density: 0.997  # g/mL
+#       molar_mass: 18.01528  # g/mol
+
+
+# ============================================================================
+# Salts
+# ============================================================================
+# Optional dissolved salts.
+# Leave as [] if no salt is needed.
+#
+# concentration is interpreted as molar.
+#
+# Each ion gets its own residue_name so it can be selected separately
+# during visualization and analysis.
+#
+# residue_name must be a 3-character PDB residue code.
+#
+# count_per_formula_unit defines explicit salt stoichiometry.
+#
+salts: []
+
+# Example NaCl:
+#
+# salts:
+#   - name: sodium_chloride
+#     concentration: 0.15  # M
+#
+#     cation:
+#       name: sodium
+#       residue_name: SOD
+#       smiles: "[Na+]"
+#       count_per_formula_unit: 1
+#
+#     anion:
+#       name: chloride
+#       residue_name: CLA
+#       smiles: "[Cl-]"
+#       count_per_formula_unit: 1
+#
+# Example sodium sulfate:
+#
+# salts:
+#   - name: sodium_sulfate
+#     concentration: 0.05  # M
+#
+#     cation:
+#       name: sodium
+#       residue_name: SOD
+#       smiles: "[Na+]"
+#       count_per_formula_unit: 2
+#
+#     anion:
+#       name: sulfate
+#       residue_name: SUL
+#       smiles: "O=S(=O)([O-])[O-]"
+#       count_per_formula_unit: 1
+
+
+# ============================================================================
+# Packing
+# ============================================================================
+# PACKMOL options used when placing solvent molecules around the fixed
+# slab/SAM/reactant structure.
+#
+packing:
+  packmol:
+    tolerance: 1.8  # Angstrom
+    nloop: 200
+
+
+# ============================================================================
+# Parameterization
+# ============================================================================
+# Force-field choices for the system builder.
+#
+# The small-molecule force field is used for SAM molecules, reactants,
+# solvent molecules, and salts.
+#
+# Metal atoms use the SAMMD INTERFACE force-field port.
+#
+parameterization:
+  small_molecule_force_field: openff-2.2.1.offxml
+  charge_model: openff-gnn-am1bcc-1.0.0.pt
+
+  metal_force_field:
+    type: interface
+    resource: interface_fcc_metals.offxml
+
+  nonbonded_cutoff: 1.0  # nm
+
+
+# ============================================================================
+# Outputs
+# ============================================================================
+# Files written by the system builder.
+#
+# These files are inputs for later OpenMM scripts.
+# They are not trajectory outputs from an MD simulation.
+#
+outputs:
+  directory: outputs/propanethiol_cinnamaldehyde_pd111
+
+  files:
+    topology: topology.cif
+    positions: positions.cif
+    openff_interchange: interchange.json
+    openmm_system: system.xml
+    build_summary: build_summary.json
+    resolved_config: resolved_config.yaml
 """
 
 
+def validate_residue_name(value: str) -> str:
+    """Validate and normalize a 3-character PDB residue code."""
+
+    normalized = value.upper()
+    if normalized != value or RESIDUE_NAME_PATTERN.fullmatch(normalized) is None:
+        msg = "residue_name must be exactly 3 uppercase letters or digits"
+        raise ValueError(msg)
+    return normalized
+
+
 def load_config_dict(data: dict[str, Any]) -> SAMMDConfig:
-    """Load and validate a SAMMD configuration from a mapping.
-
-    Parameters
-    ----------
-    data
-        Parsed configuration data.
-
-    Returns
-    -------
-    SAMMDConfig
-        Validated configuration object.
-    """
+    """Load and validate a SAMMD configuration from a mapping."""
 
     return SAMMDConfig.model_validate(data)
 
 
 def load_config(path: str | Path) -> SAMMDConfig:
-    """Load and validate a SAMMD YAML configuration file.
-
-    Parameters
-    ----------
-    path
-        Path to a YAML configuration file.
-
-    Returns
-    -------
-    SAMMDConfig
-        Validated configuration object.
-    """
+    """Load and validate a SAMMD YAML configuration file."""
 
     with Path(path).open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}

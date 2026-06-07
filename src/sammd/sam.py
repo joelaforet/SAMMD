@@ -17,6 +17,7 @@ class SAMPlacement:
     """Assignment of one SAM component to one surface binding site."""
 
     component_name: str
+    component_residue_name: str
     component_smiles: str
     side: str
     site_kind: str
@@ -65,19 +66,12 @@ def plan_sam_placements(
         msg = "lateral_area_nm2 must be positive"
         raise ValueError(msg)
 
-    selected_sites_per_side = floor(lateral_area_nm2 / sam_config.grafting_density.value + 0.5)
+    selected_sites_per_side = floor(lateral_area_nm2 / sam_config.grafting_density + 0.5)
     if selected_sites_per_side <= 0:
         msg = "grafting density selects no SAM sites"
         raise ValueError(msg)
 
-    requested_site_kinds = {sam_config.anchor.site}
-    requested_site_kinds.update(
-        component.anchor.site for component in sam_config.components if component.anchor is not None
-    )
-    if len(requested_site_kinds) > 1:
-        requested = ", ".join(sorted(requested_site_kinds))
-        msg = f"mixed SAM anchor site kinds are not supported yet; requested: {requested}"
-        raise ValueError(msg)
+    requested_site_kinds = {"fcc_hollow"}
     supplied_site_kinds = {site.site_kind for site in binding_sites}
     missing_site_kinds = sorted(requested_site_kinds - supplied_site_kinds)
     if missing_site_kinds:
@@ -107,19 +101,18 @@ def plan_sam_placements(
         selected_sites = _select_spaced_sites(side_sites, selected_sites_per_side, rng)
         components = _components_for_selected_sites(sam_config, selected_sites_per_side, rng)
         for site, component in zip(selected_sites, components, strict=True):
-            anchor = component.anchor or sam_config.anchor
             placements.append(
                 SAMPlacement(
                     component_name=component.name,
+                    component_residue_name=component.residue_name,
                     component_smiles=component.smiles,
                     side=site.side,
                     site_kind=site.site_kind,
                     position_nm=site.position_nm,
                     normal=site.normal,
                     anchor_metadata={
-                        "mode": anchor.mode,
-                        "site": anchor.site,
-                        "nonbonded_scale_factor": anchor.nonbonded.scale_factor,
+                        "mode": "nonbonded",
+                        "site": "fcc_hollow",
                         "nearest_metal_atom_indices": site.nearest_metal_atom_indices,
                     },
                 )
