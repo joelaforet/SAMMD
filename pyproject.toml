@@ -59,6 +59,7 @@ omit = [
   "notebooks/*",
   "tests/*",
   "src/sammd/interchange_backend.py",
+  "src/sammd/backends/interchange.py",
 ]
 
 [tool.coverage.report]
