@@ -124,7 +124,7 @@ def test_main_docs_preserve_build_export_vs_openmm_run_model() -> None:
         PROJECT_ROOT / "docs" / "source" / "index.rst": [
             (
                 "building and exporting self-assembled monolayer chemistry, "
-                "structure, and parameter artifacts"
+                "structure, and parameters"
             ),
             "OpenMM owns minimization, equilibration, production runs, trajectories, and reporters",
         ],
@@ -735,7 +735,8 @@ def test_openmm_simulation_tutorial_teaches_required_raw_openmm_route() -> None:
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
     notebook_sources = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
     docs_content = docs_page.read_text(encoding="utf-8")
-    combined = docs_content + "\n" + notebook_sources
+    contents = [docs_content, notebook_sources]
+    combined = "\n".join(contents)
     normalized = " ".join(combined.split())
 
     required_strings = [
@@ -751,8 +752,10 @@ def test_openmm_simulation_tutorial_teaches_required_raw_openmm_route() -> None:
         "Use the raw OpenMM Python API",
         "not a SAMMD OpenMM wrapper",
     ]
-    for required_string in required_strings:
-        assert required_string in combined
+    for content in contents:
+        content_normalized = " ".join(content.split())
+        for required_string in required_strings:
+            assert required_string in content_normalized
 
     assert "``system.xml`` is an OpenMM convenience output" in normalized
     assert "post-Interchange metal-S pair edits" in normalized
@@ -776,36 +779,38 @@ def test_openmm_simulation_tutorial_covers_minimization_steps_reporters_and_plot
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
     notebook_sources = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
     docs_content = docs_page.read_text(encoding="utf-8")
-    combined = docs_content + "\n" + notebook_sources
+    contents = [docs_content, notebook_sources]
+    combined = "\n".join(contents)
     normalized = " ".join(combined.split())
 
-    assert "production_time_ns = 10.0" in combined
-    assert "desired_trajectory_frames = 300" in combined
-    assert "desired_thermo_points = 1000" in combined
-    assert "def steps_from_time" in combined
-    assert "def interval_from_count" in combined
-    assert "equilibration_steps = steps_from_time" in combined
-    assert "production_steps = steps_from_time" in combined
-    assert "trajectory_interval = interval_from_count" in combined
-    assert "thermo_interval = interval_from_count" in combined
+    for content in contents:
+        assert "production_time_ns = 10.0" in content
+        assert "desired_trajectory_frames = 300" in content
+        assert "desired_thermo_points = 1000" in content
+        assert "def steps_from_time" in content
+        assert "def interval_from_count" in content
+        assert "equilibration_steps = steps_from_time" in content
+        assert "production_steps = steps_from_time" in content
+        assert "trajectory_interval = interval_from_count" in content
+        assert "thermo_interval = interval_from_count" in content
     assert "you do not need to do the unit math by hand" in normalized
 
-    assert "initial_state = simulation.context.getState(getEnergy=True)" in combined
-    assert "math.isfinite" in combined
+    for content in contents:
+        assert "initial_state = simulation.context.getState(getEnergy=True)" in content
+        assert "math.isfinite" in content
+        assert "simulation.minimizeEnergy()" in content
+        assert "simulation.context.setVelocitiesToTemperature(temperature)" in content
+        assert "simulation.step(equilibration_steps)" in content
+        assert "simulation.step(production_steps)" in content
+        assert "DCDReporter" in content
+        assert "StateDataReporter" in content
+        assert "import pandas as pd" in content
+        assert "import matplotlib.pyplot as plt" in content
+        assert "pd.read_csv" in content
+        assert "plt.plot" in content
     assert "often a large positive number" in normalized
     assert "The first important check is that the energy is finite" in normalized
-    assert "simulation.minimizeEnergy()" in combined
     assert "maxIterations" not in combined
-
-    assert "simulation.context.setVelocitiesToTemperature(temperature)" in combined
-    assert "simulation.step(equilibration_steps)" in combined
-    assert "simulation.step(production_steps)" in combined
-    assert "DCDReporter" in combined
-    assert "StateDataReporter" in combined
-    assert "import pandas as pd" in combined
-    assert "import matplotlib.pyplot as plt" in combined
-    assert "pd.read_csv" in combined
-    assert "plt.plot" in combined
 
 
 def test_openmm_simulation_tutorial_includes_pymol_and_optional_npt_details() -> None:
@@ -825,9 +830,25 @@ def test_openmm_simulation_tutorial_includes_pymol_and_optional_npt_details() ->
     assert "NVT for equilibration and production" in normalized
     assert "MonteCarloBarostat" in combined
     assert "MonteCarloAnisotropicBarostat" in combined
+    assert "Choose one of these examples, not both" in combined
     assert "before creating ``Simulation``" in normalized
     assert "keep ``x`` and ``y`` fixed and allow only ``z`` to change" in normalized
     assert "A barostat does not replace the thermostat" in combined
+    assert "system.addForce(MonteCarloBarostat" in docs_content
+    assert re.search(r"system\.addForce\(\s+MonteCarloAnisotropicBarostat", docs_content)
+    assert "system.addForce(MonteCarloBarostat" in notebook_sources
+    assert re.search(r"system\.addForce\(\s+MonteCarloAnisotropicBarostat", notebook_sources)
+
+
+def test_docs_index_prose_avoids_openmm_student_blocked_terms() -> None:
+    """Keep the landing-page prose aligned with current student wording."""
+
+    index = (PROJECT_ROOT / "docs" / "source" / "index.rst").read_text(encoding="utf-8")
+    prose = "\n".join(line for line in index.splitlines() if not line.startswith("   "))
+
+    blocked_terms = [r"\bartifacts?\b", r"\bcontract\b"]
+    for term in blocked_terms:
+        assert re.search(term, prose, flags=re.IGNORECASE) is None
 
 
 def test_openmm_simulation_student_prose_avoids_blocked_terms() -> None:

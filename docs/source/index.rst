@@ -2,14 +2,15 @@ SAMMD documentation
 ===================
 
 SAMMD is a configuration-first package for building and exporting
-self-assembled monolayer chemistry, structure, and parameter artifacts. The YAML
-file describes the surface, SAM chemistry, reactants, solvent, salts, packing,
+self-assembled monolayer chemistry, structure, and parameters. The YAML file
+describes the surface, SAM chemistry, reactants, solvent, salts, packing,
 parameterization, and build outputs. OpenMM owns minimization, equilibration,
-production runs, trajectories, and reporters after those artifacts exist.
+production runs, trajectories, and reporters after those files exist.
 
-If you are new to Python or molecular dynamics, start with
-:doc:`tutorials/canonical-workflow`. The command-line path gets you to a first
-``topology.cif`` file before you need to write a Python script.
+If you are new to Python or molecular dynamics, start with the
+:doc:`beginner build workflow <tutorials/canonical-workflow>`. The command-line
+path gets you to a first ``topology.cif`` file before you need to write a Python
+script.
 
 The current teaching workflow starts with validation and deterministic build
 planning, then progresses toward OpenFF/OpenMM-backed system construction and

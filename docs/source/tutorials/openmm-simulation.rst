@@ -5,7 +5,7 @@ This page shows how to run OpenMM after SAMMD has written the OpenFF/OpenMM
 files. The split is simple: SAMMD builds/exports files. OpenMM runs
 minimization, equilibration, production, trajectories, and reporters.
 
-Use the raw OpenMM Python API here. Do not use a SAMMD OpenMM wrapper.
+Use the raw OpenMM Python API here, not a SAMMD OpenMM wrapper.
 
 Before starting
 ---------------
@@ -155,15 +155,18 @@ starting system.
 NVT first
 ---------
 
-This tutorial uses NVT for equilibration and production. NVT means the number of
-particles, volume, and temperature stay fixed. It is a good default first run
-because the box shape does not change while you learn the workflow.
+This tutorial uses NVT for equilibration and production. In NVT, the number of
+particles and the volume stay fixed, and the thermostat targets the chosen
+temperature. The instantaneous temperature will still fluctuate. This is a good
+default first run because the box shape does not change while you learn the
+workflow.
 
 Optional NPT note
 -----------------
 
-Use NPT only when pressure control makes sense for your system. For a bulk fluid,
-add ``MonteCarloBarostat`` before creating ``Simulation``:
+Use NPT only when pressure control makes sense for your system. Choose one of
+these examples, not both. For a bulk fluid, add ``MonteCarloBarostat`` before
+creating ``Simulation``:
 
 .. code-block:: python
 
