@@ -42,7 +42,7 @@ def test_docs_scaffold_files_exist() -> None:
 def test_canonical_notebook_has_expected_sections() -> None:
     """Validate notebook JSON and expected tutorial section headings."""
 
-    notebook_path = PROJECT_ROOT / "notebooks" / "canonical_workflow.ipynb"
+    notebook_path = PROJECT_ROOT / "notebooks" / "building_systems_with_sammd.ipynb"
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
     headings = "\n".join(
         "".join(cell.get("source", []))
@@ -501,7 +501,7 @@ def test_developer_guide_cli_map_includes_build() -> None:
     assert "``sammd init``, ``sammd validate``, and ``sammd build``" in content
 
 
-def test_canonical_workflow_separates_default_and_backend_outputs() -> None:
+def test_building_systems_notebook_separates_default_and_backend_outputs() -> None:
     """Check tutorial output sections."""
 
     page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst"
@@ -568,7 +568,7 @@ def test_canonical_workflow_separates_default_and_backend_outputs() -> None:
         assert reserved_output not in current_outputs
 
 
-def test_canonical_workflow_other_engines_section_stays_concise() -> None:
+def test_building_systems_notebook_other_engines_section_stays_concise() -> None:
     """Keep alternate-engine notes as brief export context, not engine docs."""
 
     page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst"
@@ -670,7 +670,7 @@ def test_current_beginner_docs_do_not_teach_unavailable_md_outputs_or_wrappers()
 def test_canonical_notebook_outputs_match_current_contract() -> None:
     """Keep notebook cells aligned with default and backend export contracts."""
 
-    notebook_path = PROJECT_ROOT / "notebooks" / "canonical_workflow.ipynb"
+    notebook_path = PROJECT_ROOT / "notebooks" / "building_systems_with_sammd.ipynb"
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
     sources = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
 
@@ -878,7 +878,7 @@ def test_openmm_simulation_student_prose_avoids_blocked_terms() -> None:
         assert re.search(term, combined, flags=re.IGNORECASE) is None
 
 
-def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:
+def test_building_systems_notebook_workflow_smoke(tmp_path: Path) -> None:
     """Reproduce the notebook workflow using current lightweight package APIs."""
 
     config_path = tmp_path / "sammd.yaml"

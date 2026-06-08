@@ -83,7 +83,7 @@ and scientific defaults.
 
 The documentation scaffold lives in [docs/source](docs/source/index.rst) for
 future ReadTheDocs builds. The interactive MVP walkthrough is available at
-[notebooks/canonical_workflow.ipynb](notebooks/canonical_workflow.ipynb).
+[notebooks/building_systems_with_sammd.ipynb](notebooks/building_systems_with_sammd.ipynb).
 
 ## Quick start
 

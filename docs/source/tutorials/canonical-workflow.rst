@@ -120,5 +120,5 @@ this version.
 Notebook version
 ----------------
 
-The related notebook ``notebooks/canonical_workflow.ipynb`` demonstrates the
+The related notebook ``notebooks/building_systems_with_sammd.ipynb`` demonstrates the
 default lightweight build and inspection steps interactively.
