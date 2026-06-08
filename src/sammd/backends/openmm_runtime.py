@@ -69,8 +69,8 @@ def require_openmm() -> OpenMMModules:
     except ImportError as error:
         msg = (
             "OpenMM is required for SAMMD runtime simulation helpers. Install and run from "
-            "the SAMMD science/pixi environment before creating integrators, simulations, "
-            "or runtime forces."
+            "the appropriate SAMMD CUDA pixi environment, such as cuda-12-6, before "
+            "creating integrators, simulations, or runtime forces."
         )
         raise ImportError(msg) from error
     return OpenMMModules(openmm=openmm, app=app, unit=unit)

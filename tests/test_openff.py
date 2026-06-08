@@ -150,7 +150,7 @@ def test_parameterization_plan_from_build_plan_records_counts_and_keeps_lightwei
 
 
 def test_require_openff_toolkit_fails_with_guidance(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Explain that the optional backend requires the science environment."""
+    """Explain that the optional backend requires a CUDA pixi environment."""
 
     openff_adapter = importlib.import_module("sammd.backends.openff")
     real_import_module = importlib.import_module
@@ -162,7 +162,7 @@ def test_require_openff_toolkit_fails_with_guidance(monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setattr(openff_adapter, "import_module", fake_import_module)
 
-    with pytest.raises(ImportError, match="science/pixi environment"):
+    with pytest.raises(ImportError, match="CUDA pixi environment"):
         openff_adapter.require_openff_toolkit()
 
 

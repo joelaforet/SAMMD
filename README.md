@@ -20,7 +20,7 @@ counts.
 Build output planning resolves deterministic artifact paths. By default, the
 build command writes an inspectable `topology.cif` for molecule-viewer checks;
 SAM sulfur anchor placeholders are shown at planned sulfur positions above or
-below the selected surface sites. In the optional science environment,
+below the selected surface sites. In a CUDA-labeled pixi environment,
 `sammd build --export-backend` writes `interchange.json` as the primary portable
 OpenFF Interchange export, with `system.xml` only as an OpenMM convenience export.
 
@@ -38,7 +38,8 @@ metal OFFXML resource. The planned backend route is OpenFF Toolkit molecule and
 ForceField preparation, OpenFF Interchange construction/export, then a selected
 post-export metal-S Lennard-Jones override in OpenMM representation.
 Undefined stereochemistry follows the safer OpenFF default unless explicitly
-allowed. These helpers require the SAMMD science/pixi environment. Salt ions are
+allowed. These helpers require a SAMMD CUDA pixi environment with OpenFF
+available. Salt ions are
 planned in the YAML schema but are not yet supported by `--export-backend`; salt
 configs fail loudly rather than producing partial backend artifacts.
 
@@ -52,7 +53,7 @@ Users must still run dynamics through OpenMM itself; SAMMD does not own
 minimization, production, trajectory writing, or reporter setup.
 
 A development smoke runner is available at `tools/openmm_smoke.py` for testing
-the science environment against a compact real Pd(111)/propanethiol SAM input
+a CUDA pixi environment against a compact real Pd(111)/propanethiol SAM input
 with cinnamaldehyde and ethanol. It is not part of the public package API and
 uses pragmatic direct OpenMM construction for stability testing while full
 backend construction remains a future milestone. Ethanol placement is generated
@@ -98,10 +99,26 @@ The default build command writes `outputs/topology.cif`,
 `outputs/topology.cif` in a molecule viewer to inspect the configured surface and
 SAM anchor placements before moving on.
 
-To write parameterized backend artifacts, use the optional science environment:
+To write parameterized backend artifacts, use a CUDA-labeled pixi environment.
+On a GPU node or workstation, start by checking the NVIDIA driver:
 
 ```bash
-pixi run -e science sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+nvidia-smi
+```
+
+Choose an environment whose CUDA version is not newer than the CUDA version shown
+by `nvidia-smi`:
+
+| Environment | CUDA line | OpenMM pin | Example location |
+| --- | --- | --- | --- |
+| `cuda-12-4` | 12.4 | `openmm=8.1.2` | CU Boulder Blanca older-GPU nodes |
+| `cuda-12-6` | 12.6 | `openmm=8.4.0` | PSC Bridges2 |
+| `cuda-13-0` | 13.0 | `openmm=8.5.1` | newer local NVIDIA drivers |
+
+For example, on Bridges2:
+
+```bash
+pixi run -e cuda-12-6 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
 ```
 
 That backend mode writes `interchange.json`, `positions.cif`, `system.xml`, and
@@ -127,7 +144,7 @@ guaranteed across OpenFF Interchange versions.
 ## Developer checks
 
 Use the lightweight development environment for routine checks; optional
-OpenFF/OpenMM science tests skip unless those packages are available.
+OpenFF/OpenMM CUDA tests skip unless those packages are available.
 
 ```bash
 python -m pytest --cov=sammd --cov-report=term-missing
@@ -141,19 +158,19 @@ pixi run test
 pixi run lint
 ```
 
-The optional science environment includes OpenMM, OpenFF, RDKit, mBuild,
-PACKMOL, and `ipykernel`. To run the real-system smoke test from that
+The CUDA pixi environments include OpenMM, OpenFF, RDKit, mBuild, PACKMOL, and
+`ipykernel`. To run the real-system smoke test from the Bridges2-style
 environment:
 
 ```bash
-pixi install -e science
-pixi run -e science real-system-smoke
+pixi install -e cuda-12-6
+pixi run -e cuda-12-6 real-system-smoke
 ```
 
-To register the same environment as a Jupyter kernel:
+To register the selected environment as a Jupyter kernel:
 
 ```bash
-pixi run -e science install-science-kernel
+pixi run -e cuda-12-6 install-cuda-kernel
 ```
 
 The docs/notebook smoke coverage is included in pytest. To force a Sphinx docs

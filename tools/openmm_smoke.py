@@ -1,8 +1,8 @@
 """Run a small real OpenMM smoke system for SAMMD.
 
 This script is intentionally outside the public package API. It exercises the current
-deterministic planners with optional science dependencies from the pixi ``science``
-environment and builds a pragmatic OpenMM system directly for backend validation.
+deterministic planners with optional OpenFF/OpenMM dependencies from a CUDA-labeled
+pixi environment and builds a pragmatic OpenMM system directly for backend validation.
 """
 
 from __future__ import annotations
@@ -556,13 +556,13 @@ def validate_args(args: argparse.Namespace) -> None:
 
 
 def require_openmm_modules() -> Any:
-    """Import OpenMM lazily with guidance for pixi science users."""
+    """Import OpenMM lazily with guidance for CUDA pixi users."""
 
     try:
         import openmm
         from openmm import app, unit
     except ImportError as error:
-        msg = "OpenMM is required; run this through `pixi run -e science real-system-smoke`."
+        msg = "OpenMM is required; run this through `pixi run -e cuda-12-6 real-system-smoke`."
         raise SystemExit(msg) from error
     return type("OpenMMModules", (), {"openmm": openmm, "app": app, "unit": unit})
 
@@ -577,7 +577,7 @@ def require_openff_modules() -> Any:
     except ImportError as error:
         msg = (
             "OpenFF Toolkit with NAGL support is required; run this through "
-            "`pixi run -e science real-system-smoke`."
+            "`pixi run -e cuda-12-6 real-system-smoke`."
         )
         raise SystemExit(msg) from error
     return type(

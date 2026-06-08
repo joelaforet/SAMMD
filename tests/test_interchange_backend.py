@@ -84,7 +84,7 @@ def test_backend_export_rejects_salts_before_optional_imports(tmp_path: Path) ->
 
 
 def test_interface_metal_offxml_loads_with_current_openff() -> None:
-    """The packaged INTERFACE OFFXML stays compatible with the science env toolkit."""
+    """The packaged INTERFACE OFFXML stays compatible with the CUDA env toolkit."""
 
     pytest.importorskip("openff.toolkit")
     from sammd.backends.openff import interface_fcc_metal_offxml_resource

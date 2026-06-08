@@ -50,8 +50,8 @@ The result includes the validated configuration and resolved output paths. It
 also includes a centered registered Fcc(111) slab, using Pd(111) by default,
 internal ``fcc_hollow`` binding sites, placeholder sulfur anchors for the SAM,
 and approximate solution counts. SAMMD writes full SAM molecule coordinates and
-a parameterized backend system only when you run from the science environment
-with ``--export-backend``.
+a parameterized backend system only when you run from a CUDA-labeled pixi
+environment with ``--export-backend``.
 
 4. Inspect outputs
 ------------------
@@ -71,12 +71,15 @@ lightweight command does not write ``positions.cif``, ``interchange.json``,
 5. Optional backend output files
 --------------------------------
 
-Use the optional science environment when you want SAMMD to write files for
-OpenFF/OpenMM:
+Use a CUDA-labeled pixi environment when you want SAMMD to write files for
+OpenFF/OpenMM. Run ``nvidia-smi`` on the machine first, then choose an
+environment whose CUDA version is not newer than the CUDA version shown there.
+For example, use ``cuda-12-4`` for CU Boulder Blanca older-GPU nodes and
+``cuda-12-6`` for PSC Bridges2.
 
 .. code-block:: bash
 
-   pixi run -e science sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+   pixi run -e cuda-12-6 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
 
 That command writes these additional files:
 

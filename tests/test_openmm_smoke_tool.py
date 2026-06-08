@@ -29,7 +29,7 @@ def load_smoke_tool():
 
 
 def test_smoke_tool_import_does_not_import_heavy_science_modules() -> None:
-    """Keep the smoke tool importable before the science environment is active."""
+    """Keep the smoke tool importable before a CUDA environment is active."""
 
     sys.modules.pop("openmm", None)
     sys.modules.pop("rdkit", None)

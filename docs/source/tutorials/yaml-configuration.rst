@@ -59,7 +59,7 @@ Important sections
      Records the OpenFF small-molecule force field, charge model, INTERFACE metal
      force-field file, and nonbonded cutoff. The default builder checks and saves
      these choices. It does not create a complete OpenMM simulation system unless
-     you run ``sammd build --export-backend`` in the science environment. The
+     you run ``sammd build --export-backend`` in a CUDA-labeled pixi environment. The
      INTERFACE metal file gives the base slab LJ parameters. SAMMD records
      sulfur-metal LJ changes in the build summary; you do not configure them
      here.

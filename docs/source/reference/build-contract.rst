@@ -28,7 +28,7 @@ The supported first-release command-line surface is:
        artifacts into ``DIR``. Existing artifacts are protected unless
        ``--overwrite`` is supplied.
    * - ``sammd build CONFIG --output-dir DIR --overwrite --export-backend``
-     - In the optional science environment, write OpenFF Interchange and OpenMM
+     - In a CUDA-labeled pixi environment, write OpenFF Interchange and OpenMM
        backend artifacts in addition to the lightweight artifacts. Salt-containing
        configs are rejected until salt export is implemented.
 
@@ -59,7 +59,7 @@ exposes deterministic slab, SAM placement, solution composition, output paths,
 top-level public import in ``sammd.__all__``. ``SAMMDBuildPlan`` is not an OpenMM
 ``System``, an OpenFF ``Interchange``, or a simulation wrapper. Code that needs
 full backend construction should use the explicit CLI backend export path or the
-internal backend module from the science environment.
+internal backend module from a CUDA-labeled pixi environment.
 
 The ``build_summary()`` SAM section records the first-release metal-S interaction
 strategy as dependency-free metadata. The canonical mode is
@@ -160,7 +160,7 @@ Current limitation
 
 By default, ``sammd build`` writes only ``topology.cif``,
 ``build_summary.json``, and ``resolved_config.yaml``. With ``--export-backend``
-in the science environment, it also writes ``positions.cif``,
+in a CUDA-labeled pixi environment, it also writes ``positions.cif``,
 ``interchange.json``, ``system.xml``, and ``anchor_metadata.json``. Public SAMMD
 APIs should not add equilibration, production simulation helpers, or direct
 GROMACS/LAMMPS/Amber command workflows as part of this contract.

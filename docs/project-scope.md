@@ -29,7 +29,7 @@ Recommended v0.1.0 first-release deliverables:
 - A registered Fcc(111) slab builder, defaulting to Pd(111), and propanethiol SAM placement with tunable grafting density.
 - Mixed SAM support through multiple SAM component definitions with fractions or explicit counts.
 - Centered, double-sided registered Fcc(111) slab geometry with SAMs on both faces and solvent on both sides.
-- Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices. The default build remains lightweight; `sammd build --export-backend` performs parameterized backend export in the science environment for supported non-salt configs.
+- Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices. The default build remains lightweight; `sammd build --export-backend` performs parameterized backend export in a CUDA-labeled pixi environment for supported non-salt configs.
 - Static CHARMM-INTERFACE-derived Fcc metal Lennard-Jones parameters packaged or identified as OpenFF-compatible OFFXML resource support.
 - Visualization-friendly build artifacts, centered on mmCIF/PDBx topology-inspection output plus machine-readable build summaries.
 - Pytest coverage for configuration validation, parameter conversion, deterministic builders, and import smoke tests.
@@ -55,6 +55,8 @@ Defer until after v0.1.0:
 Reusable ideas:
 
 - Pixi environments for reproducible conda-forge installs.
+- CUDA-labeled pixi environments so OpenMM matches the NVIDIA driver available
+  on the machine.
 - Pydantic YAML schema plus loader functions for user configuration.
 - Small CLI entry points for initialization and validation.
 - `pytest` plus `pytest-cov` in the developer environment.
@@ -92,7 +94,18 @@ Conversion notes:
 
 [OpenFF Interchange construction](https://docs.openforcefield.org/projects/interchange/en/stable/using/construction.html) supports constructing an `Interchange` from a SMIRNOFF `ForceField` and OpenFF `Molecule` or `Topology` objects.
 
-The SAMMD backend pipeline uses OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy is applied after export to the selected OpenMM pair representation rather than encoded as a beginner-facing YAML option. The explicit `sammd build --export-backend` path writes `positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json` for supported non-salt configs in the science environment.
+The SAMMD backend pipeline uses OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy is applied after export to the selected OpenMM pair representation rather than encoded as a beginner-facing YAML option. The explicit `sammd build --export-backend` path writes `positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json` for supported non-salt configs in a CUDA-labeled pixi environment.
+
+OpenMM GPU support is tied to the NVIDIA driver and CUDA line available on the
+machine. Students should run `nvidia-smi` on the GPU node or workstation, then
+choose the SAMMD pixi environment whose CUDA version is not newer than the CUDA
+version shown there. Current teaching environments are:
+
+| Environment | CUDA line | OpenMM pin | Example location |
+| --- | --- | --- | --- |
+| `cuda-12-4` | 12.4 | `openmm=8.1.2` | CU Boulder Blanca older-GPU nodes |
+| `cuda-12-6` | 12.6 | `openmm=8.4.0` | PSC Bridges2 |
+| `cuda-13-0` | 13.0 | `openmm=8.5.1` | newer local NVIDIA drivers |
 
 The `interchange.json` artifact is OpenFF Interchange JSON serialization with `Interchange.model_dump_json` and reload through `Interchange.model_validate_json`. SAMMD records the concrete `openff-interchange` package version when a real artifact is written, because pre-1.0 Interchange JSON compatibility is not guaranteed across versions.
 
@@ -155,7 +168,7 @@ Initial package modules:
 - `sammd.backends.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
 - `sammd.model.solvation`: solvent mixture, salt, and reactant count calculations from solvent-only mole fractions and concentrations, followed by OpenFF/PACKMOL packing.
 - `sammd.core.builders`: high-level lightweight build planner.
-- `sammd.backends.interchange`: optional science-environment OpenFF `Interchange` construction/export path for supported non-salt configs.
+- `sammd.backends.interchange`: optional CUDA-environment OpenFF `Interchange` construction/export path for supported non-salt configs.
 - `sammd.backends.openmm_runtime`: optional/internal OpenMM utilities for development and backend validation, not a student-facing SAMMD run-wrapper API.
 - `sammd.core.io`: v0.1.0 mmCIF/PDBx topology-inspection writing; post-v0.1.0 DCD trajectory naming conventions and visualization-oriented metadata helpers.
 - `sammd.runtime.reporting`: post-v0.1.0 OpenMM reporter configuration for trajectories and thermodynamic state data.
@@ -185,11 +198,11 @@ The current `sammd build` command writes the v0.1.0 first-release artifacts:
 - `build_summary.json`: machine-readable summary of the validated plan and output paths.
 - `resolved_config.yaml`: validated YAML configuration used for the build.
 
-The optional science-environment backend export preserves the small public API surface while
+The optional CUDA-environment backend export preserves the small public API surface while
 adding artifact exports for OpenMM handoff:
 
 ```bash
-pixi run -e science sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+pixi run -e cuda-12-6 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
 ```
 
 That command writes `interchange.json`, `positions.cif`, `system.xml`, and
@@ -228,7 +241,7 @@ By default, `sammd build` writes `topology.cif`, `build_summary.json`, and
 `resolved_config.yaml`. The default `topology.cif` is a lightweight
 topology-inspection CIF for the deterministic plan, showing placeholder sulfur
 anchors at planned sulfur positions rather than full SAM molecule coordinates.
-With `--export-backend` in the science environment, SAMMD also writes
+With `--export-backend` in a CUDA-labeled pixi environment, SAMMD also writes
 `positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json`.
 The `interchange.json` artifact is JSON from `Interchange.model_dump_json` with
 reload through `Interchange.model_validate_json`; the concrete

@@ -11,13 +11,15 @@ from typing import Any
 
 OPENFF_INSTALL_GUIDANCE = (
     "OpenFF Toolkit is an optional SAMMD backend dependency. Install and use the "
-    "SAMMD science/pixi environment with OpenFF Toolkit available before calling "
+    "appropriate SAMMD CUDA pixi environment, such as cuda-12-6, with OpenFF "
+    "Toolkit available before calling "
     "OpenFF adapter utilities."
 )
 
 OPENFF_INTERCHANGE_INSTALL_GUIDANCE = (
     "OpenFF Interchange is an optional SAMMD backend dependency. Install and use the "
-    "SAMMD science/pixi environment with OpenFF Interchange available before calling "
+    "appropriate SAMMD CUDA pixi environment, such as cuda-12-6, with OpenFF "
+    "Interchange available before calling "
     "OpenFF backend construction utilities."
 )
 

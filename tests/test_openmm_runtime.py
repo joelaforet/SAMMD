@@ -212,7 +212,7 @@ def test_require_openmm_error_mentions_science_pixi_environment(monkeypatch) -> 
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
 
-    with pytest.raises(ImportError, match="science/pixi environment"):
+    with pytest.raises(ImportError, match="CUDA pixi environment"):
         require_openmm()
 
 

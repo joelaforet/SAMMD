@@ -76,7 +76,7 @@ def validate(config: Path) -> None:
 @click.option(
     "--export-backend",
     is_flag=True,
-    help="Write OpenFF Interchange and OpenMM backend artifacts using optional science deps.",
+    help="Write OpenFF Interchange and OpenMM backend artifacts using optional CUDA deps.",
 )
 def build(config: Path, output_dir: Path | None, overwrite: bool, export_backend: bool) -> None:
     """Build the current plan and write topology.cif plus reports."""
