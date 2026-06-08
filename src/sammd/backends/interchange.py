@@ -16,12 +16,19 @@ from typing import Any
 
 from sammd.backends.forcefields import get_fcc_metal_parameters
 from sammd.backends.openff import (
+    PreparedMoleculeTemplate,
     force_field_inputs_from_config,
+    prepare_molecule_template,
     require_openff_interchange,
     require_openff_toolkit,
 )
 from sammd.backends.openmm_runtime import add_sulfur_metal_lj_exceptions, require_openmm
-from sammd.core.io import safe_write_text
+from sammd.backends.packmol import (
+    PackmolMoleculeTemplate,
+    pack_fixed_solute_with_solvent,
+    packmol_file_stem,
+)
+from sammd.core.io import AtomRecord, safe_write_text
 from sammd.model.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
 from sammd.model.sam import SAMPlacement
 from sammd.utils.geometry import (
@@ -36,6 +43,12 @@ from sammd.utils.geometry import (
 )
 
 KCAL_TO_KJ = 4.184
+MAX_RESIDUES_PER_CHAIN = 9999
+# One-character PDB chain IDs are reserved for metal slab atoms as M, so component
+# chains intentionally skip M while keeping deterministic allocation order.
+CHAIN_LETTERS = "ABCDEFGHIJKLNOPQRSTUVWXYZ"
+PACKMOL_TOLERANCE_ANGSTROM = 1.8
+PACKMOL_NLOOP = 200
 
 
 @dataclass(frozen=True)
@@ -50,17 +63,71 @@ class BackendExportResult:
     sulfur_indices: tuple[int, ...]
     metal_indices: tuple[int, ...]
     anchor_pairs: tuple[tuple[int, int], ...]
-    component_ranges: dict[str, dict[str, int]]
+    component_ranges: dict[str, dict[str, object]]
     files: dict[str, Path]
     openff_toolkit_version: str | None
     openff_interchange_version: str | None
 
 
 @dataclass(frozen=True)
-class _MoleculeTemplate:
-    molecule: Any
-    positions_nm: tuple[Vector3, ...]
-    atom_symbols: tuple[str, ...]
+class _ResidueIdentity:
+    chain_id: str
+    residue_id: int
+    residue_name: str
+
+
+class _ComponentResidueAssigner:
+    """Assign one stable residue identity per chemically meaningful molecule."""
+
+    def __init__(self) -> None:
+        self._next_chain_index = 0
+        self._states: dict[str, dict[str, object]] = {}
+        self._component_ranges: dict[str, dict[str, object]] = {}
+
+    @property
+    def component_ranges(self) -> dict[str, dict[str, object]]:
+        return {key: dict(value) for key, value in self._component_ranges.items()}
+
+    def allocate(self, component_name: str, residue_name: str) -> _ResidueIdentity:
+        state = self._states.get(component_name)
+        if state is None:
+            chain_id = self._next_chain_id()
+            state = {
+                "residue_name": residue_name,
+                "chain_ids": [chain_id],
+                "next_residue_id": 1,
+                "residue_count": 0,
+            }
+            self._states[component_name] = state
+
+        chain_ids = state["chain_ids"]
+        next_residue_id = int(state["next_residue_id"])
+        if next_residue_id > MAX_RESIDUES_PER_CHAIN:
+            chain_ids.append(self._next_chain_id())
+            next_residue_id = 1
+
+        identity = _ResidueIdentity(
+            chain_id=str(chain_ids[-1]),
+            residue_id=next_residue_id,
+            residue_name=residue_name,
+        )
+        state["next_residue_id"] = next_residue_id + 1
+        state["residue_count"] = int(state["residue_count"]) + 1
+        self._component_ranges[component_name] = {
+            "residue_name": residue_name,
+            "residue_count": state["residue_count"],
+            "chain_ids": tuple(chain_ids),
+            "max_residues_per_chain": MAX_RESIDUES_PER_CHAIN,
+        }
+        return identity
+
+    def _next_chain_id(self) -> str:
+        if self._next_chain_index >= len(CHAIN_LETTERS):
+            msg = "backend export exceeded available one-character chain identifiers"
+            raise RuntimeError(msg)
+        chain_id = CHAIN_LETTERS[self._next_chain_index]
+        self._next_chain_index += 1
+        return chain_id
 
 
 ProgressCallback = Callable[[str], None]
@@ -209,10 +276,11 @@ def build_interchange_backend(
     _timed_progress(progress, "  force fields ready", stage_start)
     molecules: list[Any] = []
     positions_nm: list[Vector3] = []
+    atom_records: list[AtomRecord] = []
     sulfur_indices: list[int] = []
     metal_indices: list[int] = []
     anchor_pairs: list[tuple[int, int]] = []
-    component_ranges: dict[str, dict[str, int]] = {}
+    residue_assigner = _ComponentResidueAssigner()
 
     stage_start = perf_counter()
     _progress(progress, f"Preparing {len(plan.slab.positions_nm)} metal atoms")
@@ -220,33 +288,36 @@ def build_interchange_backend(
 
     pd_template = _metal_atom_molecule(toolkit, plan.slab.metal)
     stage_start = _timed_progress(progress, "  metal template ready", stage_start)
-    _append_molecule_block(
-        molecules,
-        positions_nm,
-        component_ranges,
-        "metal_slab",
-        [pd_template] * len(plan.slab.positions_nm),
-        [
-            tuple(position + shift for position, shift in zip(pos, shift_nm, strict=True))
-            for pos in plan.slab.positions_nm
-        ],
-    )
+    for metal_atom_index, pos in enumerate(plan.slab.positions_nm, start=1):
+        metal_identity = _ResidueIdentity(
+            chain_id="M",
+            residue_id=metal_atom_index,
+            residue_name=_metal_residue_name(plan.slab.metal),
+        )
+        _append_identified_molecule(
+            molecules,
+            positions_nm,
+            atom_records,
+            pd_template,
+            [tuple(position + shift for position, shift in zip(pos, shift_nm, strict=True))],
+            metal_identity,
+            component_label="metal_slab",
+        )
     metal_indices.extend(range(len(plan.slab.positions_nm)))
     _timed_progress(progress, "  metal block appended", stage_start)
 
     stage_start = perf_counter()
     _progress(progress, f"Preparing {len(plan.sam_placements.placements)} SAM molecules")
-    templates: dict[tuple[str, str], _MoleculeTemplate] = {}
+    templates: dict[tuple[str, str], Any] = {}
     for placement_index, placement in enumerate(plan.sam_placements.placements, start=1):
         template_key = (placement.component_name, placement.component_smiles)
         template = templates.get(template_key)
         if template is None:
-            template = _molecule_template(
+            template = _prepare_template(
                 toolkit,
                 placement.component_smiles,
                 placement.component_name,
-                plan.config,
-                progress=progress,
+                plan.config.parameterization.charge_model,
             )
             templates[template_key] = template
             stage_start = _timed_progress(
@@ -256,15 +327,24 @@ def build_interchange_backend(
             )
         molecule, transformed = _placed_sam_molecule(template, placement, shift_nm)
         start = len(positions_nm)
-        molecules.append(molecule)
-        positions_nm.extend(transformed)
+        _append_identified_molecule(
+            molecules,
+            positions_nm,
+            atom_records,
+            molecule,
+            transformed,
+            residue_assigner.allocate(
+                f"sam:{placement.component_name}",
+                placement.component_residue_name,
+            ),
+            component_label=f"sam:{placement.component_name}",
+        )
         sulfur_index = start + _single_atom_index(template.atom_symbols, "S", "SAM molecule")
         sulfur_indices.append(sulfur_index)
         anchor_pairs.extend(
             (sulfur_index, int(metal_index))
             for metal_index in placement.anchor_pose.nearest_metal_atom_indices
         )
-        _record_range(component_ranges, f"sam:{placement.component_name}", start, len(positions_nm))
         if placement_index % 25 == 0 or placement_index == len(plan.sam_placements.placements):
             stage_start = _timed_progress(
                 progress,
@@ -276,29 +356,37 @@ def build_interchange_backend(
     stage_start = perf_counter()
     _progress(progress, f"Preparing {reactant_count} reactants")
     for reactant in plan.solution.reactants:
-        template = _molecule_template(
+        template = _prepare_template(
             toolkit,
             reactant.smiles,
             reactant.name,
-            plan.config,
-            progress=progress,
+            plan.config.parameterization.charge_model,
         )
         stage_start = _timed_progress(
             progress,
             f"  reactant template ready: {reactant.name}",
             stage_start,
         )
-        for transformed in _simple_molecule_centers(
+        for transformed in _molecule_centers_above_solute(
             template,
             reactant.count,
             plan.box_plan.dimensions_nm,
-            z_fraction=0.72,
+            tuple(positions_nm),
+            clearance_nm=0.55,
         ):
             molecule = deepcopy(template.molecule)
-            start = len(positions_nm)
-            molecules.append(molecule)
-            positions_nm.extend(transformed)
-            _record_range(component_ranges, f"reactant:{reactant.name}", start, len(positions_nm))
+            _append_identified_molecule(
+                molecules,
+                positions_nm,
+                atom_records,
+                molecule,
+                transformed,
+                residue_assigner.allocate(
+                    f"reactant:{reactant.name}",
+                    reactant.residue_name or "RCT",
+                ),
+                component_label=f"reactant:{reactant.name}",
+            )
     _timed_progress(progress, "  reactants placed", stage_start)
 
     solvent_count = sum(solvent.count for solvent in plan.solution.solvent_components)
@@ -308,35 +396,54 @@ def build_interchange_backend(
         if solvent.smiles is None:
             msg = f"solvent component {solvent.name!r} requires explicit SMILES for backend export"
             raise ValueError(msg)
-        template = _molecule_template(
+        template = _prepare_template(
             toolkit,
             solvent.smiles,
             solvent.name,
-            plan.config,
-            progress=progress,
+            plan.config.parameterization.charge_model,
         )
         stage_start = _timed_progress(
             progress,
             f"  solvent template ready: {solvent.name}",
             stage_start,
         )
-        centered_solvent = _simple_molecule_centers(
-            template,
-            solvent.count,
-            plan.box_plan.dimensions_nm,
-            z_fraction=0.50,
+        centered_solvent = pack_fixed_solute_with_solvent(
+            solute_records=atom_records,
+            solvent_template=PackmolMoleculeTemplate(
+                residue_name=solvent.residue_name or "SOL",
+                positions_nm=template.positions_nm,
+                atom_symbols=template.atom_symbols,
+                atom_names=tuple(
+                    _atom_name(symbol, index)
+                    for index, symbol in enumerate(template.atom_symbols, 1)
+                ),
+            ),
+            solvent_name=solvent.name,
+            solvent_count=solvent.count,
+            dimensions_nm=plan.box_plan.dimensions_nm,
+            working_dir=_packmol_working_dir(plan, solvent.name),
+            tolerance_angstrom=PACKMOL_TOLERANCE_ANGSTROM,
+            nloop=PACKMOL_NLOOP,
         )
         stage_start = _timed_progress(
             progress,
-            f"  solvent centers ready: {solvent.name}",
+            f"  PACKMOL solvent positions ready: {solvent.name}",
             stage_start,
         )
         for solvent_index, transformed in enumerate(centered_solvent, start=1):
             molecule = deepcopy(template.molecule)
-            start = len(positions_nm)
-            molecules.append(molecule)
-            positions_nm.extend(transformed)
-            _record_range(component_ranges, f"solvent:{solvent.name}", start, len(positions_nm))
+            _append_identified_molecule(
+                molecules,
+                positions_nm,
+                atom_records,
+                molecule,
+                transformed,
+                residue_assigner.allocate(
+                    f"solvent:{solvent.name}",
+                    solvent.residue_name or "SOL",
+                ),
+                component_label=f"solvent:{solvent.name}",
+            )
             if solvent_index % 250 == 0 or solvent_index == len(centered_solvent):
                 stage_start = _timed_progress(
                     progress,
@@ -382,6 +489,7 @@ def build_interchange_backend(
     stage_start = perf_counter()
     _progress(progress, "Exporting OpenMM topology and positions")
     openmm_topology = interchange.to_openmm_topology()
+    _apply_openmm_atom_identities(openmm_topology, tuple(atom_records))
     _label_openmm_metal_atoms(openmm_topology, tuple(metal_indices), plan.slab.metal)
     _ensure_openmm_atom_names(openmm_topology)
     openmm_positions = modules.unit.Quantity(
@@ -398,49 +506,33 @@ def build_interchange_backend(
         sulfur_indices=tuple(sulfur_indices),
         metal_indices=tuple(metal_indices),
         anchor_pairs=tuple(anchor_pairs),
-        component_ranges=component_ranges,
+        component_ranges={
+            "metal_slab": {
+                "residue_name": _metal_residue_name(plan.slab.metal),
+                "residue_count": len(plan.slab.positions_nm),
+                "chain_ids": ("M",),
+                "max_residues_per_chain": MAX_RESIDUES_PER_CHAIN,
+            },
+            **residue_assigner.component_ranges,
+        },
         files={},
         openff_toolkit_version=_package_version("openff-toolkit"),
         openff_interchange_version=_package_version("openff-interchange"),
     )
 
 
-def _molecule_template(
+def _prepare_template(
     toolkit: Any,
     smiles: str,
     name: str,
-    config: Any,
-    *,
-    progress: ProgressCallback | None = None,
-) -> _MoleculeTemplate:
-    stage_start = perf_counter()
-    _progress(progress, f"  template {name}: parsing SMILES")
-    molecule = toolkit.Molecule.from_smiles(smiles, allow_undefined_stereo=True)
-    molecule.name = name
-    stage_start = _timed_progress(progress, f"  template {name}: SMILES parsed", stage_start)
-    _progress(progress, f"  template {name}: generating conformer")
-    molecule.generate_conformers(n_conformers=1)
-    stage_start = _timed_progress(progress, f"  template {name}: conformer ready", stage_start)
-    _progress(
-        progress,
-        f"  template {name}: assigning {config.parameterization.charge_model} charges",
-    )
-    molecule.assign_partial_charges(config.parameterization.charge_model)
-    stage_start = _timed_progress(progress, f"  template {name}: charges assigned", stage_start)
-    conformer = molecule.conformers[0]
-    positions = tuple(
-        (
-            conformer[index][0].m_as("nanometer"),
-            conformer[index][1].m_as("nanometer"),
-            conformer[index][2].m_as("nanometer"),
-        )
-        for index in range(molecule.n_atoms)
-    )
-    _timed_progress(progress, f"  template {name}: positions extracted", stage_start)
-    return _MoleculeTemplate(
-        molecule=molecule,
-        positions_nm=positions,
-        atom_symbols=tuple(atom.symbol for atom in molecule.atoms),
+    charge_model: str,
+) -> PreparedMoleculeTemplate:
+    return prepare_molecule_template(
+        smiles,
+        name,
+        charge_model,
+        toolkit=toolkit,
+        allow_undefined_stereo=True,
     )
 
 
@@ -454,7 +546,7 @@ def _metal_atom_molecule(toolkit: Any, symbol: str) -> Any:
 
 
 def _placed_sam_molecule(
-    template: _MoleculeTemplate,
+    template: PreparedMoleculeTemplate,
     placement: SAMPlacement,
     shift_nm: Vector3,
 ) -> tuple[Any, tuple[Vector3, ...]]:
@@ -475,52 +567,105 @@ def _placed_sam_molecule(
     return deepcopy(template.molecule), transformed
 
 
-def _simple_molecule_centers(
-    template: _MoleculeTemplate,
+def _molecule_centers_above_solute(
+    template: PreparedMoleculeTemplate,
     count: int,
     dimensions_nm: Vector3,
+    solute_positions_nm: tuple[Vector3, ...],
     *,
-    z_fraction: float,
+    clearance_nm: float,
 ) -> tuple[tuple[Vector3, ...], ...]:
     if count <= 0:
         return ()
-    columns = max(1, math.ceil(math.sqrt(count)))
-    rows = max(1, math.ceil(count / columns))
+    columns = max(1, math.ceil(count ** (1.0 / 3.0)))
+    rows = max(1, math.ceil(math.sqrt(count / columns)))
+    layers = max(1, math.ceil(count / (columns * rows)))
+    solute_top_z = max((position[2] for position in solute_positions_nm), default=0.0)
+    template_center = centroid(template.positions_nm)
+    template_radius = max(distance(template_center, position) for position in template.positions_nm)
+    z_start = solute_top_z + clearance_nm + template_radius
+    z_stop = max(z_start, dimensions_nm[2] - template_radius - 0.15)
+    z_spacing = max(0.22, (z_stop - z_start) / max(1, layers - 1))
     centered = []
     for index in range(count):
         col = index % columns
-        row = index // columns
+        row = (index // columns) % rows
+        layer = index // (columns * rows)
         center = (
             dimensions_nm[0] * (col + 0.5) / columns,
             dimensions_nm[1] * (row + 0.5) / rows,
-            dimensions_nm[2] * min(0.95, z_fraction + 0.02 * (index % 5)),
+            min(dimensions_nm[2] - template_radius - 0.05, z_start + layer * z_spacing),
         )
         centered.append(_center_template(template.positions_nm, center))
     return tuple(centered)
 
 
-def _append_molecule_block(
+def _packmol_working_dir(plan: Any, solvent_name: str) -> Path:
+    paths = getattr(plan, "output_paths", None)
+    solvated_system = getattr(paths, "solvated_system", None)
+    if solvated_system is None:
+        return Path(tempfile.mkdtemp(prefix="sammd-packmol-"))
+    return Path(solvated_system).parent / "packmol" / packmol_file_stem(solvent_name)
+
+
+def _append_identified_molecule(
     molecules: list[Any],
     positions_nm: list[Vector3],
-    component_ranges: dict[str, dict[str, int]],
-    name: str,
-    block_molecules: list[Any],
-    block_positions: list[Vector3],
+    atom_records: list[AtomRecord],
+    molecule: Any,
+    molecule_positions_nm: list[Vector3] | tuple[Vector3, ...],
+    identity: _ResidueIdentity,
+    *,
+    component_label: str,
 ) -> None:
-    start = len(positions_nm)
-    molecules.extend(deepcopy(molecule) for molecule in block_molecules)
-    positions_nm.extend(block_positions)
-    _record_range(component_ranges, name, start, len(positions_nm))
+    molecule = deepcopy(molecule)
+    local_names, local_symbols = _assign_openff_atom_identity(molecule, identity)
+    molecules.append(molecule)
+    for atom_name, symbol, position in zip(
+        local_names,
+        local_symbols,
+        molecule_positions_nm,
+        strict=True,
+    ):
+        positions_nm.append(position)
+        atom_records.append(
+            AtomRecord(
+                serial=len(atom_records) + 1,
+                atom_name=atom_name,
+                element=symbol,
+                residue_name=identity.residue_name,
+                residue_id=identity.residue_id,
+                chain_id=identity.chain_id,
+                component_label=component_label,
+                coordinates_nm=position,
+            )
+        )
 
 
-def _record_range(
-    component_ranges: dict[str, dict[str, int]], name: str, start: int, stop: int
-) -> None:
-    existing = component_ranges.get(name)
-    if existing is None:
-        component_ranges[name] = {"start": start, "stop": stop}
-    else:
-        existing["stop"] = stop
+def _assign_openff_atom_identity(
+    molecule: Any, identity: _ResidueIdentity
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    names = []
+    symbols = []
+    for atom_index, atom in enumerate(molecule.atoms, start=1):
+        symbol = getattr(atom, "symbol", None) or "X"
+        atom_name = getattr(atom, "name", "") or _atom_name(symbol, atom_index)
+        atom.name = atom_name
+        atom.metadata.update(
+            {
+                "chain_id": identity.chain_id,
+                "residue_number": str(identity.residue_id),
+                "residue_id": str(identity.residue_id),
+                "residue_name": identity.residue_name,
+            }
+        )
+        names.append(atom_name)
+        symbols.append(symbol)
+    return tuple(names), tuple(symbols)
+
+
+def _atom_name(symbol: str, atom_index: int) -> str:
+    return f"{symbol}{atom_index}"[:4]
 
 
 def _unique_charge_molecules(molecules: list[Any]) -> list[Any]:
@@ -542,7 +687,7 @@ def _single_atom_index(symbols: tuple[str, ...], symbol: str, label: str) -> int
     return matches[0]
 
 
-def _terminal_heavy_axis_index(template: _MoleculeTemplate, anchor_index: int) -> int:
+def _terminal_heavy_axis_index(template: PreparedMoleculeTemplate, anchor_index: int) -> int:
     heavy_indices = [
         index
         for index, symbol in enumerate(template.atom_symbols)
@@ -605,6 +750,26 @@ def _ensure_openmm_atom_names(topology: Any) -> None:
         element = getattr(atom, "element", None)
         symbol = getattr(element, "symbol", None) or "X"
         atom.name = symbol
+
+
+def _apply_openmm_atom_identities(
+    topology: Any,
+    atom_records: tuple[AtomRecord, ...],
+) -> None:
+    """Repair OpenMM atom/residue labels using the append-order identity ledger."""
+
+    atoms = tuple(topology.atoms())
+    if len(atoms) != len(atom_records):
+        msg = (
+            "OpenMM topology atom count does not match backend identity ledger: "
+            f"{len(atoms)} topology atoms, {len(atom_records)} atom records"
+        )
+        raise ValueError(msg)
+    for atom, record in zip(atoms, atom_records, strict=True):
+        atom.name = record.atom_name
+        atom.residue.name = record.residue_name
+        atom.residue.id = str(record.residue_id)
+        atom.residue.chain.id = record.chain_id
 
 
 def _label_openmm_metal_atoms(topology: Any, metal_indices: tuple[int, ...], symbol: str) -> None:

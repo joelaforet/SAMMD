@@ -1,13 +1,16 @@
 """Tests for dependency-free PACKMOL planning helpers."""
 
 from math import inf, nan
+from types import SimpleNamespace
 
 import pytest
 
 from sammd.backends.packmol import (
     PackmolJob,
+    PackmolMoleculeTemplate,
     PackmolStructure,
     build_packmol_input,
+    pack_fixed_solute_with_solvent,
     pdb_atom_line,
     read_pdb_positions_nm,
     run_packmol,
@@ -15,6 +18,7 @@ from sammd.backends.packmol import (
     zero_origin_box_bounds,
 )
 from sammd.core.builders import BoxPlan
+from sammd.core.io import AtomRecord
 
 
 def test_packmol_input_renders_fixed_solute_and_free_solvent() -> None:
@@ -456,3 +460,46 @@ def test_pdb_coordinate_parser_returns_nanometers(tmp_path) -> None:
 
     assert positions[0] == pytest.approx((0.1, 0.2, 0.3))
     assert positions[1] == pytest.approx((-0.1, 0.0, 1.2345))
+
+
+def test_fixed_solute_helper_uses_packmol_around_full_box(tmp_path, monkeypatch) -> None:
+    """High-level packing keeps solute fixed and allows solvent throughout box bounds."""
+
+    import sammd.backends.packmol as packmol_backend
+
+    packed_positions = (
+        (0.0, 0.0, 0.0),
+        (0.5, 0.5, 0.5),
+        (0.6, 0.5, 0.5),
+        (0.8, 0.7, 0.6),
+        (0.9, 0.7, 0.6),
+    )
+
+    def fake_run_packmol(job, input_path, working_dir, stdout_path):
+        return SimpleNamespace(returncode=0, stdout="Success!")
+
+    monkeypatch.setattr(packmol_backend, "run_packmol", fake_run_packmol)
+    monkeypatch.setattr(packmol_backend, "read_pdb_positions_nm", lambda path: packed_positions)
+
+    solvent_positions = pack_fixed_solute_with_solvent(
+        solute_records=(
+            AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (0.0, 0.0, 0.0)),
+        ),
+        solvent_template=PackmolMoleculeTemplate(
+            residue_name="EOH",
+            positions_nm=((0.0, 0.0, 0.0), (0.1, 0.0, 0.0)),
+            atom_symbols=("C", "O"),
+            atom_names=("C1", "O2"),
+        ),
+        solvent_name="ethanol",
+        solvent_count=2,
+        dimensions_nm=(2.0, 2.0, 2.0),
+        working_dir=tmp_path,
+    )
+
+    assert solvent_positions == (packed_positions[1:3], packed_positions[3:5])
+    input_text = (tmp_path / "packmol_input.inp").read_text(encoding="utf-8")
+    assert "structure fixed_solute.pdb" in input_text
+    assert "fixed 0. 0. 0. 0. 0. 0." in input_text
+    assert "structure ethanol.pdb" in input_text
+    assert "inside box 0 0 0 20 20 20" in input_text

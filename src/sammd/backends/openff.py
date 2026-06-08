@@ -9,6 +9,8 @@ from importlib import util as importlib_util
 from pathlib import Path
 from typing import Any
 
+from sammd.utils.geometry import Vector3
+
 OPENFF_INSTALL_GUIDANCE = (
     "OpenFF Toolkit is an optional SAMMD backend dependency. Install and use the "
     "appropriate SAMMD CUDA pixi environment, such as cuda-12-6, with OpenFF "
@@ -73,6 +75,15 @@ class OpenFFMoleculePreparationResult:
     )
     skipped: list[OpenFFMoleculePreparationIssue] = field(default_factory=list)
     unsupported: list[OpenFFMoleculePreparationIssue] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class PreparedMoleculeTemplate:
+    """OpenFF molecule plus one conformer expressed in nanometers."""
+
+    molecule: Any
+    positions_nm: tuple[Vector3, ...]
+    atom_symbols: tuple[str, ...]
 
 
 def require_openff_toolkit() -> Any:
@@ -241,6 +252,41 @@ def molecule_from_smiles(
     if n_conformers:
         molecule.generate_conformers(n_conformers=n_conformers)
     return molecule
+
+
+def prepare_molecule_template(
+    smiles: str,
+    name: str,
+    charge_model: str | None = None,
+    *,
+    toolkit: Any | None = None,
+    allow_undefined_stereo: bool = True,
+) -> PreparedMoleculeTemplate:
+    """Prepare an OpenFF molecule template with one conformer and optional charges."""
+
+    active_toolkit = require_openff_toolkit() if toolkit is None else toolkit
+    molecule = active_toolkit.Molecule.from_smiles(
+        smiles,
+        allow_undefined_stereo=allow_undefined_stereo,
+    )
+    molecule.name = name
+    molecule.generate_conformers(n_conformers=1)
+    if charge_model is not None:
+        molecule.assign_partial_charges(charge_model)
+    conformer = molecule.conformers[0]
+    positions = tuple(
+        (
+            conformer[index][0].m_as("nanometer"),
+            conformer[index][1].m_as("nanometer"),
+            conformer[index][2].m_as("nanometer"),
+        )
+        for index in range(molecule.n_atoms)
+    )
+    return PreparedMoleculeTemplate(
+        molecule=molecule,
+        positions_nm=positions,
+        atom_symbols=tuple(atom.symbol for atom in molecule.atoms),
+    )
 
 
 def molecules_from_config(

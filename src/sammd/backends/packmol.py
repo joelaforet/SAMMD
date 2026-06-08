@@ -12,6 +12,8 @@ from math import isfinite
 from pathlib import Path
 from typing import Any
 
+from sammd.core.io import AtomRecord
+
 Vector3 = tuple[float, float, float]
 BoxBounds = tuple[tuple[float, float], tuple[float, float], tuple[float, float]]
 
@@ -53,6 +55,23 @@ class PackmolResult:
     returncode: int
     stdout: str
     grouped_positions_nm: dict[str, tuple[Vector3, ...]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class PackmolMoleculeTemplate:
+    """Atom labels and coordinates for one molecule written as a PACKMOL PDB."""
+
+    residue_name: str
+    positions_nm: tuple[Vector3, ...]
+    atom_symbols: tuple[str, ...]
+    atom_names: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not (
+            len(self.positions_nm) == len(self.atom_symbols) == len(self.atom_names)
+        ):
+            msg = "PACKMOL molecule template fields must have matching atom counts"
+            raise ValueError(msg)
 
 
 def zero_origin_box_bounds(dimensions_nm: Any) -> BoxBounds:
@@ -151,6 +170,72 @@ def run_packmol(
     )
 
 
+def pack_fixed_solute_with_solvent(
+    *,
+    solute_records: tuple[AtomRecord, ...] | list[AtomRecord],
+    solvent_template: PackmolMoleculeTemplate,
+    solvent_name: str,
+    solvent_count: int,
+    dimensions_nm: Any,
+    working_dir: str | Path,
+    tolerance_angstrom: float = 1.8,
+    nloop: int = 200,
+) -> tuple[tuple[Vector3, ...], ...]:
+    """Pack solvent throughout a box around one fixed solute and return solvent positions."""
+
+    if solvent_count <= 0:
+        return ()
+    solute_atoms = tuple(solute_records)
+    if not solute_atoms:
+        msg = "fixed-solute packing requires at least one solute atom record"
+        raise ValueError(msg)
+
+    workdir = Path(working_dir)
+    workdir.mkdir(parents=True, exist_ok=True)
+    solute_path = workdir / "fixed_solute.pdb"
+    solvent_path = workdir / f"{packmol_file_stem(solvent_name)}.pdb"
+    output_path = workdir / "packmol_output.pdb"
+    input_path = workdir / "packmol_input.inp"
+    stdout_path = workdir / "packmol_stdout.log"
+
+    write_atom_records_pdb(solute_path, solute_atoms)
+    write_template_pdb(solvent_path, solvent_template)
+    job = PackmolJob(
+        output_path=output_path.name,
+        structures=(
+            PackmolStructure("solute", solute_path.name, 1, fixed=True),
+            PackmolStructure(solvent_name, solvent_path.name, solvent_count),
+        ),
+        box_bounds_nm=zero_origin_box_bounds(dimensions_nm),
+        tolerance_angstrom=tolerance_angstrom,
+        nloop=nloop,
+    )
+    input_path.write_text(build_packmol_input(job), encoding="utf-8")
+    result = run_packmol(job, input_path, workdir, stdout_path)
+    if result.returncode != 0 or "Success!" not in result.stdout:
+        msg = f"PACKMOL failed while placing {solvent_name}; see {stdout_path}"
+        raise RuntimeError(msg)
+
+    packed_positions = read_pdb_positions_nm(output_path)
+    atoms_per_solvent = len(solvent_template.positions_nm)
+    solvent_atom_count = solvent_count * atoms_per_solvent
+    expected_atom_count = len(solute_atoms) + solvent_atom_count
+    if len(packed_positions) != expected_atom_count:
+        msg = (
+            f"PACKMOL output contains {len(packed_positions)} atoms, expected "
+            f"{expected_atom_count} ({len(solute_atoms)} solute + "
+            f"{solvent_atom_count} solvent)"
+        )
+        raise RuntimeError(msg)
+
+    solvent_start = len(solute_atoms)
+    solvent_stop = solvent_start + solvent_atom_count
+    return tuple(
+        packed_positions[index : index + atoms_per_solvent]
+        for index in range(solvent_start, solvent_stop, atoms_per_solvent)
+    )
+
+
 def read_pdb_positions_nm(path: str | Path) -> tuple[Vector3, ...]:
     """Read ATOM/HETATM coordinates from a PDB file and return nanometers."""
 
@@ -194,6 +279,61 @@ def pdb_atom_line(
         f"{residue_id:4d}    {x_angstrom:8.3f}{y_angstrom:8.3f}{z_angstrom:8.3f}"
         f"  1.00  0.00          {element:>2.2s}"
     )
+
+
+def write_atom_records_pdb(path: str | Path, records: tuple[AtomRecord, ...]) -> Path:
+    """Write AtomRecord entries as PACKMOL-readable HETATM PDB rows."""
+
+    lines = [
+        pdb_atom_line(
+            serial=index,
+            atom_name=record.atom_name,
+            residue_name=record.residue_name,
+            residue_id=record.residue_id,
+            coordinates_nm=record.coordinates_nm,
+            element=record.element,
+            chain_id=record.chain_id,
+        )
+        for index, record in enumerate(records, 1)
+    ]
+    destination = Path(path)
+    destination.write_text("\n".join([*lines, "END", ""]), encoding="utf-8")
+    return destination
+
+
+def write_template_pdb(path: str | Path, template: PackmolMoleculeTemplate) -> Path:
+    """Write one molecule template as PACKMOL-readable HETATM PDB rows."""
+
+    lines = [
+        pdb_atom_line(
+            serial=index,
+            atom_name=atom_name,
+            residue_name=template.residue_name,
+            residue_id=1,
+            coordinates_nm=position,
+            element=symbol,
+            chain_id="A",
+        )
+        for index, (position, symbol, atom_name) in enumerate(
+            zip(
+                template.positions_nm,
+                template.atom_symbols,
+                template.atom_names,
+                strict=True,
+            ),
+            1,
+        )
+    ]
+    destination = Path(path)
+    destination.write_text("\n".join([*lines, "END", ""]), encoding="utf-8")
+    return destination
+
+
+def packmol_file_stem(name: str) -> str:
+    """Return a filesystem-safe lowercase stem for PACKMOL scratch files."""
+
+    stem = "".join(character if character.isalnum() else "_" for character in name.lower())
+    return stem.strip("_") or "solvent"
 
 
 def _validate_job(job: PackmolJob) -> None:

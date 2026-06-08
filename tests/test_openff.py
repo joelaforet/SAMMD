@@ -323,6 +323,61 @@ def test_molecules_from_config_prepares_salt_ions(
     assert result.unsupported == []
 
 
+def test_prepare_molecule_template_assigns_charges_and_extracts_positions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Prepare one charged molecule template without importing real OpenFF in tests."""
+
+    openff_adapter = importlib.import_module("sammd.backends.openff")
+    calls: list[tuple[str, object]] = []
+
+    class FakeQuantity(float):
+        def m_as(self, unit: str) -> float:
+            calls.append(("unit", unit))
+            return float(self)
+
+    class FakeMolecule:
+        def __init__(self) -> None:
+            self.name = ""
+            self.n_atoms = 2
+            self.atoms = [SimpleNamespace(symbol="C"), SimpleNamespace(symbol="O")]
+            self.conformers = [
+                ((FakeQuantity(0.1), FakeQuantity(0.2), FakeQuantity(0.3)),
+                 (FakeQuantity(0.4), FakeQuantity(0.5), FakeQuantity(0.6)))
+            ]
+
+        def generate_conformers(self, n_conformers: int) -> None:
+            calls.append(("conformers", n_conformers))
+
+        def assign_partial_charges(self, charge_model: str) -> None:
+            calls.append(("charges", charge_model))
+
+    fake_molecule = FakeMolecule()
+
+    def fake_from_smiles(smiles: str, allow_undefined_stereo: bool):
+        calls.append(("smiles", (smiles, allow_undefined_stereo)))
+        return fake_molecule
+
+    toolkit = SimpleNamespace(
+        Molecule=SimpleNamespace(from_smiles=fake_from_smiles),
+    )
+
+    template = openff_adapter.prepare_molecule_template(
+        "CCO",
+        "ethanol",
+        "am1bcc",
+        toolkit=toolkit,
+    )
+
+    assert template.molecule is fake_molecule
+    assert template.molecule.name == "ethanol"
+    assert template.positions_nm == ((0.1, 0.2, 0.3), (0.4, 0.5, 0.6))
+    assert template.atom_symbols == ("C", "O")
+    assert ("smiles", ("CCO", True)) in calls
+    assert ("conformers", 1) in calls
+    assert ("charges", "am1bcc") in calls
+
+
 def test_molecule_from_propanethiol_smiles_when_openff_available() -> None:
     """Optionally create a thiol OpenFF molecule."""
 

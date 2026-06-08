@@ -140,6 +140,72 @@ def test_metal_residue_name_pads_to_three_characters() -> None:
     assert backend._metal_residue_name("Zn") == "Znx"
 
 
+def test_component_residue_assigner_tracks_mixed_components() -> None:
+    """Mixed component append order should not collapse identity to atom ranges."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    assigner = backend._ComponentResidueAssigner()
+
+    first_ptl = assigner.allocate("sam:propanethiol", "PTL")
+    first_mce = assigner.allocate("sam:mercaptoethanol", "MCE")
+    second_ptl = assigner.allocate("sam:propanethiol", "PTL")
+
+    assert first_ptl.chain_id == "A"
+    assert first_ptl.residue_id == 1
+    assert first_mce.chain_id == "B"
+    assert first_mce.residue_id == 1
+    assert second_ptl.chain_id == "A"
+    assert second_ptl.residue_id == 2
+    assert assigner.component_ranges["sam:propanethiol"]["residue_count"] == 2
+
+
+def test_openmm_identity_repair_labels_nonmetal_residues() -> None:
+    """Nonmetal molecules should not remain UNK/X/0 after Interchange export."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    from sammd.core.io import AtomRecord
+
+    residue = SimpleNamespace(name="UNK", id="0", chain=SimpleNamespace(id="X"))
+    atoms = [SimpleNamespace(name="", residue=residue), SimpleNamespace(name="", residue=residue)]
+    topology = SimpleNamespace(atoms=lambda: iter(atoms))
+    records = (
+        AtomRecord(1, "C1", "C", "EOH", 12, "A", "solvent:ethanol", (0.0, 0.0, 0.0)),
+        AtomRecord(2, "O2", "O", "EOH", 12, "A", "solvent:ethanol", (0.1, 0.0, 0.0)),
+    )
+
+    backend._apply_openmm_atom_identities(topology, records)
+
+    assert [atom.name for atom in atoms] == ["C1", "O2"]
+    assert residue.name == "EOH"
+    assert residue.id == "12"
+    assert residue.chain.id == "A"
+
+
+def test_molecule_centers_above_solute_avoid_slab_z_range() -> None:
+    """Fallback placement should not put solution atoms inside the slab region."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    from sammd.backends.openff import PreparedMoleculeTemplate
+
+    template = PreparedMoleculeTemplate(
+        molecule=object(),
+        positions_nm=((0.0, 0.0, -0.05), (0.0, 0.0, 0.05)),
+        atom_symbols=("C", "O"),
+    )
+    slab_positions = ((0.0, 0.0, 3.9), (1.0, 1.0, 5.5))
+
+    placed = backend._molecule_centers_above_solute(
+        template,
+        4,
+        (4.0, 4.0, 8.0),
+        slab_positions,
+        clearance_nm=0.25,
+    )
+
+    assert len(placed) == 4
+    assert min(position[2] for molecule in placed for position in molecule) > 5.5
+
+
 def test_interface_metal_offxml_loads_with_current_openff() -> None:
     """The packaged INTERFACE OFFXML stays compatible with the CUDA env toolkit."""
 
