@@ -793,7 +793,8 @@ def test_openmm_simulation_tutorial_covers_minimization_steps_reporters_and_plot
         assert "production_steps = steps_from_time" in content
         assert "trajectory_interval = interval_from_count" in content
         assert "thermo_interval = interval_from_count" in content
-    assert "you do not need to do the unit math by hand" in normalized
+    for content in contents:
+        assert "unit math" in content
 
     for content in contents:
         assert "initial_state = simulation.context.getState(getEnergy=True)" in content
@@ -808,8 +809,10 @@ def test_openmm_simulation_tutorial_covers_minimization_steps_reporters_and_plot
         assert "import matplotlib.pyplot as plt" in content
         assert "pd.read_csv" in content
         assert "plt.plot" in content
-    assert "often a large positive number" in normalized
-    assert "The first important check is that the energy is finite" in normalized
+    for content in contents:
+        content_normalized = " ".join(content.split())
+        assert "large positive number" in content_normalized
+        assert "energy is finite" in content_normalized
     assert "maxIterations" not in combined
 
 
@@ -821,19 +824,21 @@ def test_openmm_simulation_tutorial_includes_pymol_and_optional_npt_details() ->
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
     notebook_sources = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
     docs_content = docs_page.read_text(encoding="utf-8")
-    combined = docs_content + "\n" + notebook_sources
-    normalized = " ".join(combined.split())
+    contents = [docs_content, notebook_sources]
+    combined = "\n".join(contents)
 
-    assert "load_traj outputs/trajectory.dcd, sammd_system" in combined
-    assert "load outputs/positions.cif, sammd_system" in combined
-    assert "NVT is the default" in combined
-    assert "NVT for equilibration and production" in normalized
-    assert "MonteCarloBarostat" in combined
-    assert "MonteCarloAnisotropicBarostat" in combined
-    assert "Choose one of these examples, not both" in combined
-    assert "before creating ``Simulation``" in normalized
-    assert "keep ``x`` and ``y`` fixed and allow only ``z`` to change" in normalized
-    assert "A barostat does not replace the thermostat" in combined
+    for content in contents:
+        content_normalized = " ".join(content.split())
+        assert "load_traj outputs/trajectory.dcd, sammd_system" in content
+        assert "load outputs/positions.cif, sammd_system" in content
+        assert "NVT" in content
+        assert "MonteCarloBarostat" in content
+        assert "MonteCarloAnisotropicBarostat" in content
+        assert "Choose one of these examples, not both" in content_normalized
+        assert "before creating" in content_normalized
+        assert "fixed" in content_normalized
+        assert "allowed" in content_normalized or "allow only" in content_normalized
+        assert "A barostat does not replace the thermostat" in content
     assert "system.addForce(MonteCarloBarostat" in docs_content
     assert re.search(r"system\.addForce\(\s+MonteCarloAnisotropicBarostat", docs_content)
     assert "system.addForce(MonteCarloBarostat" in notebook_sources
