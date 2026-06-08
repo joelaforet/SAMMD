@@ -71,10 +71,11 @@ and docs. It does not require OpenMM, OpenFF, RDKit, PACKMOL, or a GPU.
 
 ```bash
 pixi install
-pixi shell
+pixi shell -e default
 ```
 
-After `pixi shell`, the `sammd` command is on `PATH`, so commands work normally:
+After `pixi shell -e default`, the `sammd` command is on `PATH`, so commands
+work normally:
 
 ```bash
 sammd init -o sammd.yaml
@@ -108,7 +109,7 @@ Pixi does not use `conda activate`. Use `pixi shell -e <env>` instead.
 
 ```bash
 # Enter the default lightweight environment
-pixi shell
+pixi shell -e default
 
 # Leave it
 exit
@@ -160,7 +161,7 @@ this README, the default is `cuda-12-4`.
 ### Option A: use a pixi shell
 
 ```bash
-pixi shell
+pixi shell -e default
 sammd init -o sammd.yaml
 sammd validate sammd.yaml
 sammd build sammd.yaml --output-dir outputs --overwrite
@@ -237,8 +238,8 @@ The OpenMM tutorial teaches the raw OpenMM Python API with
 | `sammd build sammd.yaml --output-dir outputs --overwrite` | Write default lightweight output files |
 | `sammd build sammd.yaml --output-dir outputs --overwrite --export-backend` | Write OpenFF/OpenMM backend files from a CUDA pixi environment |
 
-Use `pixi run ...` outside a pixi shell, or run `pixi shell` first and then use
-the commands directly.
+Use `pixi run ...` outside a pixi shell, or run `pixi shell -e default` first
+and then use the lightweight commands directly.
 
 ## Documentation And Notebooks
 

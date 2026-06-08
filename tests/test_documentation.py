@@ -110,9 +110,9 @@ def test_cuda_pixi_environment_guidance_is_documented() -> None:
     installation = (
         PROJECT_ROOT / "docs" / "source" / "tutorials" / "installation.rst"
     ).read_text(encoding="utf-8")
-    assert "pixi shell" in readme
+    assert "pixi shell -e default" in readme
     assert "pixi run" in readme
-    assert "pixi shell" in installation
+    assert "pixi shell -e default" in installation
     assert "pixi run" in installation
 
     for env_name in ["cuda-12-4", "cuda-12-6", "cuda-13-0"]:

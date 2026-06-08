@@ -6,8 +6,9 @@ spelling mistakes fail early.
 
 .. note::
 
-   If you already ran ``pixi shell``, use ``sammd`` commands directly. If you
-   are not inside a pixi shell, prefix commands with ``pixi run``.
+   If you already ran ``pixi shell -e default``, use ``sammd`` commands
+   directly. If you are not inside a pixi shell, prefix commands with
+   ``pixi run``.
 
 Minimal starting point
 ----------------------

@@ -7,7 +7,7 @@ you can load in OpenMM. SAMMD builds; OpenMM runs.
 
 .. note::
 
-   If you already ran ``pixi shell``, use commands such as
+   If you already ran ``pixi shell -e default``, use commands such as
    ``sammd validate sammd.yaml`` directly. If you are not inside a pixi shell,
    prefix SAMMD commands with ``pixi run``, for example
    ``pixi run sammd validate sammd.yaml``.

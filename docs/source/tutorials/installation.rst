@@ -36,9 +36,9 @@ testing, and docs. It does not need OpenMM, OpenFF, RDKit, PACKMOL, or a GPU.
 .. code-block:: bash
 
    pixi install
-   pixi shell
+   pixi shell -e default
 
-After ``pixi shell``, the ``sammd`` command is available directly:
+After ``pixi shell -e default``, the ``sammd`` command is available directly:
 
 .. code-block:: bash
 
@@ -74,7 +74,7 @@ Pixi does not use ``conda activate``. Use ``pixi shell -e ENV_NAME`` instead.
 
 .. code-block:: bash
 
-   pixi shell
+   pixi shell -e default
    exit
 
    pixi shell -e cuda-12-4
