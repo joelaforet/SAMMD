@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import tempfile
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 from sammd.backends.forcefields import get_fcc_metal_parameters
@@ -59,30 +63,70 @@ class _MoleculeTemplate:
     atom_symbols: tuple[str, ...]
 
 
-def export_interchange_backend(plan: Any, *, overwrite: bool = False) -> BackendExportResult:
+ProgressCallback = Callable[[str], None]
+
+
+def _progress(callback: ProgressCallback | None, message: str) -> None:
+    if callback is not None:
+        callback(message)
+
+
+def _timed_progress(
+    callback: ProgressCallback | None,
+    message: str,
+    start_time: float,
+) -> float:
+    now = perf_counter()
+    _progress(callback, f"{message} ({now - start_time:.2f}s)")
+    return now
+
+
+def export_interchange_backend(
+    plan: Any,
+    *,
+    overwrite: bool = False,
+    progress: ProgressCallback | None = None,
+) -> BackendExportResult:
     """Construct Interchange-backed artifacts and write them to configured paths."""
 
-    result = build_interchange_backend(plan)
+    _progress(progress, "Building OpenFF Interchange and patched OpenMM System")
+    result = build_interchange_backend(plan, progress=progress)
     paths = plan.output_paths
     _require_paths(paths)
 
+    stage_start = perf_counter()
+    _progress(progress, "Writing interchange.json")
     safe_write_text(
         paths.openff_interchange,
         result.interchange.model_dump_json(indent=2) + "\n",
         overwrite=overwrite,
     )
-    _write_pdbx(paths.topology, result.openmm_topology, result.positions, overwrite=overwrite)
-    _write_pdbx(paths.positions, result.openmm_topology, result.positions, overwrite=overwrite)
+    _timed_progress(progress, "  interchange.json written", stage_start)
+    stage_start = perf_counter()
+    _progress(progress, "Writing solvated_system.cif")
+    _write_pdbx(
+        paths.solvated_system,
+        result.openmm_topology,
+        result.positions,
+        overwrite=overwrite,
+    )
+    _timed_progress(progress, "  solvated_system.cif written", stage_start)
+    stage_start = perf_counter()
+    _progress(progress, "Writing system.xml")
     safe_write_text(
         paths.openmm_system,
         require_openmm().openmm.XmlSerializer.serialize(result.openmm_system),
         overwrite=overwrite,
     )
+    _timed_progress(progress, "  system.xml written", stage_start)
+    stage_start = perf_counter()
+    _progress(progress, "Writing anchor_metadata.json")
     safe_write_text(
         paths.anchor_metadata,
         json.dumps(_anchor_metadata(result), indent=2, sort_keys=True) + "\n",
         overwrite=overwrite,
     )
+    _timed_progress(progress, "  anchor_metadata.json written", stage_start)
     return BackendExportResult(
         interchange=result.interchange,
         openmm_topology=result.openmm_topology,
@@ -94,8 +138,7 @@ def export_interchange_backend(plan: Any, *, overwrite: bool = False) -> Backend
         anchor_pairs=result.anchor_pairs,
         component_ranges=result.component_ranges,
         files={
-            "topology": paths.topology,
-            "positions": paths.positions,
+            "solvated_system": paths.solvated_system,
             "openff_interchange": paths.openff_interchange,
             "openmm_system": paths.openmm_system,
             "anchor_metadata": paths.anchor_metadata,
@@ -110,7 +153,7 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
 
     summary = plan.build_summary()
     artifacts = dict(summary["artifacts"])
-    for key in ("topology", "positions", "openff_interchange", "openmm_system", "anchor_metadata"):
+    for key in ("solvated_system", "openff_interchange", "openmm_system", "anchor_metadata"):
         artifact = dict(artifacts[key])
         artifact["status"] = "current"
         artifact["available"] = True
@@ -139,7 +182,11 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
     return summary
 
 
-def build_interchange_backend(plan: Any) -> BackendExportResult:
+def build_interchange_backend(
+    plan: Any,
+    *,
+    progress: ProgressCallback | None = None,
+) -> BackendExportResult:
     """Build an OpenFF Interchange and patched OpenMM system from a SAMMD plan."""
 
     if plan.solution.salts:
@@ -147,13 +194,19 @@ def build_interchange_backend(plan: Any) -> BackendExportResult:
         msg = f"Interchange backend export does not yet support salts: {names}"
         raise NotImplementedError(msg)
 
+    stage_start = perf_counter()
+    _progress(progress, "Importing OpenFF/OpenMM dependencies")
     toolkit = require_openff_toolkit()
     interchange_module = require_openff_interchange()
     modules = require_openmm()
     unit = _openff_unit_module()
+    _timed_progress(progress, "  OpenFF/OpenMM dependencies ready", stage_start)
 
+    stage_start = perf_counter()
+    _progress(progress, "Loading force fields")
     force_field_inputs = [str(item) for item in force_field_inputs_from_config(plan.config)]
     force_field = toolkit.ForceField(*force_field_inputs)
+    _timed_progress(progress, "  force fields ready", stage_start)
     molecules: list[Any] = []
     positions_nm: list[Vector3] = []
     sulfur_indices: list[int] = []
@@ -161,9 +214,12 @@ def build_interchange_backend(plan: Any) -> BackendExportResult:
     anchor_pairs: list[tuple[int, int]] = []
     component_ranges: dict[str, dict[str, int]] = {}
 
+    stage_start = perf_counter()
+    _progress(progress, f"Preparing {len(plan.slab.positions_nm)} metal atoms")
     shift_nm = tuple(dimension / 2.0 for dimension in plan.box_plan.dimensions_nm)
 
     pd_template = _metal_atom_molecule(toolkit, plan.slab.metal)
+    stage_start = _timed_progress(progress, "  metal template ready", stage_start)
     _append_molecule_block(
         molecules,
         positions_nm,
@@ -176,18 +232,28 @@ def build_interchange_backend(plan: Any) -> BackendExportResult:
         ],
     )
     metal_indices.extend(range(len(plan.slab.positions_nm)))
+    _timed_progress(progress, "  metal block appended", stage_start)
 
+    stage_start = perf_counter()
+    _progress(progress, f"Preparing {len(plan.sam_placements.placements)} SAM molecules")
     templates: dict[tuple[str, str], _MoleculeTemplate] = {}
-    for placement in plan.sam_placements.placements:
-        template = templates.setdefault(
-            (placement.component_name, placement.component_smiles),
-            _molecule_template(
+    for placement_index, placement in enumerate(plan.sam_placements.placements, start=1):
+        template_key = (placement.component_name, placement.component_smiles)
+        template = templates.get(template_key)
+        if template is None:
+            template = _molecule_template(
                 toolkit,
                 placement.component_smiles,
                 placement.component_name,
                 plan.config,
-            ),
-        )
+                progress=progress,
+            )
+            templates[template_key] = template
+            stage_start = _timed_progress(
+                progress,
+                f"  SAM template ready: {placement.component_name}",
+                stage_start,
+            )
         molecule, transformed = _placed_sam_molecule(template, placement, shift_nm)
         start = len(positions_nm)
         molecules.append(molecule)
@@ -199,9 +265,29 @@ def build_interchange_backend(plan: Any) -> BackendExportResult:
             for metal_index in placement.anchor_pose.nearest_metal_atom_indices
         )
         _record_range(component_ranges, f"sam:{placement.component_name}", start, len(positions_nm))
+        if placement_index % 25 == 0 or placement_index == len(plan.sam_placements.placements):
+            stage_start = _timed_progress(
+                progress,
+                f"  placed {placement_index}/{len(plan.sam_placements.placements)} SAM molecules",
+                stage_start,
+            )
 
+    reactant_count = sum(reactant.count for reactant in plan.solution.reactants)
+    stage_start = perf_counter()
+    _progress(progress, f"Preparing {reactant_count} reactants")
     for reactant in plan.solution.reactants:
-        template = _molecule_template(toolkit, reactant.smiles, reactant.name, plan.config)
+        template = _molecule_template(
+            toolkit,
+            reactant.smiles,
+            reactant.name,
+            plan.config,
+            progress=progress,
+        )
+        stage_start = _timed_progress(
+            progress,
+            f"  reactant template ready: {reactant.name}",
+            stage_start,
+        )
         for transformed in _simple_molecule_centers(
             template,
             reactant.count,
@@ -213,31 +299,64 @@ def build_interchange_backend(plan: Any) -> BackendExportResult:
             molecules.append(molecule)
             positions_nm.extend(transformed)
             _record_range(component_ranges, f"reactant:{reactant.name}", start, len(positions_nm))
+    _timed_progress(progress, "  reactants placed", stage_start)
 
+    solvent_count = sum(solvent.count for solvent in plan.solution.solvent_components)
+    stage_start = perf_counter()
+    _progress(progress, f"Preparing {solvent_count} solvent molecules")
     for solvent in plan.solution.solvent_components:
         if solvent.smiles is None:
             msg = f"solvent component {solvent.name!r} requires explicit SMILES for backend export"
             raise ValueError(msg)
-        template = _molecule_template(toolkit, solvent.smiles, solvent.name, plan.config)
-        for transformed in _simple_molecule_centers(
+        template = _molecule_template(
+            toolkit,
+            solvent.smiles,
+            solvent.name,
+            plan.config,
+            progress=progress,
+        )
+        stage_start = _timed_progress(
+            progress,
+            f"  solvent template ready: {solvent.name}",
+            stage_start,
+        )
+        centered_solvent = _simple_molecule_centers(
             template,
             solvent.count,
             plan.box_plan.dimensions_nm,
             z_fraction=0.50,
-        ):
+        )
+        stage_start = _timed_progress(
+            progress,
+            f"  solvent centers ready: {solvent.name}",
+            stage_start,
+        )
+        for solvent_index, transformed in enumerate(centered_solvent, start=1):
             molecule = deepcopy(template.molecule)
             start = len(positions_nm)
             molecules.append(molecule)
             positions_nm.extend(transformed)
             _record_range(component_ranges, f"solvent:{solvent.name}", start, len(positions_nm))
+            if solvent_index % 250 == 0 or solvent_index == len(centered_solvent):
+                stage_start = _timed_progress(
+                    progress,
+                    f"  placed {solvent_index}/{len(centered_solvent)} {solvent.name} molecules",
+                    stage_start,
+                )
 
+    stage_start = perf_counter()
+    _progress(progress, f"Creating OpenFF Topology ({len(molecules)} molecules)")
     topology = toolkit.Topology.from_molecules(molecules)
+    stage_start = _timed_progress(progress, "  OpenFF topology object ready", stage_start)
     topology.box_vectors = [
         [plan.box_plan.dimensions_nm[0], 0.0, 0.0],
         [0.0, plan.box_plan.dimensions_nm[1], 0.0],
         [0.0, 0.0, plan.box_plan.dimensions_nm[2]],
     ] * unit.nanometer
     positions = positions_nm * unit.nanometer
+    _timed_progress(progress, f"  positions array ready ({len(positions_nm)} atoms)", stage_start)
+    stage_start = perf_counter()
+    _progress(progress, "Parameterizing with OpenFF Interchange")
     interchange = interchange_module.Interchange.from_smirnoff(
         force_field,
         topology,
@@ -245,7 +364,13 @@ def build_interchange_backend(plan: Any) -> BackendExportResult:
         positions=positions,
         charge_from_molecules=_unique_charge_molecules(molecules),
     )
+    _timed_progress(progress, "  OpenFF Interchange ready", stage_start)
+    stage_start = perf_counter()
+    _progress(progress, "Exporting OpenMM System")
     openmm_system = interchange.to_openmm()
+    _timed_progress(progress, "  OpenMM System ready", stage_start)
+    stage_start = perf_counter()
+    _progress(progress, f"Applying {len(anchor_pairs)} sulfur-metal pair overrides")
     add_sulfur_metal_lj_exceptions(
         openmm_system,
         tuple(anchor_pairs),
@@ -253,11 +378,17 @@ def build_interchange_backend(plan: Any) -> BackendExportResult:
         epsilon_kj_mol=METAL_SULFUR_EPSILON_KCAL_MOL * KCAL_TO_KJ,
         unit_module=modules.unit,
     )
+    _timed_progress(progress, "  sulfur-metal overrides applied", stage_start)
+    stage_start = perf_counter()
+    _progress(progress, "Exporting OpenMM topology and positions")
     openmm_topology = interchange.to_openmm_topology()
+    _label_openmm_metal_atoms(openmm_topology, tuple(metal_indices), plan.slab.metal)
+    _ensure_openmm_atom_names(openmm_topology)
     openmm_positions = modules.unit.Quantity(
         [modules.openmm.Vec3(*position) for position in positions_nm],
         modules.unit.nanometer,
     )
+    _timed_progress(progress, "  OpenMM topology and positions ready", stage_start)
     return BackendExportResult(
         interchange=interchange,
         openmm_topology=openmm_topology,
@@ -274,11 +405,28 @@ def build_interchange_backend(plan: Any) -> BackendExportResult:
     )
 
 
-def _molecule_template(toolkit: Any, smiles: str, name: str, config: Any) -> _MoleculeTemplate:
+def _molecule_template(
+    toolkit: Any,
+    smiles: str,
+    name: str,
+    config: Any,
+    *,
+    progress: ProgressCallback | None = None,
+) -> _MoleculeTemplate:
+    stage_start = perf_counter()
+    _progress(progress, f"  template {name}: parsing SMILES")
     molecule = toolkit.Molecule.from_smiles(smiles, allow_undefined_stereo=True)
     molecule.name = name
+    stage_start = _timed_progress(progress, f"  template {name}: SMILES parsed", stage_start)
+    _progress(progress, f"  template {name}: generating conformer")
     molecule.generate_conformers(n_conformers=1)
+    stage_start = _timed_progress(progress, f"  template {name}: conformer ready", stage_start)
+    _progress(
+        progress,
+        f"  template {name}: assigning {config.parameterization.charge_model} charges",
+    )
     molecule.assign_partial_charges(config.parameterization.charge_model)
+    stage_start = _timed_progress(progress, f"  template {name}: charges assigned", stage_start)
     conformer = molecule.conformers[0]
     positions = tuple(
         (
@@ -288,6 +436,7 @@ def _molecule_template(toolkit: Any, smiles: str, name: str, config: Any) -> _Mo
         )
         for index in range(molecule.n_atoms)
     )
+    _timed_progress(progress, f"  template {name}: positions extracted", stage_start)
     return _MoleculeTemplate(
         molecule=molecule,
         positions_nm=positions,
@@ -298,7 +447,8 @@ def _molecule_template(toolkit: Any, smiles: str, name: str, config: Any) -> _Mo
 def _metal_atom_molecule(toolkit: Any, symbol: str) -> Any:
     get_fcc_metal_parameters(symbol)
     molecule = toolkit.Molecule.from_smiles(f"[{symbol}]", allow_undefined_stereo=True)
-    molecule.name = symbol
+    molecule.name = _metal_residue_name(symbol)
+    molecule.atoms[0].name = symbol
     molecule.assign_partial_charges("zeros")
     return molecule
 
@@ -422,15 +572,70 @@ def _anchor_metadata(result: BackendExportResult) -> dict[str, object]:
 
 
 def _write_pdbx(path: Path, topology: Any, positions: Any, *, overwrite: bool) -> None:
-    if path.exists() and not overwrite:
-        raise FileExistsError(f"refusing to overwrite existing file: {path}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        require_openmm().app.PDBxFile.writeFile(topology, positions, handle, keepIds=True)
+    destination = Path(path)
+    if destination.exists() and not overwrite:
+        raise FileExistsError(f"refusing to overwrite existing file: {destination}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    temporary_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=destination.parent, delete=False
+        ) as handle:
+            temporary_name = handle.name
+            require_openmm().app.PDBxFile.writeFile(topology, positions, handle, keepIds=True)
+            # PyMOL treats EOF inside the final atom_site loop as a truncated loop.
+            handle.write("\n#\n")
+        if overwrite:
+            os.replace(temporary_name, destination)
+        else:
+            os.link(temporary_name, destination)
+            os.unlink(temporary_name)
+    finally:
+        if temporary_name is not None and Path(temporary_name).exists():
+            Path(temporary_name).unlink()
+
+
+def _ensure_openmm_atom_names(topology: Any) -> None:
+    """Fill missing atom names so PDBx/mmCIF rows have all declared fields."""
+
+    for atom in topology.atoms():
+        if getattr(atom, "name", None):
+            continue
+        element = getattr(atom, "element", None)
+        symbol = getattr(element, "symbol", None) or "X"
+        atom.name = symbol
+
+
+def _label_openmm_metal_atoms(topology: Any, metal_indices: tuple[int, ...], symbol: str) -> None:
+    """Assign metal atom/residue labels that produce valid, readable PDBx rows."""
+
+    residue_name = _metal_residue_name(symbol)
+    metal_index_set = set(metal_indices)
+    for atom in topology.atoms():
+        if atom.index not in metal_index_set:
+            continue
+        atom.name = symbol
+        atom.residue.name = residue_name
+        atom.residue.id = str(atom.index + 1)
+        atom.residue.chain.id = "M"
+
+
+def _metal_residue_name(symbol: str) -> str:
+    """Return a three-character metal residue name, e.g. Pd -> Pdx."""
+
+    if len(symbol) >= 3:
+        return symbol[:3]
+    return symbol + "x" * (3 - len(symbol))
 
 
 def _require_paths(paths: Any) -> None:
-    for key in ("topology", "positions", "openff_interchange", "openmm_system", "anchor_metadata"):
+    for key in (
+        "solvated_system",
+        "openff_interchange",
+        "openmm_system",
+        "anchor_metadata",
+    ):
         if getattr(paths, key) is None:
             msg = f"{key} output path is not configured"
             raise ValueError(msg)

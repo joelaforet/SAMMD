@@ -65,7 +65,7 @@ For a named environment, add ``-e``:
 
 .. code-block:: bash
 
-   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
 
 5. Switch environments
 ----------------------

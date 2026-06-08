@@ -275,8 +275,8 @@ class ParameterizationConfig(SAMMDBaseModel):
 class OutputFilesConfig(SAMMDBaseModel):
     """Current and reserved system-builder artifact file names."""
 
-    topology: str = "topology.cif"
-    positions: str = "positions.cif"
+    sam_grafting_density: str = "sam_grafting_density.cif"
+    solvated_system: str = "solvated_system.cif"
     openff_interchange: str = "interchange.json"
     openmm_system: str = "system.xml"
     anchor_metadata: str = "anchor_metadata.json"
@@ -378,8 +378,8 @@ CONFIG_TEMPLATE = """# =========================================================
 #
 #      sammd build config.yaml --output-dir outputs/my_system --overwrite
 #
-# 5. Inspect topology.cif, build_summary.json, and resolved_config.yaml.
-#    OpenMM/OpenFF backend exports are reserved target work.
+# 5. Inspect sam_grafting_density.cif, build_summary.json, and resolved_config.yaml.
+#    Use --full when you need solvated_system.cif and OpenMM files.
 #
 # This file defines the molecular system only.
 # It does NOT define equilibration, production MD, thermostats, barostats,
@@ -613,13 +613,13 @@ parameterization:
 # Outputs
 # ============================================================================
 # Current files written by the lightweight system builder:
-#   - topology.cif
+#   - sam_grafting_density.cif  # Pd slab + sulfur anchors for grafting-density checks
 #   - build_summary.json
 #   - resolved_config.yaml
 #
-# Reserved future backend artifact names:
+# Backend artifact names written by --full:
 #   - interchange.json  # primary portable backend export
-#   - positions.cif     # companion coordinate structure file
+#   - solvated_system.cif  # full slab + SAMs + reactants + solvent coordinates
 #   - system.xml        # OpenMM convenience export
 #   - anchor_metadata.json  # SAM anchor metadata export
 #
@@ -629,8 +629,8 @@ outputs:
   directory: outputs/propanethiol_cinnamaldehyde_pd111
 
   files:
-    topology: topology.cif
-    positions: positions.cif
+    sam_grafting_density: sam_grafting_density.cif
+    solvated_system: solvated_system.cif
     openff_interchange: interchange.json
     openmm_system: system.xml
     anchor_metadata: anchor_metadata.json

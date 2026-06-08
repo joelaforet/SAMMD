@@ -74,13 +74,13 @@ def test_yaml_template_describes_current_build_contract() -> None:
     assert "Build and parameterize your molecular system" not in CONFIG_TEMPLATE
     assert "Use the exported OpenMM/OpenFF files" not in CONFIG_TEMPLATE
     assert "Validate and build the current inspection artifacts" in CONFIG_TEMPLATE
-    assert "OpenMM/OpenFF backend exports are reserved target work" in CONFIG_TEMPLATE
+    assert "Use --full when you need solvated_system.cif" in CONFIG_TEMPLATE
     assert "Current files written by the lightweight system builder" in CONFIG_TEMPLATE
-    assert "Reserved future backend artifact names" in CONFIG_TEMPLATE
-    assert "topology.cif" in CONFIG_TEMPLATE
+    assert "Backend artifact names written by --full" in CONFIG_TEMPLATE
+    assert "sam_grafting_density.cif" in CONFIG_TEMPLATE
     assert "build_summary.json" in CONFIG_TEMPLATE
     assert "resolved_config.yaml" in CONFIG_TEMPLATE
-    assert "positions.cif" in CONFIG_TEMPLATE
+    assert "solvated_system.cif" in CONFIG_TEMPLATE
     assert "interchange.json" in CONFIG_TEMPLATE
     assert "system.xml" in CONFIG_TEMPLATE
     assert "anchor_metadata.json" in CONFIG_TEMPLATE

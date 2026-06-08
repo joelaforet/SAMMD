@@ -65,16 +65,18 @@ Important sections
      Records the OpenFF small-molecule force field, charge model, INTERFACE metal
      force-field file, and nonbonded cutoff. The default builder checks and saves
      these choices. It does not create a complete OpenMM simulation system unless
-     you run ``sammd build --export-backend`` in a CUDA-labeled pixi environment. The
+     you run ``sammd build --full`` in a CUDA-labeled pixi environment. The
      INTERFACE metal file gives the base slab LJ parameters. SAMMD records
      sulfur-metal LJ changes in the build summary; you do not configure them
      here.
 
 ``outputs``
-     Names build output files such as ``topology.cif``,
-     ``build_summary.json``, and ``resolved_config.yaml``. It also names OpenMM
-     export files written by ``--export-backend`` such as ``positions.cif``,
-     ``interchange.json``, and ``system.xml``, plus ``anchor_metadata.json``.
+     Names build output files. The ``sam_grafting_density`` key controls the
+     slab-and-sulfur visual check file. The ``solvated_system`` key controls the
+     full CIF written by ``--full`` with slab, SAMs, reactants, and
+     solvent. It also names files such as ``interchange.json``, ``system.xml``,
+     ``anchor_metadata.json``, ``build_summary.json``, and
+     ``resolved_config.yaml``.
      These are not MD trajectory files. ``interchange.json`` stores OpenFF
      Interchange data. Interchange is not yet at version 1.0, so this JSON
      format may change between versions. For this tutorial, use OpenMM.
@@ -136,8 +138,10 @@ Beginner glossary
    Saved frames from an MD simulation. This YAML file does not configure
    trajectories; students will learn OpenMM simulation control separately.
 
-``topology.cif``
-   The first structure file to inspect after ``sammd build``. It shows the
-   configured surface and the planned sulfur anchor positions for the SAM.
-   Full SAM molecule coordinates are created when you export OpenMM files.
+``sam_grafting_density.cif``
+   The first structure file to inspect after the default ``sammd build``. It is
+   a visual smoke test showing the configured surface and planned sulfur anchor
+   positions for the SAM. Use it to check slab geometry, three-fold hollow-site
+   placement, and grafting density. Full SAM, solvent, and reactant coordinates
+   are created in ``solvated_system.cif`` when you export OpenMM files.
    Trajectory frames are created later by OpenMM simulation scripts.

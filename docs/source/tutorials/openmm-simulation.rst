@@ -24,9 +24,9 @@ Bridges2. The default example here uses ``cuda-12-4``:
 
 .. code-block:: bash
 
-   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
 
-This writes files such as ``interchange.json``, ``positions.cif``,
+This writes files such as ``interchange.json``, ``solvated_system.cif``,
 ``system.xml``, and ``anchor_metadata.json``. In this tutorial we load
 ``interchange.json`` first, then ask OpenFF Interchange for the OpenMM objects.
 
@@ -225,7 +225,7 @@ trajectory into the same object:
 
 .. code-block:: text
 
-   load outputs/positions.cif, sammd_system
+   load outputs/solvated_system.cif, sammd_system
    load_traj outputs/trajectory.dcd, sammd_system
 
 The DCD uses the atom order from the OpenMM topology. Loading the SAMMD structure

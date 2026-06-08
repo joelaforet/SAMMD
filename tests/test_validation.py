@@ -45,7 +45,7 @@ def test_current_validation_gates_do_not_require_backend_artifacts(tmp_path: Pat
     }
 
     assert current_gate_ids.isdisjoint(deferred_backend_gate_ids)
-    assert not plan.output_paths.positions.exists()
+    assert not plan.output_paths.solvated_system.exists()
     assert not plan.output_paths.openff_interchange.exists()
     assert not plan.output_paths.openmm_system.exists()
 
@@ -91,7 +91,7 @@ def test_bad_output_suffix_fails_validation(tmp_path: Path) -> None:
     """Current and reserved path fields use stable artifact suffixes."""
 
     paths = OutputPaths(
-        topology=tmp_path / "topology.txt",
+        sam_grafting_density=tmp_path / "sam_grafting_density.txt",
         anchor_metadata=tmp_path / "anchor_metadata.yaml",
     )
 
@@ -102,7 +102,7 @@ def test_bad_output_suffix_fails_validation(tmp_path: Path) -> None:
 
     assert not report.passed
     assert gate.details["failures"] == {
-        "topology": "expected .cif, found .txt",
+        "sam_grafting_density": "expected .cif, found .txt",
         "anchor_metadata": "expected .json, found .yaml",
     }
 

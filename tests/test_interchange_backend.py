@@ -83,6 +83,63 @@ def test_backend_export_rejects_salts_before_optional_imports(tmp_path: Path) ->
         backend.build_interchange_backend(plan)
 
 
+def test_pdbx_writer_terminates_final_loop_for_pymol(tmp_path: Path, monkeypatch) -> None:
+    """PyMOL rejects CIF files that end inside the final loop without '#'."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+
+    class FakePDBxFile:
+        @staticmethod
+        def writeFile(topology, positions, handle, *, keepIds):  # noqa: N802, N803
+            handle.write("loop_\n_atom_site.id\n1\n")
+
+    fake_openmm = SimpleNamespace(app=SimpleNamespace(PDBxFile=FakePDBxFile))
+    monkeypatch.setattr(backend, "require_openmm", lambda: fake_openmm)
+
+    path = tmp_path / "solvated_system.cif"
+    backend._write_pdbx(path, topology=object(), positions=object(), overwrite=False)
+
+    assert path.read_text(encoding="utf-8").endswith("\n#\n")
+
+
+def test_openmm_atom_name_sanitizer_fills_blank_metal_names() -> None:
+    """OpenMM PDBx writer omits blank atom-name fields, which breaks PyMOL."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    atom = SimpleNamespace(name="", element=SimpleNamespace(symbol="Pd"))
+    topology = SimpleNamespace(atoms=lambda: iter([atom]))
+
+    backend._ensure_openmm_atom_names(topology)
+
+    assert atom.name == "Pd"
+
+
+def test_openmm_metal_labeler_sets_atom_and_residue_names() -> None:
+    """Metal particles should export as named atoms in three-character residues."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    residue = SimpleNamespace(name="UNK", id="0", chain=SimpleNamespace(id="X"))
+    atom = SimpleNamespace(index=7, name="", residue=residue)
+    topology = SimpleNamespace(atoms=lambda: iter([atom]))
+
+    backend._label_openmm_metal_atoms(topology, (7,), "Pd")
+
+    assert atom.name == "Pd"
+    assert residue.name == "Pdx"
+    assert residue.id == "8"
+    assert residue.chain.id == "M"
+
+
+def test_metal_residue_name_pads_to_three_characters() -> None:
+    """Use PDB-style three-character residue labels while preserving symbols."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+
+    assert backend._metal_residue_name("Pd") == "Pdx"
+    assert backend._metal_residue_name("Au") == "Aux"
+    assert backend._metal_residue_name("Zn") == "Znx"
+
+
 def test_interface_metal_offxml_loads_with_current_openff() -> None:
     """The packaged INTERFACE OFFXML stays compatible with the CUDA env toolkit."""
 

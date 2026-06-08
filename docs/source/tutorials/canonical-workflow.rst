@@ -49,30 +49,34 @@ Build the starting model:
 
 In this version, this command writes exactly three output files:
 
-* ``topology.cif`` so you can inspect the planned topology
+* ``sam_grafting_density.cif`` as a visual smoke test for the Pd slab and SAM
+  sulfur anchor positions
 * ``build_summary.json`` for a JSON build report that scripts can read
 * ``resolved_config.yaml`` for the exact validated input used for the build
 
 The result includes the validated configuration and resolved output paths. It
 also includes a centered registered Fcc(111) slab, using Pd(111) by default,
-internal ``fcc_hollow`` binding sites, placeholder sulfur anchors for the SAM,
-and approximate solution counts. SAMMD writes full SAM molecule coordinates and
-a parameterized backend system only when you run from a CUDA-labeled pixi
-environment with ``--export-backend``.
+internal ``fcc_hollow`` binding sites, sulfur atoms marking the planned SAM
+anchors, and approximate solution counts. SAMMD writes full SAM molecule
+coordinates and a parameterized backend system only when you run from a
+CUDA-labeled pixi environment with ``--full``.
 
 4. Inspect outputs
 ------------------
 
-Open ``outputs/topology.cif`` in a molecule viewer such as PyMOL to inspect the
-configured surface and the placeholder sulfur anchors. Use it to check the
-surface size, exposed faces, and where the SAM anchors will go before moving on.
+Open ``outputs/sam_grafting_density.cif`` in a molecule viewer such as PyMOL to
+inspect the configured surface and the sulfur anchor atoms. This is a useful
+smoke test: you can see the Pd(111) slab geometry and check whether the thiol
+sulfur atoms land at the intended three-fold hollow sites with the expected
+grafting density. It does not contain the rest of each SAM molecule or solvent
+coordinates.
 
 Use ``outputs/build_summary.json`` to confirm the same build choices in a
 machine-readable form. Use ``outputs/resolved_config.yaml`` when you need the
 exact validated YAML that produced the plan.
 
 You may see those filenames in resolved paths or metadata, but the default
-lightweight command does not write ``positions.cif``, ``interchange.json``,
+lightweight command does not write ``solvated_system.cif``, ``interchange.json``,
 ``system.xml``, or ``anchor_metadata.json``.
 
 5. Optional backend output files
@@ -86,12 +90,13 @@ For example, use ``cuda-12-4`` for CU Boulder Blanca older-GPU nodes and
 
 .. code-block:: bash
 
-   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
 
 That command writes these additional files:
 
 * ``interchange.json`` for the primary OpenFF Interchange export
-* ``positions.cif`` for coordinates you can inspect and load in OpenMM
+* ``solvated_system.cif`` for the full slab + SAMs + reactants + solvent
+  coordinates you can inspect and load in OpenMM
 * ``system.xml`` for an OpenMM file, not the primary OpenFF Interchange output
 * ``anchor_metadata.json`` for SAM anchor metadata
 
@@ -100,6 +105,10 @@ The ``interchange.json`` file is OpenFF Interchange JSON written with
 ``Interchange.model_validate_json``. Pre-1.0 Interchange JSON compatibility is
 not guaranteed across OpenFF Interchange versions. Configs that include salt are
 rejected until backend export supports salt.
+
+After backend export, inspect ``outputs/solvated_system.cif`` if you want to see
+full SAM molecules, solvent, and reactants. ``outputs/sam_grafting_density.cif``
+remains the separate grafting-density smoke test.
 
 6. Use these files with OpenMM
 ------------------------------
@@ -111,7 +120,7 @@ students use them in their own OpenMM Python API script. Follow these steps:
   ``Interchange.model_validate_json``
 * export an OpenMM ``System`` from that Interchange object with
   ``interchange.to_openmm()``
-* load positions from ``positions.cif`` for the constructed coordinates
+* load positions from ``solvated_system.cif`` for the constructed coordinates
 * optionally use ``system.xml`` only as an OpenMM file
 * create and run a raw OpenMM ``Simulation`` for minimization, equilibration,
   production, and reporters

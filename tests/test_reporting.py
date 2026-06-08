@@ -98,7 +98,7 @@ def test_openmm_reporter_runtime_helper_errors_when_unavailable(monkeypatch, tmp
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
     output_paths = OutputPaths(
-        topology=tmp_path / "topology.cif",
+        sam_grafting_density=tmp_path / "sam_grafting_density.cif",
         trajectory=tmp_path / "traj/run.dcd",
         thermodynamics=tmp_path / "reports/state.csv",
     )
@@ -129,7 +129,7 @@ def test_openmm_reporter_runtime_helper_uses_expected_reporter_arguments(tmp_pat
                 self.kwargs = kwargs
 
     output_paths = OutputPaths(
-        topology=tmp_path / "topology.cif",
+        sam_grafting_density=tmp_path / "sam_grafting_density.cif",
         trajectory=tmp_path / "traj/run.dcd",
         thermodynamics=tmp_path / "reports/state.csv",
     )
@@ -161,7 +161,7 @@ def test_reporter_directory_preparation_is_explicit(tmp_path) -> None:
     """Create reporter output directories only through the explicit helper."""
 
     output_paths = OutputPaths(
-        topology=tmp_path / "topology.cif",
+        sam_grafting_density=tmp_path / "sam_grafting_density.cif",
         trajectory=tmp_path / "traj/run.dcd",
         thermodynamics=tmp_path / "reports/state.csv",
     )

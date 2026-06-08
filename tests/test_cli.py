@@ -15,7 +15,8 @@ def test_init_cli_writes_loadable_template() -> None:
     with runner.isolated_filesystem():
         result = runner.invoke(main, ["init", "-o", "sammd.yaml"])
         assert result.exit_code == 0
-        assert "INIT Created a SAMMD configuration template at sammd.yaml" in result.output
+        assert "INIT" in result.output
+        assert "Created a SAMMD configuration template at sammd.yaml" in result.output
         config = load_config("sammd.yaml")
         assert config.surface.metal == "Pd"
 
@@ -64,19 +65,21 @@ def test_build_cli_writes_topology_and_summary() -> None:
         result = runner.invoke(main, ["build", "sammd.yaml", "--output-dir", "outputs"])
 
         assert result.exit_code == 0
-        assert "PLAN SAMMD build plan ready" in result.output
-        assert "OK Lightweight validation gates passed" in result.output
-        assert "PLAN Surface: Pd(111)" in result.output
-        assert "WRITE Wrote topology CIF" in result.output
-        assert "WRITE Wrote build summary" in result.output
-        assert "WRITE Wrote resolved config" in result.output
-        assert "NEXT Inspect topology.cif" in result.output
+        assert "SAMMD Build" in result.output
+        assert "Reading config and constructing deterministic build plan" in result.output
+        assert "OK" in result.output
+        assert "Lightweight validation gates passed" in result.output
+        assert "Surface: Pd(111)" in result.output
+        assert "SAM grafting-density CIF" in result.output
+        assert "Build summary" in result.output
+        assert "Resolved config" in result.output
+        assert "Inspect sam_grafting_density.cif" in result.output
         assert load_config("sammd.yaml").surface.metal == "Pd"
 
-        assert Path("outputs/topology.cif").is_file()
+        assert Path("outputs/sam_grafting_density.cif").is_file()
         assert Path("outputs/build_summary.json").is_file()
         assert Path("outputs/resolved_config.yaml").is_file()
-        assert not Path("outputs/positions.cif").exists()
+        assert not Path("outputs/solvated_system.cif").exists()
         assert not Path("outputs/interchange.json").exists()
         assert not Path("outputs/system.xml").exists()
         assert not Path("outputs/anchor_metadata.json").exists()
@@ -98,3 +101,13 @@ def test_build_cli_respects_no_overwrite_unless_requested() -> None:
             main, ["build", "sammd.yaml", "--output-dir", "outputs", "--overwrite"]
         )
         assert forced.exit_code == 0
+
+
+def test_build_help_exposes_full_not_backend_alias() -> None:
+    """Show the intuitive MD export flag while hiding the old backend wording."""
+
+    result = CliRunner().invoke(main, ["build", "--help"])
+
+    assert result.exit_code == 0
+    assert "--full" in result.output
+    assert "--export-backend" not in result.output

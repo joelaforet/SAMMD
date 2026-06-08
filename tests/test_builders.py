@@ -56,15 +56,15 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
     assert plan.solution.solvent_components[0].residue_name == "EOH"
     assert plan.solution.reactants[0].name == "cinnamaldehyde"
     assert plan.solution.reactants[0].residue_name == "CIN"
-    assert plan.output_paths.topology == tmp_path / "topology.cif"
-    assert plan.output_paths.positions == tmp_path / "positions.cif"
+    assert plan.output_paths.sam_grafting_density == tmp_path / "sam_grafting_density.cif"
+    assert plan.output_paths.solvated_system == tmp_path / "solvated_system.cif"
     assert plan.output_paths.openff_interchange == tmp_path / "interchange.json"
     assert plan.output_paths.openmm_system == tmp_path / "system.xml"
     assert plan.output_paths.anchor_metadata == tmp_path / "anchor_metadata.json"
     assert not plan.full_construction_available
     artifacts = plan.build_summary()["artifacts"]
-    assert artifacts["topology"] == {
-        "path": str(tmp_path / "topology.cif"),
+    assert artifacts["sam_grafting_density"] == {
+        "path": str(tmp_path / "sam_grafting_density.cif"),
         "status": "current",
         "available": True,
     }
@@ -222,7 +222,7 @@ def test_build_plan_writes_topology_cif_and_refuses_overwrite(tmp_path) -> None:
     text = written_path.read_text(encoding="utf-8")
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
 
-    assert written_path == tmp_path / "topology.cif"
+    assert written_path == tmp_path / "sam_grafting_density.cif"
     assert summary_path == tmp_path / "build_summary.json"
     assert resolved_config_path == tmp_path / "resolved_config.yaml"
     assert text.startswith("data_sammd_topology")

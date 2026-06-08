@@ -425,7 +425,7 @@ def test_create_openmm_simulation_attaches_reporters(tmp_path) -> None:
     """Configure a simulation with positions, platform, and SAMMD reporters."""
 
     output_paths = OutputPaths(
-        topology=tmp_path / "topology.cif",
+        sam_grafting_density=tmp_path / "sam_grafting_density.cif",
         trajectory=tmp_path / "traj/run.dcd",
         thermodynamics=tmp_path / "reports/state.csv",
     )
@@ -454,7 +454,7 @@ def test_create_openmm_simulation_prepares_reporter_directories_when_requested(t
     """Create reporter directories only when simulation setup explicitly opts in."""
 
     output_paths = OutputPaths(
-        topology=tmp_path / "topology.cif",
+        sam_grafting_density=tmp_path / "sam_grafting_density.cif",
         trajectory=tmp_path / "traj/run.dcd",
         thermodynamics=tmp_path / "reports/state.csv",
     )

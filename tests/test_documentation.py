@@ -88,7 +88,7 @@ def test_build_export_and_openmm_ownership_boundary_is_documented() -> None:
 
     assert "SAMMD builds and exports chemistry, structure, and parameter artifacts" in combined
     assert "OpenMM runs minimization, equilibration, production" in combined
-    assert "sammd build --export-backend" in combined
+    assert "sammd build --full" in combined
     assert "not a student-facing SAMMD run-wrapper API" in combined
 
 
@@ -130,12 +130,21 @@ def test_build_tutorial_documents_default_and_backend_outputs() -> None:
     notebook = _notebook_sources(PROJECT_ROOT / "notebooks" / "building_systems_with_sammd.ipynb")
     combined = tutorial + "\n" + notebook
 
-    for default_output in ["topology.cif", "build_summary.json", "resolved_config.yaml"]:
+    for default_output in [
+        "sam_grafting_density.cif",
+        "build_summary.json",
+        "resolved_config.yaml",
+    ]:
         assert default_output in combined
-    backend_outputs = ["positions.cif", "interchange.json", "system.xml", "anchor_metadata.json"]
+    backend_outputs = [
+        "solvated_system.cif",
+        "interchange.json",
+        "system.xml",
+        "anchor_metadata.json",
+    ]
     for backend_output in backend_outputs:
         assert backend_output in combined
-    assert "--export-backend" in combined
+    assert "--full" in combined
     assert "RUN_BACKEND_EXPORT = False" in notebook
     assert "SAMMD_PIXI_ENV = \"cuda-12-4\"" in notebook
 
@@ -187,7 +196,7 @@ def test_building_systems_notebook_workflow_smoke(tmp_path: Path) -> None:
     assert topology_path.is_file()
     assert build_summary_path.is_file()
     assert resolved_config_path.is_file()
-    assert not plan.output_paths.positions.exists()
+    assert not plan.output_paths.solvated_system.exists()
     assert not plan.output_paths.openff_interchange.exists()
     assert not plan.output_paths.openmm_system.exists()
     assert plan.slab.metal == "Pd"
@@ -195,7 +204,7 @@ def test_building_systems_notebook_workflow_smoke(tmp_path: Path) -> None:
     assert len(plan.binding_sites) > 0
     assert len(plan.sam_placements.placements) > 0
     assert plan.solution.molecule_counts["ethanol"] > 0
-    assert plan.output_paths.topology == output_dir / "topology.cif"
+    assert plan.output_paths.sam_grafting_density == output_dir / "sam_grafting_density.cif"
     assert plan.output_paths.build_summary == output_dir / "build_summary.json"
     assert plan.output_paths.resolved_config == output_dir / "resolved_config.yaml"
     assert not plan.full_construction_available

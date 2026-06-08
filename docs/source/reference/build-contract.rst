@@ -27,7 +27,7 @@ The supported first-release command-line surface is:
      - Build the current deterministic plan and write the currently implemented
        artifacts into ``DIR``. Existing artifacts are protected unless
        ``--overwrite`` is supplied.
-   * - ``sammd build CONFIG --output-dir DIR --overwrite --export-backend``
+   * - ``sammd build CONFIG --output-dir DIR --overwrite --full``
      - In a CUDA-labeled pixi environment, write OpenFF Interchange and OpenMM
        backend artifacts in addition to the lightweight artifacts. Salt-containing
        configs are rejected until salt export is implemented.
@@ -86,12 +86,12 @@ current/reserved output suffixes, and lightweight topology CIF atom counts and
 cell lengths.
 
 These gates intentionally do not require OpenMM, OpenFF, or full backend
-artifacts. Missing backend artifacts such as ``positions.cif``,
+artifacts. Missing backend artifacts such as ``solvated_system.cif``,
 ``interchange.json``, ``system.xml``, and ``anchor_metadata.json`` are not
-failures unless ``--export-backend`` is requested.
+failures unless ``--full`` is requested.
 
 Backend validation gates should stay skipped/not required when optional
-dependencies or backend artifacts are absent. Once ``--export-backend`` writes
+dependencies or backend artifacts are absent. Once ``--full`` writes
 concrete artifacts, those gates should check that:
 
 * ``interchange.json`` reloads with ``Interchange.model_validate_json``.
@@ -121,12 +121,15 @@ downstream exports from Interchange and are not taught in the beginner workflow.
    * - Artifact
      - Status
      - Contract
-   * - ``topology.cif``
+   * - ``sam_grafting_density.cif``
      - Current
-     - Lightweight topology-inspection CIF for the deterministic plan, including
-       SAM sulfur anchor placeholders at planned sulfur positions. This is a
-       human-inspectable/OpenMM-loadable structure file, not a parameterized
-       backend system.
+     - Lightweight visual smoke-test CIF for the deterministic plan, including
+       the Pd slab and SAM sulfur atoms at planned three-fold hollow-site anchor
+       positions. In default builds, this file is meant for checking slab
+       geometry and grafting density; it does not include full SAM, solvent, or
+       reactant coordinates and is not a parameterized backend system. Backend
+       export leaves this smoke-test file separate from the full solvated-system
+       structure.
    * - ``build_summary.json``
      - Current
      - Machine-readable summary of the validated plan, output paths, and
@@ -134,14 +137,14 @@ downstream exports from Interchange and are not taught in the beginner workflow.
    * - ``resolved_config.yaml``
      - Current
      - Validated YAML configuration used for the build.
-   * - ``positions.cif``
+   * - ``solvated_system.cif``
      - Backend
-     - Written by ``--export-backend`` for fully constructed coordinates. This
-       is a human-inspectable/OpenMM-loadable structure file paired with the
-       backend system artifact.
+     - Written by ``--full`` for fully constructed SAM, solvent, and
+       reactant coordinates. This is a human-inspectable/OpenMM-loadable
+       structure file paired with the backend system artifact.
    * - ``interchange.json``
      - Backend
-     - Written by ``--export-backend`` as the primary portable OpenFF
+     - Written by ``--full`` as the primary portable OpenFF
        Interchange export. The JSON path is ``Interchange.model_dump_json`` for
        saving and ``Interchange.model_validate_json`` for reload. SAMMD records
        the concrete ``openff-interchange`` package version when the artifact is
@@ -149,18 +152,18 @@ downstream exports from Interchange and are not taught in the beginner workflow.
        guaranteed across versions.
    * - ``system.xml``
      - Backend
-     - Written by ``--export-backend`` as an OpenMM convenience export derived
+     - Written by ``--full`` as an OpenMM convenience export derived
        from the backend system, not the primary portable SAMMD artifact.
    * - ``anchor_metadata.json``
      - Backend
-     - Written by ``--export-backend`` for selected sulfur-metal pair metadata.
+     - Written by ``--full`` for selected sulfur-metal pair metadata.
 
 Current limitation
 ------------------
 
-By default, ``sammd build`` writes only ``topology.cif``,
-``build_summary.json``, and ``resolved_config.yaml``. With ``--export-backend``
-in a CUDA-labeled pixi environment, it also writes ``positions.cif``,
+By default, ``sammd build`` writes only ``sam_grafting_density.cif``,
+``build_summary.json``, and ``resolved_config.yaml``. With ``--full``
+in a CUDA-labeled pixi environment, it also writes ``solvated_system.cif``,
 ``interchange.json``, ``system.xml``, and ``anchor_metadata.json``. Public SAMMD
 APIs should not add equilibration, production simulation helpers, or direct
 GROMACS/LAMMPS/Amber command workflows as part of this contract.

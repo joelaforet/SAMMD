@@ -9,9 +9,9 @@ production runs, trajectories, and reporters after those files exist.
 
 If you are new to Python or molecular dynamics, start with
 :doc:`installation and pixi basics <tutorials/installation>`, then continue to
-the :doc:`beginner build workflow <tutorials/canonical-workflow>`. The
-command-line path gets you to a first ``topology.cif`` file before you need to
-write a Python script.
+the :doc:`beginner build workflow <tutorials/canonical-workflow>`. The first
+command-line build writes ``sam_grafting_density.cif`` as a visual smoke test
+for the slab and SAM grafting density before you need to write a Python script.
 
 The current teaching workflow starts with validation and deterministic build
 planning, then progresses toward OpenFF/OpenMM-backed system construction and

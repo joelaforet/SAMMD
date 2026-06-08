@@ -121,7 +121,8 @@ class SAMMDBuildPlan:
         Parameters
         ----------
         path
-            Optional destination path. Defaults to the configured ``topology.cif`` path.
+            Optional destination path. Defaults to the configured
+            ``sam_grafting_density.cif`` path.
         overwrite
             Whether an existing destination may be replaced.
 
@@ -131,10 +132,10 @@ class SAMMDBuildPlan:
             Written topology CIF path.
         """
 
-        if path is None and self.output_paths.topology is None:
-            msg = "topology output path is not configured"
+        if path is None and self.output_paths.sam_grafting_density is None:
+            msg = "SAM grafting-density output path is not configured"
             raise ValueError(msg)
-        destination = self.output_paths.topology if path is None else Path(path)
+        destination = self.output_paths.sam_grafting_density if path is None else Path(path)
         assert destination is not None
         return write_mmcif(
             destination,
@@ -220,10 +221,12 @@ class SAMMDBuildPlan:
                 for key, value in self.output_paths.__dict__.items()
             },
             "artifacts": {
-                "topology": self._artifact_summary("topology", "current"),
+                "sam_grafting_density": self._artifact_summary(
+                    "sam_grafting_density", "current"
+                ),
                 "build_summary": self._artifact_summary("build_summary", "current"),
                 "resolved_config": self._artifact_summary("resolved_config", "current"),
-                "positions": self._artifact_summary("positions", "reserved"),
+                "solvated_system": self._artifact_summary("solvated_system", "reserved"),
                 "openff_interchange": self._artifact_summary(
                     "openff_interchange", "reserved"
                 ),

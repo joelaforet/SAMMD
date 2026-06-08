@@ -100,7 +100,7 @@ pixi run sammd validate sammd.yaml
 For named environments, add `-e <env>`:
 
 ```bash
-pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
 ```
 
 ### 4. Switch environments
@@ -192,14 +192,14 @@ choose the environment with `nvidia-smi`, then run the backend build.
 Example for the default CUDA 12.4 backend environment:
 
 ```bash
-pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
 ```
 
 Or enter the environment once:
 
 ```bash
 pixi shell -e cuda-12-4
-sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+sammd build sammd.yaml --output-dir outputs --overwrite --full
 ```
 
 Backend mode writes these additional files:
@@ -236,7 +236,7 @@ The OpenMM tutorial teaches the raw OpenMM Python API with
 | `sammd init -o sammd.yaml` | Write a starter YAML file |
 | `sammd validate sammd.yaml` | Check the YAML before building |
 | `sammd build sammd.yaml --output-dir outputs --overwrite` | Write default lightweight output files |
-| `sammd build sammd.yaml --output-dir outputs --overwrite --export-backend` | Write OpenFF/OpenMM backend files from a CUDA pixi environment |
+| `sammd build sammd.yaml --output-dir outputs --overwrite --full` | Write full MD simulation files from a CUDA pixi environment |
 
 Use `pixi run ...` outside a pixi shell, or run `pixi shell -e default` first
 and then use the lightweight commands directly.

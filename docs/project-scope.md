@@ -29,7 +29,7 @@ Recommended v0.1.0 first-release deliverables:
 - A registered Fcc(111) slab builder, defaulting to Pd(111), and propanethiol SAM placement with tunable grafting density.
 - Mixed SAM support through multiple SAM component definitions with fractions or explicit counts.
 - Centered, double-sided registered Fcc(111) slab geometry with SAMs on both faces and solvent on both sides.
-- Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices. The default build remains lightweight; `sammd build --export-backend` performs parameterized backend export in a CUDA-labeled pixi environment for supported non-salt configs.
+- Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices. The default build remains lightweight; `sammd build --full` performs parameterized MD-file export in a CUDA-labeled pixi environment for supported non-salt configs.
 - Static CHARMM-INTERFACE-derived Fcc metal Lennard-Jones parameters packaged or identified as OpenFF-compatible OFFXML resource support.
 - Visualization-friendly build artifacts, centered on mmCIF/PDBx topology-inspection output plus machine-readable build summaries.
 - Pytest coverage for configuration validation, parameter conversion, deterministic builders, and import smoke tests.
@@ -94,7 +94,7 @@ Conversion notes:
 
 [OpenFF Interchange construction](https://docs.openforcefield.org/projects/interchange/en/stable/using/construction.html) supports constructing an `Interchange` from a SMIRNOFF `ForceField` and OpenFF `Molecule` or `Topology` objects.
 
-The SAMMD backend pipeline uses OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy is applied after export to the selected OpenMM pair representation rather than encoded as a beginner-facing YAML option. The explicit `sammd build --export-backend` path writes `positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json` for supported non-salt configs in a CUDA-labeled pixi environment.
+The SAMMD backend pipeline uses OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy is applied after export to the selected OpenMM pair representation rather than encoded as a beginner-facing YAML option. The explicit `sammd build --full` path writes `solvated_system.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json` for supported non-salt configs in a CUDA-labeled pixi environment.
 
 OpenMM GPU support is tied to the NVIDIA driver and CUDA line available on the
 machine. Students should run `nvidia-smi` on the GPU node or workstation, then
@@ -183,7 +183,7 @@ from sammd import load_config, build_system
 
 config = load_config("sammd.yaml")
 plan = build_system(config, output_dir="outputs")
-plan.write_topology_cif()  # Writes outputs/topology.cif by default
+plan.write_topology_cif()  # Writes outputs/sam_grafting_density.cif by default
 ```
 
 The returned plan contains validated configuration, a commensurate registered Fcc(111) slab,
@@ -194,7 +194,7 @@ solvent, salts, or reactants.
 
 The current `sammd build` command writes the v0.1.0 first-release artifacts:
 
-- `topology.cif`: lightweight topology-inspection CIF for the deterministic plan, with SAM sulfur anchor placeholders at planned sulfur positions.
+- `sam_grafting_density.cif`: lightweight visual smoke-test CIF for the deterministic plan, with the Pd slab and SAM sulfur atoms at planned three-fold hollow-site anchors.
 - `build_summary.json`: machine-readable summary of the validated plan and output paths.
 - `resolved_config.yaml`: validated YAML configuration used for the build.
 
@@ -202,10 +202,10 @@ The optional CUDA-environment backend export preserves the small public API surf
 adding artifact exports for OpenMM handoff:
 
 ```bash
-pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
 ```
 
-That command writes `interchange.json`, `positions.cif`, `system.xml`, and
+That command writes `interchange.json`, `solvated_system.cif`, `system.xml`, and
 `anchor_metadata.json` in addition to the lightweight artifacts. Salt-containing
 configs are rejected until salt backend export is implemented.
 
@@ -232,17 +232,21 @@ SAMMD-generated structures and OpenMM-run outputs should be optimized for visual
 
 Default post-v0.1.0 backend exports plus tutorial-only OpenMM run outputs should include:
 
-- `topology.cif`: mmCIF/PDBx topology and starting coordinates.
+- `solvated_system.cif`: mmCIF/PDBx topology and starting coordinates for the full slab + SAMs + reactants + solvent system.
 - `trajectory.dcd`: DCD trajectory from OpenMM.
 - `thermodynamics.csv`: tabular OpenMM state data from a thermodynamic reporter.
 - Optional OpenMM restart/checkpoint artifacts for continuing simulations.
 
-By default, `sammd build` writes `topology.cif`, `build_summary.json`, and
-`resolved_config.yaml`. The default `topology.cif` is a lightweight
-topology-inspection CIF for the deterministic plan, showing placeholder sulfur
-anchors at planned sulfur positions rather than full SAM molecule coordinates.
-With `--export-backend` in a CUDA-labeled pixi environment, SAMMD also writes
-`positions.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json`.
+By default, `sammd build` writes `sam_grafting_density.cif`,
+`build_summary.json`, and `resolved_config.yaml`. The default
+`sam_grafting_density.cif` is a lightweight
+visual smoke-test CIF for the deterministic plan, showing the Pd slab and SAM
+sulfur atoms at planned three-fold hollow-site anchors. It is useful for
+checking slab geometry and SAM grafting density before full backend export; it
+does not include full SAM molecule, solvent, or reactant coordinates.
+With `--full` in a CUDA-labeled pixi environment, SAMMD also writes
+`solvated_system.cif`, `interchange.json`, `system.xml`, and
+`anchor_metadata.json`.
 The `interchange.json` artifact is JSON from `Interchange.model_dump_json` with
 reload through `Interchange.model_validate_json`; the concrete
 `openff-interchange` package version is recorded when SAMMD writes the artifact,
@@ -250,7 +254,7 @@ and pre-1.0 JSON compatibility is not guaranteed across versions.
 
 mmCIF/PDBx should be preferred over legacy PDB because SAMMD systems may have many atoms, many solvent/reactant molecules, nonstandard residues, and metal particles. Atom names, residue names, chain IDs, molecule labels, and component metadata should be chosen so PyMOL sessions are easy to inspect: metal slab, top SAM, bottom SAM, solvent, salts, and reactants should be distinguishable by selection.
 
-DCD should be the canonical post-v0.1.0/tutorial OpenMM trajectory convention, not a v0.1.0 build artifact. The topology/trajectory pair should load cleanly as `topology.cif` plus `trajectory.dcd` in PyMOL or common Python analysis tools after user-owned OpenMM scripts run from SAMMD-exported artifacts.
+DCD should be the canonical post-v0.1.0/tutorial OpenMM trajectory convention, not a v0.1.0 build artifact. The topology/trajectory pair should load cleanly as `solvated_system.cif` plus `trajectory.dcd` in PyMOL or common Python analysis tools after user-owned OpenMM scripts run from SAMMD-exported artifacts.
 
 ### Thermodynamic Reporting
 

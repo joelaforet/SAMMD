@@ -18,8 +18,8 @@ Vector3 = tuple[float, float, float]
 class OutputPaths:
     """Resolved output artifact paths for system building."""
 
-    topology: Path | None = None
-    positions: Path | None = None
+    sam_grafting_density: Path | None = None
+    solvated_system: Path | None = None
     openff_interchange: Path | None = None
     openmm_system: Path | None = None
     anchor_metadata: Path | None = None
@@ -62,24 +62,24 @@ def plan_output_paths(config: Any, base_dir: str | Path = ".") -> OutputPaths:
     output_config = getattr(config, "outputs", config)
     files = getattr(output_config, "files", output_config)
     root = Path(base_dir)
-    topology = _resolve_output_path(root, files.topology)
-    positions = _resolve_output_path(root, files.positions)
+    sam_grafting_density = _resolve_output_path(root, files.sam_grafting_density)
+    solvated_system = _resolve_output_path(root, files.solvated_system)
     openff_interchange = _resolve_output_path(root, files.openff_interchange)
     openmm_system = _resolve_output_path(root, files.openmm_system)
     anchor_metadata = _resolve_output_path(root, files.anchor_metadata)
     build_summary = _resolve_output_path(root, files.build_summary)
     resolved_config = _resolve_output_path(root, files.resolved_config)
 
-    _validate_suffix(topology, ".cif", "topology")
-    _validate_suffix(positions, ".cif", "positions")
+    _validate_suffix(sam_grafting_density, ".cif", "SAM grafting-density")
+    _validate_suffix(solvated_system, ".cif", "solvated system")
     _validate_suffix(openff_interchange, ".json", "OpenFF Interchange")
     _validate_suffix(openmm_system, ".xml", "OpenMM system")
     _validate_suffix(anchor_metadata, ".json", "anchor metadata")
     _validate_suffix(build_summary, ".json", "build summary")
     _validate_suffix(resolved_config, ".yaml", "resolved config")
     return OutputPaths(
-        topology=topology,
-        positions=positions,
+        sam_grafting_density=sam_grafting_density,
+        solvated_system=solvated_system,
         openff_interchange=openff_interchange,
         openmm_system=openmm_system,
         anchor_metadata=anchor_metadata,
@@ -275,7 +275,7 @@ def write_mmcif(
     """
 
     destination = Path(path)
-    _validate_suffix(destination, ".cif", "topology")
+    _validate_suffix(destination, ".cif", "SAM grafting-density")
     text = format_mmcif(atom_records, data_name=data_name, cell_lengths_nm=cell_lengths_nm)
     return safe_write_text(destination, text, overwrite=overwrite)
 
