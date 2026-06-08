@@ -202,7 +202,7 @@ The optional CUDA-environment backend export preserves the small public API surf
 adding artifact exports for OpenMM handoff:
 
 ```bash
-pixi run -e cuda-12-6 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
 ```
 
 That command writes `interchange.json`, `positions.cif`, `system.xml`, and

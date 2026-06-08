@@ -14,11 +14,17 @@ From the repository root, build the files in a CUDA-labeled pixi environment.
 Run ``nvidia-smi`` on the machine first, then choose an environment whose CUDA
 version is not newer than the CUDA version shown there. For example, use
 ``cuda-12-4`` for CU Boulder Blanca older-GPU nodes and ``cuda-12-6`` on PSC
-Bridges2:
+Bridges2. The default example here uses ``cuda-12-4``:
+
+.. tip::
+
+   You can run each command with ``pixi run -e cuda-12-4 ...`` or enter the
+   environment once with ``pixi shell -e cuda-12-4``. Leave the environment with
+   ``exit`` before switching to another pixi environment.
 
 .. code-block:: bash
 
-   pixi run -e cuda-12-6 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
 
 This writes files such as ``interchange.json``, ``positions.cif``,
 ``system.xml``, and ``anchor_metadata.json``. In this tutorial we load

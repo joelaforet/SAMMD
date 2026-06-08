@@ -28,6 +28,7 @@ def test_docs_scaffold_files_exist_and_tutorials_are_linked() -> None:
         "docs/source/index.rst",
         "docs/source/explanation/scientific-assumptions.rst",
         "docs/source/reference/build-contract.rst",
+        "docs/source/tutorials/installation.rst",
         "docs/source/tutorials/canonical-workflow.rst",
         "docs/source/tutorials/openmm-simulation.rst",
         "docs/source/tutorials/yaml-configuration.rst",
@@ -40,6 +41,7 @@ def test_docs_scaffold_files_exist_and_tutorials_are_linked() -> None:
 
     index = (PROJECT_ROOT / "docs" / "source" / "index.rst").read_text(encoding="utf-8")
     for docname in [
+        "tutorials/installation",
         "tutorials/canonical-workflow",
         "tutorials/openmm-simulation",
         "tutorials/yaml-configuration",
@@ -103,7 +105,15 @@ def test_cuda_pixi_environment_guidance_is_documented() -> None:
         assert "nvidia-smi" in content
         assert "cuda-12-4" in content
         assert "cuda-12-6" in content
-        assert "pixi run -e cuda-12-6 sammd build" in content
+        assert "pixi run -e cuda-12-4 sammd build" in content
+
+    installation = (
+        PROJECT_ROOT / "docs" / "source" / "tutorials" / "installation.rst"
+    ).read_text(encoding="utf-8")
+    assert "pixi shell" in readme
+    assert "pixi run" in readme
+    assert "pixi shell" in installation
+    assert "pixi run" in installation
 
     for env_name in ["cuda-12-4", "cuda-12-6", "cuda-13-0"]:
         assert env_name in pixi
@@ -127,7 +137,7 @@ def test_build_tutorial_documents_default_and_backend_outputs() -> None:
         assert backend_output in combined
     assert "--export-backend" in combined
     assert "RUN_BACKEND_EXPORT = False" in notebook
-    assert "SAMMD_PIXI_ENV = \"cuda-12-6\"" in notebook
+    assert "SAMMD_PIXI_ENV = \"cuda-12-4\"" in notebook
 
 
 def test_openmm_tutorial_teaches_raw_openmm_route() -> None:

@@ -4,6 +4,11 @@ YAML configuration tutorial
 SAMMD checks the YAML file with Pydantic v2. Unknown keys are rejected so
 spelling mistakes fail early.
 
+.. note::
+
+   If you already ran ``pixi shell``, use ``sammd`` commands directly. If you
+   are not inside a pixi shell, prefix commands with ``pixi run``.
+
 Minimal starting point
 ----------------------
 
@@ -11,7 +16,7 @@ Generate a complete template with resolved defaults:
 
 .. code-block:: bash
 
-   sammd init -o sammd.yaml
+   pixi run sammd init -o sammd.yaml
 
 Important sections
 ------------------

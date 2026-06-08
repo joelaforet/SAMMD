@@ -7,10 +7,11 @@ describes the surface, SAM chemistry, reactants, solvent, salts, packing,
 parameterization, and build outputs. OpenMM owns minimization, equilibration,
 production runs, trajectories, and reporters after those files exist.
 
-If you are new to Python or molecular dynamics, start with the
-:doc:`beginner build workflow <tutorials/canonical-workflow>`. The command-line
-path gets you to a first ``topology.cif`` file before you need to write a Python
-script.
+If you are new to Python or molecular dynamics, start with
+:doc:`installation and pixi basics <tutorials/installation>`, then continue to
+the :doc:`beginner build workflow <tutorials/canonical-workflow>`. The
+command-line path gets you to a first ``topology.cif`` file before you need to
+write a Python script.
 
 The current teaching workflow starts with validation and deterministic build
 planning, then progresses toward OpenFF/OpenMM-backed system construction and
@@ -20,6 +21,7 @@ student-written OpenMM simulation scripts.
    :maxdepth: 2
    :caption: Tutorials
 
+   tutorials/installation
    tutorials/canonical-workflow
    tutorials/yaml-configuration
    tutorials/openmm-simulation

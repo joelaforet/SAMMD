@@ -562,7 +562,7 @@ def require_openmm_modules() -> Any:
         import openmm
         from openmm import app, unit
     except ImportError as error:
-        msg = "OpenMM is required; run this through `pixi run -e cuda-12-6 real-system-smoke`."
+        msg = "OpenMM is required; run this through `pixi run -e cuda-12-4 real-system-smoke`."
         raise SystemExit(msg) from error
     return type("OpenMMModules", (), {"openmm": openmm, "app": app, "unit": unit})
 
@@ -577,7 +577,7 @@ def require_openff_modules() -> Any:
     except ImportError as error:
         msg = (
             "OpenFF Toolkit with NAGL support is required; run this through "
-            "`pixi run -e cuda-12-6 real-system-smoke`."
+            "`pixi run -e cuda-12-4 real-system-smoke`."
         )
         raise SystemExit(msg) from error
     return type(

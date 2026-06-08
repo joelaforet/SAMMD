@@ -5,6 +5,13 @@ This tutorial shows the recommended path for students. SAMMD checks the YAML,
 builds the same starting structure each time, and, if requested, writes files
 you can load in OpenMM. SAMMD builds; OpenMM runs.
 
+.. note::
+
+   If you already ran ``pixi shell``, use commands such as
+   ``sammd validate sammd.yaml`` directly. If you are not inside a pixi shell,
+   prefix SAMMD commands with ``pixi run``, for example
+   ``pixi run sammd validate sammd.yaml``.
+
 1. Create config
 ----------------
 
@@ -12,7 +19,7 @@ From the repository root, create a starter YAML file:
 
 .. code-block:: bash
 
-   sammd init -o sammd.yaml
+   pixi run sammd init -o sammd.yaml
 
 The template follows the defaults summarized in :doc:`yaml-configuration`. It
 describes the surface, SAM, solution composition, and output names used for the
@@ -26,7 +33,7 @@ Validate the YAML before building anything:
 
 .. code-block:: bash
 
-   sammd validate sammd.yaml
+   pixi run sammd validate sammd.yaml
 
 Validation checks that SAMMD can interpret the file and reports configuration
 errors before any output files are written.
@@ -38,7 +45,7 @@ Build the starting model:
 
 .. code-block:: bash
 
-   sammd build sammd.yaml --output-dir outputs --overwrite
+   pixi run sammd build sammd.yaml --output-dir outputs --overwrite
 
 In this version, this command writes exactly three output files:
 
@@ -75,11 +82,11 @@ Use a CUDA-labeled pixi environment when you want SAMMD to write files for
 OpenFF/OpenMM. Run ``nvidia-smi`` on the machine first, then choose an
 environment whose CUDA version is not newer than the CUDA version shown there.
 For example, use ``cuda-12-4`` for CU Boulder Blanca older-GPU nodes and
-``cuda-12-6`` for PSC Bridges2.
+``cuda-12-6`` for PSC Bridges2. The default example here uses ``cuda-12-4``.
 
 .. code-block:: bash
 
-   pixi run -e cuda-12-6 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
+   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --export-backend
 
 That command writes these additional files:
 
