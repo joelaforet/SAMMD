@@ -426,6 +426,7 @@ surface:
 # residue_name must be a 3-character PDB residue code.
 #
 # For mixed SAMs, list multiple components and make fractions sum to 1.0.
+# Larger grafting_density values mean fewer SAM molecules on the surface.
 #
 # extended_length_nm is an optional advanced override for the fully extended SAM
 # length from sulfur anchor to tail tip. If omitted, SAMMD uses a lightweight,

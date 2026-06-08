@@ -119,7 +119,8 @@ Beginner glossary
 
 ``grafting density``
    How much surface area is assigned to each attached SAM molecule. Smaller
-   values place more molecules on the surface.
+   values place more molecules on the surface; larger values place fewer
+   molecules on the surface.
 
 ``SMILES``
    A short text string that describes a molecule, for example ``CCO`` for
