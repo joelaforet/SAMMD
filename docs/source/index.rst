@@ -21,6 +21,7 @@ student-written OpenMM simulation scripts.
 
    tutorials/canonical-workflow
    tutorials/yaml-configuration
+   tutorials/openmm-simulation
 
 .. toctree::
    :maxdepth: 2

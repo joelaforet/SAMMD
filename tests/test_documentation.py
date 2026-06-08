@@ -712,6 +712,146 @@ def test_canonical_notebook_outputs_match_current_contract() -> None:
         assert backend_output in sources
 
 
+def test_openmm_simulation_tutorial_and_notebook_exist_and_are_linked() -> None:
+    """Keep the OpenMM-from-SAMMD teaching files visible."""
+
+    docs_page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "openmm-simulation.rst"
+    notebook_path = PROJECT_ROOT / "notebooks" / "openmm_from_sammd.ipynb"
+    index = PROJECT_ROOT / "docs" / "source" / "index.rst"
+
+    assert docs_page.is_file()
+    assert notebook_path.is_file()
+    assert "tutorials/openmm-simulation" in index.read_text(encoding="utf-8")
+
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    assert notebook["metadata"]["kernelspec"]["language"] == "python"
+
+
+def test_openmm_simulation_tutorial_teaches_required_raw_openmm_route() -> None:
+    """Guard the required Interchange-to-raw-OpenMM workflow."""
+
+    docs_page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "openmm-simulation.rst"
+    notebook_path = PROJECT_ROOT / "notebooks" / "openmm_from_sammd.ipynb"
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    notebook_sources = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+    docs_content = docs_page.read_text(encoding="utf-8")
+    combined = docs_content + "\n" + notebook_sources
+    normalized = " ".join(combined.split())
+
+    required_strings = [
+        "from openff.interchange import Interchange",
+        'Interchange.model_validate_json(interchange_path.read_text(encoding="utf-8"))',
+        "system = interchange.to_openmm()",
+        "topology = interchange.to_openmm_topology()",
+        "positions = interchange.get_positions(include_virtual_sites=True).to_openmm()",
+        "LangevinMiddleIntegrator",
+        "Simulation(topology, system, integrator)",
+        "SAMMD builds/exports files",
+        "OpenMM runs minimization, equilibration, production, trajectories, and reporters",
+        "Use the raw OpenMM Python API",
+        "not a SAMMD OpenMM wrapper",
+    ]
+    for required_string in required_strings:
+        assert required_string in combined
+
+    assert "``system.xml`` is an OpenMM convenience output" in normalized
+    assert "post-Interchange metal-S pair edits" in normalized
+    assert "present only in ``system.xml`` unless you apply the same changes again" in normalized
+    assert "Do not assume ``interchange.json`` contains every later OpenMM-only change" in normalized
+
+    blocked_wrapper_patterns = [
+        r"\bcreate_openmm_simulation\b",
+        r"\bsammd\.openmm_runtime\b",
+        r"\bOpenMMRuntime\b",
+    ]
+    for pattern in blocked_wrapper_patterns:
+        assert re.search(pattern, combined) is None
+
+
+def test_openmm_simulation_tutorial_covers_minimization_steps_reporters_and_plots() -> None:
+    """Guard the student workflow details in the new tutorial and notebook."""
+
+    docs_page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "openmm-simulation.rst"
+    notebook_path = PROJECT_ROOT / "notebooks" / "openmm_from_sammd.ipynb"
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    notebook_sources = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+    docs_content = docs_page.read_text(encoding="utf-8")
+    combined = docs_content + "\n" + notebook_sources
+    normalized = " ".join(combined.split())
+
+    assert "production_time_ns = 10.0" in combined
+    assert "desired_trajectory_frames = 300" in combined
+    assert "desired_thermo_points = 1000" in combined
+    assert "def steps_from_time" in combined
+    assert "def interval_from_count" in combined
+    assert "equilibration_steps = steps_from_time" in combined
+    assert "production_steps = steps_from_time" in combined
+    assert "trajectory_interval = interval_from_count" in combined
+    assert "thermo_interval = interval_from_count" in combined
+    assert "you do not need to do the unit math by hand" in normalized
+
+    assert "initial_state = simulation.context.getState(getEnergy=True)" in combined
+    assert "math.isfinite" in combined
+    assert "often a large positive number" in normalized
+    assert "The first important check is that the energy is finite" in normalized
+    assert "simulation.minimizeEnergy()" in combined
+    assert "maxIterations" not in combined
+
+    assert "simulation.context.setVelocitiesToTemperature(temperature)" in combined
+    assert "simulation.step(equilibration_steps)" in combined
+    assert "simulation.step(production_steps)" in combined
+    assert "DCDReporter" in combined
+    assert "StateDataReporter" in combined
+    assert "import pandas as pd" in combined
+    assert "import matplotlib.pyplot as plt" in combined
+    assert "pd.read_csv" in combined
+    assert "plt.plot" in combined
+
+
+def test_openmm_simulation_tutorial_includes_pymol_and_optional_npt_details() -> None:
+    """Keep viewer and optional pressure-control guidance present."""
+
+    docs_page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "openmm-simulation.rst"
+    notebook_path = PROJECT_ROOT / "notebooks" / "openmm_from_sammd.ipynb"
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    notebook_sources = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+    docs_content = docs_page.read_text(encoding="utf-8")
+    combined = docs_content + "\n" + notebook_sources
+    normalized = " ".join(combined.split())
+
+    assert "load_traj outputs/trajectory.dcd, sammd_system" in combined
+    assert "load outputs/positions.cif, sammd_system" in combined
+    assert "NVT is the default" in combined
+    assert "NVT for equilibration and production" in normalized
+    assert "MonteCarloBarostat" in combined
+    assert "MonteCarloAnisotropicBarostat" in combined
+    assert "before creating ``Simulation``" in normalized
+    assert "keep ``x`` and ``y`` fixed and allow only ``z`` to change" in normalized
+    assert "A barostat does not replace the thermostat" in combined
+
+
+def test_openmm_simulation_student_prose_avoids_blocked_terms() -> None:
+    """Avoid confusing terms in only the new student-facing OpenMM material."""
+
+    docs_page = PROJECT_ROOT / "docs" / "source" / "tutorials" / "openmm-simulation.rst"
+    notebook_path = PROJECT_ROOT / "notebooks" / "openmm_from_sammd.ipynb"
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    notebook_sources = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
+    combined = docs_page.read_text(encoding="utf-8") + "\n" + notebook_sources
+
+    blocked_terms = [
+        r"\bcanonical\b",
+        r"\bartifacts?\b",
+        r"\bhandoff\b",
+        r"\bboundary\b",
+        r"\bcontract\b",
+        r"\bportable\b",
+        r"\bknob\b",
+    ]
+    for term in blocked_terms:
+        assert re.search(term, combined, flags=re.IGNORECASE) is None
+
+
 def test_canonical_notebook_workflow_smoke(tmp_path: Path) -> None:
     """Reproduce the notebook workflow using current lightweight package APIs."""
 
