@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "sammd"
 version = "0.1.0"
-description = "Configuration-first scaffolding for self-assembled monolayer MD systems."
+description = "SAMMD: Self-Assembled Monolayers studied with Molecular Dynamics"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [
-  { name = "SAMMD contributors" },
+  { name = "Joseph R. Laforet Jr." },
 ]
 dependencies = [
   "click>=8.1",
@@ -40,7 +40,7 @@ packages = ["src/sammd"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
