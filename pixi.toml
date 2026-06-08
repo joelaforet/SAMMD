@@ -5,6 +5,8 @@ platforms = ["linux-64", "osx-64", "osx-arm64"]
 
 [dependencies]
 python = ">=3.10"
+pip = "*"
+ipykernel = "*"
 click = ">=8.1"
 pydantic = ">=2"
 pyyaml = ">=6"
@@ -30,7 +32,6 @@ mbuild = "*"
 openff-toolkit = "*"
 openff-interchange = "*"
 packmol = "*"
-ipykernel = "*"
 
 [feature.cuda-12-4.dependencies]
 # CUDA 12.4 driver line, e.g. CU Boulder Blanca older-GPU nodes.
