@@ -2,7 +2,7 @@
 
 import pytest
 
-from sammd.surfaces import (
+from sammd.model.surfaces import (
     FCC_SURFACE_REGISTRY,
     _nearest_indices_xy,
     generate_binding_sites,

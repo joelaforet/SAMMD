@@ -163,7 +163,7 @@ def force_field_inputs_from_config(config: Any) -> tuple[Any, ...]:
 def parameterization_plan_from_config(config: Any) -> OpenFFParameterizationPlan:
     """Create a lightweight OpenFF parameterization plan from validated config."""
 
-    from sammd.io import plan_output_paths
+    from sammd.core.io import plan_output_paths
 
     output_paths = plan_output_paths(config, base_dir=config.outputs.directory)
     return _parameterization_plan(

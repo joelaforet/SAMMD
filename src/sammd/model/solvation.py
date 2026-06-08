@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from math import floor, isfinite
 from typing import Any
 
-from sammd.config import (
+from sammd.core.config import (
     KNOWN_COSOLVENT_MOLAR_MASSES_G_MOL,
     MOLE_FRACTION_TOLERANCE,
     SAMMDConfig,

@@ -23,14 +23,14 @@ The supported first-release command-line surface is:
        unless ``--force`` is supplied.
    * - ``sammd validate CONFIG``
      - Load and validate a YAML configuration without writing build artifacts.
-    * - ``sammd build CONFIG --output-dir DIR --overwrite``
-      - Build the current deterministic plan and write the currently implemented
-        artifacts into ``DIR``. Existing artifacts are protected unless
-        ``--overwrite`` is supplied.
-    * - ``sammd build CONFIG --output-dir DIR --overwrite --export-backend``
-      - In the optional science environment, write OpenFF Interchange and OpenMM
-        backend artifacts in addition to the lightweight artifacts. Salt-containing
-        configs are rejected until salt export is implemented.
+   * - ``sammd build CONFIG --output-dir DIR --overwrite``
+     - Build the current deterministic plan and write the currently implemented
+       artifacts into ``DIR``. Existing artifacts are protected unless
+       ``--overwrite`` is supplied.
+   * - ``sammd build CONFIG --output-dir DIR --overwrite --export-backend``
+     - In the optional science environment, write OpenFF Interchange and OpenMM
+       backend artifacts in addition to the lightweight artifacts. Salt-containing
+       configs are rejected until salt export is implemented.
 
 The ``build`` command does not run minimization, equilibration, production MD,
 trajectory writing, or reporter setup.
@@ -76,7 +76,7 @@ post-Interchange OpenMM ``NonbondedForce`` exceptions and records them in
 Validation gates
 ----------------
 
-The internal ``sammd.validation`` module provides dependency-free gates for the
+The internal ``sammd.core.validation`` module provides dependency-free gates for the
 current lightweight build plan and topology CIF text. These gates check surface
 atom metadata lengths, non-empty top and bottom binding-site labels, SAM counts,
 solution-volume/box-volume agreement, finite positive box dimensions/bounds and
@@ -134,26 +134,26 @@ downstream exports from Interchange and are not taught in the beginner workflow.
    * - ``resolved_config.yaml``
      - Current
      - Validated YAML configuration used for the build.
-    * - ``positions.cif``
-      - Backend
-      - Written by ``--export-backend`` for fully constructed coordinates. This
-        is a human-inspectable/OpenMM-loadable structure file paired with the
-        backend system artifact.
-    * - ``interchange.json``
-      - Backend
-      - Written by ``--export-backend`` as the primary portable OpenFF
-        Interchange export. The JSON path is ``Interchange.model_dump_json`` for
-        saving and ``Interchange.model_validate_json`` for reload. SAMMD records
-        the concrete ``openff-interchange`` package version when the artifact is
-        written and treats pre-1.0 Interchange JSON compatibility as not
-        guaranteed across versions.
-    * - ``system.xml``
-      - Backend
-      - Written by ``--export-backend`` as an OpenMM convenience export derived
-        from the backend system, not the primary portable SAMMD artifact.
-    * - ``anchor_metadata.json``
-      - Backend
-      - Written by ``--export-backend`` for selected sulfur-metal pair metadata.
+   * - ``positions.cif``
+     - Backend
+     - Written by ``--export-backend`` for fully constructed coordinates. This
+       is a human-inspectable/OpenMM-loadable structure file paired with the
+       backend system artifact.
+   * - ``interchange.json``
+     - Backend
+     - Written by ``--export-backend`` as the primary portable OpenFF
+       Interchange export. The JSON path is ``Interchange.model_dump_json`` for
+       saving and ``Interchange.model_validate_json`` for reload. SAMMD records
+       the concrete ``openff-interchange`` package version when the artifact is
+       written and treats pre-1.0 Interchange JSON compatibility as not
+       guaranteed across versions.
+   * - ``system.xml``
+     - Backend
+     - Written by ``--export-backend`` as an OpenMM convenience export derived
+       from the backend system, not the primary portable SAMMD artifact.
+   * - ``anchor_metadata.json``
+     - Backend
+     - Written by ``--export-backend`` for selected sulfur-metal pair metadata.
 
 Current limitation
 ------------------

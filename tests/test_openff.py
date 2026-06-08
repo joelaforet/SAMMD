@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from sammd.builders import build_system
-from sammd.config import SAMMDConfig, load_config_dict
+from sammd.core.builders import build_system
+from sammd.core.config import SAMMDConfig, load_config_dict
 
 
 def test_adapter_import_does_not_import_openff_eagerly() -> None:
@@ -18,7 +18,7 @@ def test_adapter_import_does_not_import_openff_eagerly() -> None:
     optional_prefixes = ("openff", "openmm", "rdkit")
     optional_modules_before = _loaded_optional_modules(optional_prefixes)
 
-    importlib.import_module("sammd.openff")
+    importlib.import_module("sammd.backends.openff")
 
     optional_modules_after = _loaded_optional_modules(optional_prefixes)
 
@@ -30,7 +30,7 @@ def test_openff_backend_availability_reports_missing_dependencies(
 ) -> None:
     """Return a structured unavailable report without importing optional backends."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
     optional_modules_before = _loaded_optional_modules(("openff", "openmm", "rdkit"))
 
     monkeypatch.setattr(openff_adapter.importlib_util, "find_spec", lambda name: None)
@@ -52,7 +52,7 @@ def test_openff_backend_availability_handles_absent_parent_package(
 ) -> None:
     """Treat find_spec absent-parent failures as unavailable optional backends."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
 
     def fake_find_spec(name: str):
         raise ModuleNotFoundError("No module named 'openff'", name=name)
@@ -73,7 +73,7 @@ def test_openff_backend_availability_reports_partial_dependencies(
 ) -> None:
     """Report Interchange guidance when Toolkit is discoverable but Interchange is not."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
 
     def fake_find_spec(name: str):
         if name == "openff.toolkit":
@@ -98,7 +98,7 @@ def test_openff_backend_availability_reports_partial_dependencies(
 def test_force_field_inputs_from_config_are_inspectable_without_openff_imports() -> None:
     """Expose configured base force field and packaged INTERFACE resource marker."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
     config = SAMMDConfig(parameterization={"small_molecule_force_field": "openff-2.1.0.offxml"})
 
     inputs = openff_adapter.force_field_inputs_from_config(config)
@@ -111,7 +111,7 @@ def test_force_field_inputs_from_config_are_inspectable_without_openff_imports()
 def test_parameterization_plan_from_config_records_choices_and_targets() -> None:
     """Plan future backend parameterization without constructing backend objects."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
     config = SAMMDConfig(
         parameterization={
             "small_molecule_force_field": "openff-2.1.0.offxml",
@@ -137,7 +137,7 @@ def test_parameterization_plan_from_build_plan_records_counts_and_keeps_lightwei
 ) -> None:
     """Summarize build-plan molecule counts while leaving construction disabled."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
     build_plan = build_system(SAMMDConfig(), output_dir=tmp_path)
 
     plan = openff_adapter.parameterization_plan_from_build_plan(build_plan)
@@ -152,7 +152,7 @@ def test_parameterization_plan_from_build_plan_records_counts_and_keeps_lightwei
 def test_require_openff_toolkit_fails_with_guidance(monkeypatch: pytest.MonkeyPatch) -> None:
     """Explain that the optional backend requires the science environment."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
     real_import_module = importlib.import_module
 
     def fake_import_module(name: str, package: str | None = None):
@@ -169,7 +169,7 @@ def test_require_openff_toolkit_fails_with_guidance(monkeypatch: pytest.MonkeyPa
 def test_interface_fcc_metal_offxml_resource_exists() -> None:
     """Expose the packaged metal OFFXML resource without importing OpenFF."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
     resource = openff_adapter.interface_fcc_metal_offxml_resource()
 
     assert resource.name == "interface_fcc_metals.offxml"
@@ -179,7 +179,7 @@ def test_interface_fcc_metal_offxml_resource_exists() -> None:
 def test_molecule_from_smiles_requires_nonnegative_conformer_count() -> None:
     """Validate conformer count before importing optional backends."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
 
     with pytest.raises(ValueError, match="n_conformers must be non-negative"):
         openff_adapter.molecule_from_smiles("CCCS", n_conformers=-1)
@@ -190,7 +190,7 @@ def test_molecule_from_smiles_disallows_undefined_stereo_by_default(
 ) -> None:
     """Use the safer OpenFF stereochemistry default unless callers opt in."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
     captured: dict[str, bool] = {}
 
     molecule = SimpleNamespace(name="", generate_conformers=lambda n_conformers: None)
@@ -214,7 +214,7 @@ def test_molecule_from_smiles_disallows_undefined_stereo_by_default(
 def test_molecules_from_config_groups_supported_sections(monkeypatch: pytest.MonkeyPatch) -> None:
     """Create molecules and report entries that are not OpenFF molecules."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
     calls: list[tuple[str, str | None, int, bool]] = []
 
     def fake_molecule_from_smiles(
@@ -250,7 +250,7 @@ def test_molecules_from_config_reports_solvent_without_smiles(
 ) -> None:
     """Report non-water solvent entries that lack SMILES instead of dropping them."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
     monkeypatch.setattr(openff_adapter, "molecule_from_smiles", lambda *args, **kwargs: args[0])
     config = load_config_dict(
         {
@@ -281,7 +281,7 @@ def test_molecules_from_config_prepares_salt_ions(
 ) -> None:
     """Prepare separate OpenFF molecules for cation and anion species."""
 
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
     calls: list[tuple[str, str | None]] = []
 
     def fake_molecule_from_smiles(smiles: str, name: str | None = None, **kwargs):
@@ -327,7 +327,7 @@ def test_molecule_from_propanethiol_smiles_when_openff_available() -> None:
     """Optionally create a thiol OpenFF molecule."""
 
     pytest.importorskip("openff.toolkit")
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
 
     molecule = openff_adapter.molecule_from_smiles("CCCS", name="propanethiol")
 
@@ -339,7 +339,7 @@ def test_molecule_from_cinnamaldehyde_smiles_when_openff_available() -> None:
     """Optionally create the default reactant OpenFF molecule."""
 
     pytest.importorskip("openff.toolkit")
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
 
     molecule = openff_adapter.molecule_from_smiles(
         "C1=CC=C(C=C1)/C=C/C=O",
@@ -356,7 +356,7 @@ def test_load_force_field_with_interface_metals_when_openff_available() -> None:
     """Optionally verify packaged Pd vdW parameters are loaded."""
 
     pytest.importorskip("openff.toolkit")
-    openff_adapter = importlib.import_module("sammd.openff")
+    openff_adapter = importlib.import_module("sammd.backends.openff")
 
     force_field = openff_adapter.load_force_field(include_interface_metals=True)
     vdw_handler = force_field.get_parameter_handler("vdW")

@@ -5,9 +5,9 @@ import sys
 
 import pytest
 
-from sammd.config import ReporterConfig
-from sammd.io import OutputPaths
-from sammd.reporting import (
+from sammd.core.config import ReporterConfig
+from sammd.core.io import OutputPaths
+from sammd.runtime.reporting import (
     SUPPORTED_THERMODYNAMIC_FIELDS,
     build_state_data_reporter_config,
     create_openmm_reporters,

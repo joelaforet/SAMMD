@@ -2,8 +2,14 @@
 
 import pytest
 
-from sammd.config import IonConfig, SaltConfig, SAMMDConfig, SolventComponentConfig, SolventConfig
-from sammd.solvation import (
+from sammd.core.config import (
+    IonConfig,
+    SaltConfig,
+    SAMMDConfig,
+    SolventComponentConfig,
+    SolventConfig,
+)
+from sammd.model.solvation import (
     AVOGADRO_CONSTANT_MOL_INV,
     L_TO_ML,
     NM3_TO_L,

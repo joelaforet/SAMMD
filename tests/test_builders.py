@@ -8,17 +8,21 @@ from pathlib import Path
 
 import pytest
 
-from sammd.builders import DEFAULT_SAM_EXTENDED_LENGTH_NM, DEFAULT_SOLVENT_PADDING_NM, build_system
-from sammd.config import CONFIG_TEMPLATE, SAMMDConfig
-from sammd.metal_sulfur import (
+from sammd.core.builders import (
+    DEFAULT_SAM_EXTENDED_LENGTH_NM,
+    DEFAULT_SOLVENT_PADDING_NM,
+    build_system,
+)
+from sammd.core.config import CONFIG_TEMPLATE, SAMMDConfig
+from sammd.model.metal_sulfur import (
     METAL_SULFUR_EPSILON_KCAL_MOL,
     METAL_SULFUR_EPSILON_KJ_MOL,
     METAL_SULFUR_INTERACTION_MODE,
     METAL_SULFUR_PAIRS_PER_ANCHOR,
     METAL_SULFUR_SIGMA_NM,
 )
-from sammd.solvation import round_half_up
-from sammd.surfaces import plan_fcc111_slab, plan_pd111_slab
+from sammd.model.solvation import round_half_up
+from sammd.model.surfaces import plan_fcc111_slab, plan_pd111_slab
 
 
 def test_build_system_accepts_config_dict_and_yaml_path(tmp_path) -> None:
@@ -306,7 +310,7 @@ def test_build_import_avoids_heavy_backend_modules() -> None:
     heavy_modules = ("openmm", "openff", "rdkit", "mbuild", "MDAnalysis", "parmed", "pdbfixer")
     code = (
         "import json, sys; "
-        "import sammd, sammd.builders, sammd.metal_sulfur; "
+        "import sammd, sammd.core.builders, sammd.model.metal_sulfur; "
         f"heavy_modules = {heavy_modules!r}; "
         "print(json.dumps([name for name in heavy_modules if name in sys.modules]))"
     )

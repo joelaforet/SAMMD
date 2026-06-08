@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
-from sammd.reporting import create_openmm_reporters, prepare_reporter_output_directories
+from sammd.runtime.reporting import create_openmm_reporters, prepare_reporter_output_directories
 
 DEFAULT_PD_RESTRAINT_K_KJ_MOL_NM2 = 10000.0
 POSITION_RESTRAINT_EXPRESSION = "0.5*k*((x-x0)^2+(y-y0)^2+(z-z0)^2)"

@@ -10,10 +10,10 @@ Core workflow
 
 .. autofunction:: sammd.build_system
 
-.. autoclass:: sammd.builders.SAMMDBuildPlan
+.. autoclass:: sammd.core.builders.SAMMDBuildPlan
    :members:
 
-.. autoclass:: sammd.builders.BoxPlan
+.. autoclass:: sammd.core.builders.BoxPlan
    :members:
 
 Configuration model

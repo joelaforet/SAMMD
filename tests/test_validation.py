@@ -7,9 +7,9 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
-from sammd.builders import build_system
-from sammd.io import OutputPaths
-from sammd.validation import (
+from sammd.core.builders import build_system
+from sammd.core.io import OutputPaths
+from sammd.core.validation import (
     validate_build_plan,
     validate_output_paths,
     validate_topology_cif_text,
@@ -146,7 +146,7 @@ def test_module_import_avoids_heavy_backend_modules() -> None:
     heavy_modules = ("openmm", "openff", "rdkit", "mbuild", "MDAnalysis", "parmed", "pdbfixer")
     code = (
         "import json, sys; "
-        "import sammd.validation; "
+        "import sammd.core.validation; "
         f"heavy_modules = {heavy_modules!r}; "
         "print(json.dumps([name for name in heavy_modules if name in sys.modules]))"
     )

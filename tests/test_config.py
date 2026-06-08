@@ -6,7 +6,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from sammd.config import CONFIG_TEMPLATE, SAMMDConfig, load_config, load_config_dict
+from sammd.core.config import CONFIG_TEMPLATE, SAMMDConfig, load_config, load_config_dict
 
 
 def _template_data() -> dict:

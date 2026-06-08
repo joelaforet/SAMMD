@@ -9,7 +9,7 @@ from math import isfinite
 from pathlib import Path
 from typing import Any
 
-from sammd.surfaces import SurfaceSlab
+from sammd.model.surfaces import SurfaceSlab
 
 Vector3 = tuple[float, float, float]
 

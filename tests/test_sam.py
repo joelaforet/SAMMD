@@ -4,21 +4,21 @@ from math import dist, pi, sqrt
 
 import pytest
 
-from sammd.config import SAMComponentConfig, SAMConfig
-from sammd.metal_sulfur import (
+from sammd.core.config import SAMComponentConfig, SAMConfig
+from sammd.model.metal_sulfur import (
     METAL_SULFUR_EPSILON_KCAL_MOL,
     METAL_SULFUR_EPSILON_KJ_MOL,
     METAL_SULFUR_INTERACTION_MODE,
     METAL_SULFUR_PAIRS_PER_ANCHOR,
     METAL_SULFUR_SIGMA_NM,
 )
-from sammd.sam import (
+from sammd.model.sam import (
     DEFAULT_SULFUR_HEIGHT_NM,
     plan_anchor_pose,
     plan_sam_placements,
     sam_azimuth_rad,
 )
-from sammd.surfaces import generate_binding_sites, plan_pd111_slab
+from sammd.model.surfaces import generate_binding_sites, plan_pd111_slab
 
 
 def _binding_sites():

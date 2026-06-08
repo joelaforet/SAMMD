@@ -4,15 +4,15 @@ from math import inf, nan
 
 import pytest
 
-from sammd.config import OutputFilesConfig, OutputsConfig, SAMMDConfig
-from sammd.io import (
+from sammd.core.config import OutputFilesConfig, OutputsConfig, SAMMDConfig
+from sammd.core.io import (
     AtomRecord,
     format_mmcif,
     plan_output_paths,
     safe_write_text,
     slab_to_atom_records,
 )
-from sammd.surfaces import plan_pd111_slab
+from sammd.model.surfaces import plan_pd111_slab
 
 
 def _base_atom_record(**overrides) -> AtomRecord:

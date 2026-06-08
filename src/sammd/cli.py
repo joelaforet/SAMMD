@@ -6,9 +6,9 @@ from typing import Any
 
 import click
 
-from sammd.builders import build_system
-from sammd.config import CONFIG_TEMPLATE, load_config
-from sammd.validation import validate_build_plan, validate_output_paths
+from sammd.core.builders import build_system
+from sammd.core.config import CONFIG_TEMPLATE, load_config
+from sammd.core.validation import validate_build_plan, validate_output_paths
 
 
 def _step(label: str, message: str, fg: str) -> None:
@@ -100,7 +100,7 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, export_backend
         resolved_config = plan.write_resolved_config(overwrite=overwrite)
         backend_files = None
         if export_backend:
-            from sammd.interchange_backend import backend_build_summary, export_interchange_backend
+            from sammd.backends.interchange import backend_build_summary, export_interchange_backend
 
             backend_result = export_interchange_backend(plan, overwrite=overwrite)
             backend_files = backend_result.files

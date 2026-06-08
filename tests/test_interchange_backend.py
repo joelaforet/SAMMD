@@ -9,8 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from sammd.builders import build_system
-from sammd.config import SAMMDConfig, load_config_dict
+from sammd.core.builders import build_system
+from sammd.core.config import SAMMDConfig, load_config_dict
 
 
 def test_backend_module_import_does_not_import_optional_science_modules() -> None:
@@ -20,7 +20,7 @@ def test_backend_module_import_does_not_import_optional_science_modules() -> Non
         if name.startswith(("openff", "openmm", "rdkit")):
             sys.modules.pop(name, None)
 
-    importlib.import_module("sammd.interchange_backend")
+    importlib.import_module("sammd.backends.interchange")
 
     assert not any(name.startswith(("openff", "openmm", "rdkit")) for name in sys.modules)
 
@@ -28,7 +28,7 @@ def test_backend_module_import_does_not_import_optional_science_modules() -> Non
 def test_backend_build_summary_marks_completed_exports(tmp_path: Path) -> None:
     """Completed backend export metadata updates reserved artifact summaries."""
 
-    backend = importlib.import_module("sammd.interchange_backend")
+    backend = importlib.import_module("sammd.backends.interchange")
     plan = build_system(SAMMDConfig(), output_dir=tmp_path)
     result = SimpleNamespace(
         openff_toolkit_version="0.18.0",
@@ -54,7 +54,7 @@ def test_backend_build_summary_marks_completed_exports(tmp_path: Path) -> None:
 def test_backend_export_rejects_salts_before_optional_imports(tmp_path: Path) -> None:
     """Avoid silently omitting schema-supported salts from backend artifacts."""
 
-    backend = importlib.import_module("sammd.interchange_backend")
+    backend = importlib.import_module("sammd.backends.interchange")
     config = load_config_dict(
         {
             "salts": [
@@ -87,7 +87,7 @@ def test_interface_metal_offxml_loads_with_current_openff() -> None:
     """The packaged INTERFACE OFFXML stays compatible with the science env toolkit."""
 
     pytest.importorskip("openff.toolkit")
-    from sammd.openff import interface_fcc_metal_offxml_resource
+    from sammd.backends.openff import interface_fcc_metal_offxml_resource
 
     force_field_type = importlib.import_module("openff.toolkit").ForceField
 

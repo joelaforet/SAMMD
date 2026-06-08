@@ -12,7 +12,6 @@ import csv
 import json
 import math
 import shutil
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,12 +19,39 @@ from typing import Any
 
 import yaml
 
-from sammd.builders import build_system
-from sammd.config import SAMMDConfig, load_config
-from sammd.forcefields import get_fcc_metal_parameters
-from sammd.io import safe_write_text
-from sammd.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
-from sammd.openmm_runtime import AnchorScalingMetadata, create_langevin_integrator
+from sammd.backends.forcefields import get_fcc_metal_parameters
+from sammd.backends.openmm_runtime import AnchorScalingMetadata, create_langevin_integrator
+from sammd.backends.packmol import (
+    PackmolJob,
+    PackmolStructure,
+    read_pdb_positions_nm,
+    zero_origin_box_bounds,
+)
+from sammd.backends.packmol import (
+    build_packmol_input as render_packmol_input,
+)
+from sammd.backends.packmol import (
+    pdb_atom_line as format_pdb_atom_line,
+)
+from sammd.backends.packmol import (
+    run_packmol as execute_packmol,
+)
+from sammd.core.builders import build_system
+from sammd.core.config import SAMMDConfig, load_config
+from sammd.core.io import safe_write_text
+from sammd.model.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
+from sammd.utils.geometry import (
+    add_vectors,
+    centroid,
+    distance,
+    dot_product,
+    matvec,
+    normalize,
+    rotate_about_axis,
+    rotation_matrix,
+    scale_vector,
+    subtract_vectors,
+)
 
 KCAL_TO_KJ = 4.184
 ETHANOL_MASS_G_MOL = 46.06844
@@ -1222,48 +1248,32 @@ def build_packmol_input(
 ) -> str:
     """Build Packmol input text for the smoke solvent placement."""
 
-    box_angstrom = tuple(length * 10.0 for length in box_dimensions_nm)
-
-    lines = [
-        f"tolerance {PACKMOL_TOLERANCE_ANGSTROM:.3f}",
-        "filetype pdb",
-        f"output {output_path.name}",
-        "movebadrandom",
-        f"nloop {PACKMOL_NLOOP}",
-        "",
-        f"structure {solute_path.name}",
-        "  number 1",
-        "  fixed 0. 0. 0. 0. 0. 0.",
-        "end structure",
-        "",
-        f"structure {solvent_path.name}",
-        f"  number {solvent_count}",
-        f"  inside box 0. 0. 0. {box_angstrom[0]:.6f} {box_angstrom[1]:.6f} {box_angstrom[2]:.6f}",
-        "end structure",
-        "",
-    ]
-    return "\n".join(lines)
+    job = PackmolJob(
+        output_path=output_path.name,
+        structures=(
+            PackmolStructure("solute", solute_path.name, 1, fixed=True),
+            PackmolStructure(SOLVENT_NAME, solvent_path.name, solvent_count),
+        ),
+        box_bounds_nm=zero_origin_box_bounds(box_dimensions_nm),
+        tolerance_angstrom=PACKMOL_TOLERANCE_ANGSTROM,
+        nloop=PACKMOL_NLOOP,
+    )
+    return render_packmol_input(job)
 
 
 def run_packmol(input_path: Path, working_dir: Path, stdout_path: Path) -> None:
     """Execute Packmol and keep stdout for debugging."""
 
-    packmol = shutil.which("packmol")
-    if packmol is None:
-        msg = "Packmol executable not found; run through `pixi run -e science real-system-smoke`."
-        raise RuntimeError(msg)
-    with input_path.open("r", encoding="utf-8") as handle:
-        result = subprocess.run(
-            [packmol],
-            stdin=handle,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            cwd=working_dir,
-            check=False,
-        )
-    stdout = result.stdout.decode("utf-8", errors="replace")
-    stdout_path.write_text(stdout, encoding="utf-8")
-    if result.returncode != 0 or "Success!" not in stdout:
+    job = PackmolJob(
+        output_path="packmol_output.pdb",
+        structures=(
+            PackmolStructure("solute", "fixed_solute.pdb", 1, fixed=True),
+            PackmolStructure(SOLVENT_NAME, f"{SOLVENT_NAME}.pdb", 1),
+        ),
+        box_bounds_nm=zero_origin_box_bounds((1.0, 1.0, 1.0)),
+    )
+    result = execute_packmol(job, input_path, working_dir, stdout_path)
+    if result.returncode != 0 or "Success!" not in result.stdout:
         msg = f"Packmol failed; see {stdout_path}"
         raise RuntimeError(msg)
 
@@ -1326,29 +1336,15 @@ def pdb_atom_line(
 ) -> str:
     """Format one simple HETATM line for Packmol input."""
 
-    x_angstrom, y_angstrom, z_angstrom = (coordinate * 10.0 for coordinate in position_nm)
-    return (
-        f"HETATM{serial:5d} {atom_name[:4]:<4s} {residue_name[:3]:>3s} {chain_id[:1]:1s}"
-        f"{residue_id:4d}    {x_angstrom:8.3f}{y_angstrom:8.3f}{z_angstrom:8.3f}"
-        f"  1.00  0.00          {element[:2]:>2s}"
+    return format_pdb_atom_line(
+        serial,
+        atom_name,
+        residue_name,
+        residue_id,
+        position_nm,
+        element=element,
+        chain_id=chain_id,
     )
-
-
-def read_pdb_positions_nm(path: Path) -> tuple[Vector3, ...]:
-    """Read HETATM/ATOM coordinates from a PDB file as nanometer tuples."""
-
-    positions = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.startswith(("ATOM", "HETATM")):
-            continue
-        positions.append(
-            (
-                float(line[30:38]) * 0.1,
-                float(line[38:46]) * 0.1,
-                float(line[46:54]) * 0.1,
-            )
-        )
-    return tuple(positions)
 
 
 def add_pd_slab(
@@ -1824,20 +1820,6 @@ def orient_template_by_anchor(
     )
 
 
-def rotate_about_axis(vector: Vector3, axis: Vector3, angle_rad: float) -> Vector3:
-    """Rotate a vector around an arbitrary axis through the origin."""
-
-    unit_axis = normalize(axis)
-    cosine = math.cos(angle_rad)
-    sine = math.sin(angle_rad)
-    parallel = scale_vector(unit_axis, dot_product(unit_axis, vector) * (1.0 - cosine))
-    cross = cross_product(unit_axis, vector)
-    return add_vectors(
-        add_vectors(scale_vector(vector, cosine), scale_vector(cross, sine)),
-        parallel,
-    )
-
-
 def center_template(template: MoleculeTemplate, center_nm: Vector3) -> tuple[Vector3, ...]:
     """Translate a template so its coordinate centroid is at ``center_nm``."""
 
@@ -1845,55 +1827,6 @@ def center_template(template: MoleculeTemplate, center_nm: Vector3) -> tuple[Vec
     return tuple(
         add_vectors(center_nm, subtract_vectors(position, current_center))
         for position in template.positions_nm
-    )
-
-
-def rotation_matrix(source: Vector3, target: Vector3) -> tuple[Vector3, Vector3, Vector3]:
-    """Return a 3x3 matrix rotating ``source`` onto ``target``."""
-
-    source_unit = normalize(source)
-    target_unit = normalize(target)
-    cross = cross_product(source_unit, target_unit)
-    dot = max(-1.0, min(1.0, dot_product(source_unit, target_unit)))
-    sine = norm(cross)
-    if sine < 1.0e-12:
-        if dot > 0.0:
-            return ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
-        axis_candidate = cross_product(source_unit, (1.0, 0.0, 0.0))
-        if norm(axis_candidate) < 1.0e-12:
-            axis_candidate = cross_product(source_unit, (0.0, 1.0, 0.0))
-        axis = normalize(axis_candidate)
-        return axis_angle_matrix(axis, math.pi)
-    k_matrix = skew_matrix(cross)
-    k_squared = matrix_multiply(k_matrix, k_matrix)
-    scale = (1.0 - dot) / (sine * sine)
-    identity = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
-    return matrix_add(matrix_add(identity, k_matrix), matrix_scale(k_squared, scale))
-
-
-def axis_angle_matrix(axis: Vector3, angle_rad: float) -> tuple[Vector3, Vector3, Vector3]:
-    """Return a 3x3 rotation matrix for an axis-angle rotation."""
-
-    x, y, z = axis
-    cosine = math.cos(angle_rad)
-    sine = math.sin(angle_rad)
-    one_minus_cosine = 1.0 - cosine
-    return (
-        (
-            cosine + x * x * one_minus_cosine,
-            x * y * one_minus_cosine - z * sine,
-            x * z * one_minus_cosine + y * sine,
-        ),
-        (
-            y * x * one_minus_cosine + z * sine,
-            cosine + y * y * one_minus_cosine,
-            y * z * one_minus_cosine - x * sine,
-        ),
-        (
-            z * x * one_minus_cosine - y * sine,
-            z * y * one_minus_cosine + x * sine,
-            cosine + z * z * one_minus_cosine,
-        ),
     )
 
 
@@ -2248,116 +2181,6 @@ def clamp_to_box(position: Vector3, box_dimensions_nm: Vector3) -> Vector3:
         max(margin, min(length - margin, coordinate))
         for coordinate, length in zip(position, box_dimensions_nm, strict=True)
     )
-
-
-def add_vectors(left: Vector3, right: Vector3) -> Vector3:
-    """Add two vectors."""
-
-    return (left[0] + right[0], left[1] + right[1], left[2] + right[2])
-
-
-def subtract_vectors(left: Vector3, right: Vector3) -> Vector3:
-    """Subtract two vectors."""
-
-    return (left[0] - right[0], left[1] - right[1], left[2] - right[2])
-
-
-def scale_vector(vector: Vector3, scale: float) -> Vector3:
-    """Scale a vector."""
-
-    return (vector[0] * scale, vector[1] * scale, vector[2] * scale)
-
-
-def distance(left: Vector3, right: Vector3) -> float:
-    """Return Euclidean distance between vectors."""
-
-    return norm(subtract_vectors(left, right))
-
-
-def norm(vector: Vector3) -> float:
-    """Return Euclidean norm."""
-
-    return math.sqrt(dot_product(vector, vector))
-
-
-def normalize(vector: Vector3) -> Vector3:
-    """Return a unit vector."""
-
-    vector_norm = norm(vector)
-    if vector_norm < 1.0e-15:
-        raise ValueError("cannot normalize a zero vector")
-    return (vector[0] / vector_norm, vector[1] / vector_norm, vector[2] / vector_norm)
-
-
-def dot_product(left: Vector3, right: Vector3) -> float:
-    """Return vector dot product."""
-
-    return left[0] * right[0] + left[1] * right[1] + left[2] * right[2]
-
-
-def cross_product(left: Vector3, right: Vector3) -> Vector3:
-    """Return vector cross product."""
-
-    return (
-        left[1] * right[2] - left[2] * right[1],
-        left[2] * right[0] - left[0] * right[2],
-        left[0] * right[1] - left[1] * right[0],
-    )
-
-
-def centroid(positions: tuple[Vector3, ...]) -> Vector3:
-    """Return coordinate centroid."""
-
-    count = len(positions)
-    return (
-        sum(position[0] for position in positions) / count,
-        sum(position[1] for position in positions) / count,
-        sum(position[2] for position in positions) / count,
-    )
-
-
-def matvec(matrix: tuple[Vector3, Vector3, Vector3], vector: Vector3) -> Vector3:
-    """Multiply a 3x3 matrix by a vector."""
-
-    return tuple(dot_product(row, vector) for row in matrix)  # type: ignore[return-value]
-
-
-def skew_matrix(vector: Vector3) -> tuple[Vector3, Vector3, Vector3]:
-    """Return skew-symmetric matrix for a vector."""
-
-    x, y, z = vector
-    return ((0.0, -z, y), (z, 0.0, -x), (-y, x, 0.0))
-
-
-def matrix_multiply(
-    left: tuple[Vector3, Vector3, Vector3],
-    right: tuple[Vector3, Vector3, Vector3],
-) -> tuple[Vector3, Vector3, Vector3]:
-    """Multiply two 3x3 matrices."""
-
-    columns = tuple((right[0][i], right[1][i], right[2][i]) for i in range(3))
-    return tuple(tuple(dot_product(row, column) for column in columns) for row in left)  # type: ignore[return-value]
-
-
-def matrix_add(
-    left: tuple[Vector3, Vector3, Vector3],
-    right: tuple[Vector3, Vector3, Vector3],
-) -> tuple[Vector3, Vector3, Vector3]:
-    """Add two 3x3 matrices."""
-
-    return tuple(
-        tuple(left[row][column] + right[row][column] for column in range(3))
-        for row in range(3)
-    )  # type: ignore[return-value]
-
-
-def matrix_scale(
-    matrix: tuple[Vector3, Vector3, Vector3],
-    scale: float,
-) -> tuple[Vector3, Vector3, Vector3]:
-    """Scale a 3x3 matrix."""
-
-    return tuple(tuple(value * scale for value in row) for row in matrix)  # type: ignore[return-value]
 
 
 def angle_between_points(first: Vector3, center: Vector3, third: Vector3) -> float:

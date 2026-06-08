@@ -4,27 +4,27 @@ Contributor and developer guide
 Current package map
 -------------------
 
-``sammd.config``
+``sammd.core.config``
    Pydantic v2 models, YAML loading, CLI template text, and validation rules.
 
 ``sammd.cli``
    Lightweight ``sammd init``, ``sammd validate``, and ``sammd build`` commands.
 
-``sammd.surfaces``
+``sammd.model.surfaces``
    Registered Fcc(111) lattice metadata, commensurate slab planning, and hollow
    binding-site generation.
 
-``sammd.sam``
+``sammd.model.sam``
    Deterministic SAM site selection and component assignment.
 
-``sammd.solvation``
+``sammd.model.solvation``
    Approximate solvent, salt, and reactant molecule-count planning.
 
-``sammd.io`` and ``sammd.reporting``
+``sammd.core.io`` and ``sammd.runtime.reporting``
    Output path planning, topology CIF writing helpers, and future reporter field
    metadata.
 
-``sammd.forcefields``
+``sammd.backends.forcefields``
    Lightweight INTERFACE metal parameter metadata and OFFXML export helpers.
 
 ``sammd.analysis``

@@ -4,8 +4,7 @@ from math import inf, nan
 
 import pytest
 
-from sammd.builders import BoxPlan
-from sammd.packmol import (
+from sammd.backends.packmol import (
     PackmolJob,
     PackmolStructure,
     build_packmol_input,
@@ -15,6 +14,7 @@ from sammd.packmol import (
     write_packmol_input,
     zero_origin_box_bounds,
 )
+from sammd.core.builders import BoxPlan
 
 
 def test_packmol_input_renders_fixed_solute_and_free_solvent() -> None:

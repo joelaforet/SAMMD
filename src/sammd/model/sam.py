@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from math import floor, pi, sqrt, tau
 from random import Random
 
-from sammd.config import SAMComponentConfig, SAMConfig
-from sammd.metal_sulfur import MetalSulfurLJOverrideSpec, default_metal_sulfur_interaction
-from sammd.surfaces import BindingSite
+from sammd.core.config import SAMComponentConfig, SAMConfig
+from sammd.model.metal_sulfur import MetalSulfurLJOverrideSpec, default_metal_sulfur_interaction
+from sammd.model.surfaces import BindingSite
 
 Vector3 = tuple[float, float, float]
 DEFAULT_SULFUR_HEIGHT_NM = 0.18

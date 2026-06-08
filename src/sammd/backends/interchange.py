@@ -10,8 +10,17 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-from sammd.forcefields import get_fcc_metal_parameters
-from sammd.geometry import (
+from sammd.backends.forcefields import get_fcc_metal_parameters
+from sammd.backends.openff import (
+    force_field_inputs_from_config,
+    require_openff_interchange,
+    require_openff_toolkit,
+)
+from sammd.backends.openmm_runtime import add_sulfur_metal_lj_exceptions, require_openmm
+from sammd.core.io import safe_write_text
+from sammd.model.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
+from sammd.model.sam import SAMPlacement
+from sammd.utils.geometry import (
     Vector3,
     add_vectors,
     centroid,
@@ -21,15 +30,6 @@ from sammd.geometry import (
     rotation_matrix,
     subtract_vectors,
 )
-from sammd.io import safe_write_text
-from sammd.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
-from sammd.openff import (
-    force_field_inputs_from_config,
-    require_openff_interchange,
-    require_openff_toolkit,
-)
-from sammd.openmm_runtime import add_sulfur_metal_lj_exceptions, require_openmm
-from sammd.sam import SAMPlacement
 
 KCAL_TO_KJ = 4.184
 

@@ -6,9 +6,7 @@ import sys
 
 import pytest
 
-from sammd.config import ReporterConfig
-from sammd.io import OutputPaths
-from sammd.openmm_runtime import (
+from sammd.backends.openmm_runtime import (
     add_position_restraints,
     add_sulfur_metal_lj_exceptions,
     add_sulfur_metal_lj_scaling,
@@ -16,6 +14,8 @@ from sammd.openmm_runtime import (
     create_openmm_simulation,
     require_openmm,
 )
+from sammd.core.config import ReporterConfig
+from sammd.core.io import OutputPaths
 
 
 class FakeUnitValue:
@@ -192,9 +192,9 @@ def test_openmm_runtime_module_does_not_import_openmm_at_import_time() -> None:
     """Keep optional runtime helpers importable without OpenMM."""
 
     sys.modules.pop("openmm", None)
-    import sammd.openmm_runtime
+    import sammd.backends.openmm_runtime
 
-    assert sammd.openmm_runtime is not None
+    assert sammd.backends.openmm_runtime is not None
     assert "openmm" not in sys.modules
 
 

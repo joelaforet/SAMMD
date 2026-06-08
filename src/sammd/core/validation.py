@@ -7,7 +7,7 @@ from math import isfinite
 from pathlib import Path
 from typing import Any
 
-from sammd.metal_sulfur import default_metal_sulfur_interaction
+from sammd.model.metal_sulfur import default_metal_sulfur_interaction
 
 APPROX_TOLERANCE = 1.0e-6
 

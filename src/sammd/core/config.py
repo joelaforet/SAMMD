@@ -39,7 +39,7 @@ class SurfaceConfig(SAMMDBaseModel):
     def _validate_registered_fcc_surface(self) -> SurfaceConfig:
         """Require a surface present in the Fcc metadata registry."""
 
-        from sammd.surfaces import get_fcc_surface_metadata
+        from sammd.model.surfaces import get_fcc_surface_metadata
 
         get_fcc_surface_metadata(self.metal, self.facet)
         return self
@@ -322,7 +322,7 @@ class ReporterConfig(SAMMDBaseModel):
     def _validate_supported_fields(cls, value: list[str]) -> list[str]:
         """Validate reporter field names against the lightweight registry."""
 
-        from sammd.reporting import SUPPORTED_THERMODYNAMIC_FIELDS
+        from sammd.runtime.reporting import SUPPORTED_THERMODYNAMIC_FIELDS
 
         unknown = sorted(set(value) - set(SUPPORTED_THERMODYNAMIC_FIELDS))
         if unknown:

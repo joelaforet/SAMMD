@@ -10,8 +10,9 @@ from pathlib import Path
 
 import pytest
 
-from sammd.builders import build_system
-from sammd.config import SAMMDConfig
+from sammd.core.builders import build_system
+from sammd.core.config import SAMMDConfig
+from sammd.utils.geometry import norm
 
 
 def load_smoke_tool():
@@ -78,7 +79,7 @@ def test_rotation_matrix_maps_source_vector_to_target_vector() -> None:
     assert rotated[0] == pytest.approx(0.0, abs=1.0e-12)
     assert rotated[1] == pytest.approx(0.0, abs=1.0e-12)
     assert rotated[2] == pytest.approx(-1.0, abs=1.0e-12)
-    assert math.isclose(smoke.norm(rotated), 1.0)
+    assert math.isclose(norm(rotated), 1.0)
 
 
 def test_component_residue_assigner_wraps_after_9999_residues() -> None:
@@ -145,7 +146,7 @@ def test_packmol_input_packs_solvent_around_fixed_solute() -> None:
     assert "  number 25" in text
     assert "structure fixed_pd_sam.pdb" in text
     assert "fixed 0. 0. 0. 0. 0. 0." in text
-    assert "inside box 0. 0." in text
+    assert "inside box 0 0 0" in text
     assert "nloop 200" in text
 
 

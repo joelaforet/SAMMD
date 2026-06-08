@@ -30,7 +30,7 @@ atoms or midpoint/centroid selections, COM-to-target orientation vectors, and
 angles relative to top (+z), bottom (-z), or explicit surface normals without
 requiring MDAnalysis, OpenMM, OpenFF, or RDKit.
 
-Optional OpenFF adapter helpers live in `sammd.openff` for future backend
+Optional OpenFF adapter helpers live in `sammd.backends.openff` for future backend
 parameterization work. They lazily create OpenFF molecules from configured SAM
 components, SMILES-bearing solvents, reactants, and separate salt ions, and can
 record or load base OpenFF force fields together with the packaged INTERFACE Fcc

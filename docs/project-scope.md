@@ -149,16 +149,16 @@ For SAMMD MVP, use three-fold hollow placement on registered Fcc(111) surfaces a
 
 Initial package modules:
 
-- `sammd.config`: Pydantic models, YAML loading, YAML template generation.
-- `sammd.surfaces`: registered Fcc(111) slab builders with lattice constants and facet metadata, defaulting to Pd(111).
-- `sammd.sam`: dependency-free SAM placement and sulfur anchor pose planning today; future backend work should add OpenFF/RDKit molecule creation, conformer generation, and molecule-graph sulfur anchor detection.
-- `sammd.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
-- `sammd.solvation`: solvent mixture, salt, and reactant count calculations from solvent-only mole fractions and concentrations, followed by OpenFF/PACKMOL packing.
-- `sammd.builders`: high-level lightweight build planner.
-- `sammd.interchange_backend`: optional science-environment OpenFF `Interchange` construction/export path for supported non-salt configs.
-- `sammd.openmm_runtime`: optional/internal OpenMM utilities for development and backend validation, not a student-facing SAMMD run-wrapper API.
-- `sammd.io`: v0.1.0 mmCIF/PDBx topology-inspection writing; post-v0.1.0 DCD trajectory naming conventions and visualization-oriented metadata helpers.
-- `sammd.reporting`: post-v0.1.0 OpenMM reporter configuration for trajectories and thermodynamic state data.
+- `sammd.core.config`: Pydantic models, YAML loading, YAML template generation.
+- `sammd.model.surfaces`: registered Fcc(111) slab builders with lattice constants and facet metadata, defaulting to Pd(111).
+- `sammd.model.sam`: dependency-free SAM placement and sulfur anchor pose planning today; future backend work should add OpenFF/RDKit molecule creation, conformer generation, and molecule-graph sulfur anchor detection.
+- `sammd.backends.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
+- `sammd.model.solvation`: solvent mixture, salt, and reactant count calculations from solvent-only mole fractions and concentrations, followed by OpenFF/PACKMOL packing.
+- `sammd.core.builders`: high-level lightweight build planner.
+- `sammd.backends.interchange`: optional science-environment OpenFF `Interchange` construction/export path for supported non-salt configs.
+- `sammd.backends.openmm_runtime`: optional/internal OpenMM utilities for development and backend validation, not a student-facing SAMMD run-wrapper API.
+- `sammd.core.io`: v0.1.0 mmCIF/PDBx topology-inspection writing; post-v0.1.0 DCD trajectory naming conventions and visualization-oriented metadata helpers.
+- `sammd.runtime.reporting`: post-v0.1.0 OpenMM reporter configuration for trajectories and thermodynamic state data.
 - `sammd.analysis`: orientation metrics and later umbrella-sampling support.
 - `sammd.cli`: minimal `init` and maybe `validate` commands.
 

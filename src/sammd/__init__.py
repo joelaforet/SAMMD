@@ -2,8 +2,8 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
-from sammd.builders import build_system
-from sammd.config import SAMMDConfig, load_config, load_config_dict
+from sammd.core.builders import build_system
+from sammd.core.config import SAMMDConfig, load_config, load_config_dict
 
 try:
     __version__ = version("sammd")

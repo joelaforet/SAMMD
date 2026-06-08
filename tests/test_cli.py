@@ -5,7 +5,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from sammd.cli import main
-from sammd.config import load_config
+from sammd.core.config import load_config
 
 
 def test_init_cli_writes_loadable_template() -> None:

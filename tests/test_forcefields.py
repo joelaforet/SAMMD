@@ -5,14 +5,14 @@ from xml.etree import ElementTree
 
 import pytest
 
-from sammd.forcefields import (
+from sammd.backends.forcefields import (
     FCC_METAL_LJ_REGISTRY,
     generate_interface_metal_offxml,
     get_fcc_metal_parameters,
     sigma_from_rmin_half,
     write_interface_metal_offxml,
 )
-from sammd.surfaces import FCC_SURFACE_REGISTRY
+from sammd.model.surfaces import FCC_SURFACE_REGISTRY
 
 
 def test_registry_contains_all_fcc_metals() -> None:

@@ -9,8 +9,8 @@ from typing import Any
 
 import yaml
 
-from sammd.config import SAMMDConfig, load_config, load_config_dict
-from sammd.io import (
+from sammd.core.config import SAMMDConfig, load_config, load_config_dict
+from sammd.core.io import (
     AtomRecord,
     OutputPaths,
     plan_output_paths,
@@ -18,10 +18,10 @@ from sammd.io import (
     slab_to_atom_records,
     write_mmcif,
 )
-from sammd.metal_sulfur import default_metal_sulfur_interaction
-from sammd.sam import SAMPlacementPlan, plan_sam_placements
-from sammd.solvation import SolutionPlan, plan_solution_composition
-from sammd.surfaces import BindingSite, SurfaceSlab, generate_binding_sites, plan_fcc111_slab
+from sammd.model.metal_sulfur import default_metal_sulfur_interaction
+from sammd.model.sam import SAMPlacementPlan, plan_sam_placements
+from sammd.model.solvation import SolutionPlan, plan_solution_composition
+from sammd.model.surfaces import BindingSite, SurfaceSlab, generate_binding_sites, plan_fcc111_slab
 
 DEFAULT_SOLVENT_PADDING_NM = 3.0
 DEFAULT_SAM_EXTENDED_LENGTH_NM = 0.95
@@ -394,7 +394,7 @@ def _topology_atom_records(plan: SAMMDBuildPlan) -> tuple[AtomRecord, ...]:
 def _auto_slab_layers(config: SAMMDConfig) -> int:
     """Choose a slab thick enough for the configured nonbonded cutoff."""
 
-    from sammd.surfaces import get_fcc_surface_metadata
+    from sammd.model.surfaces import get_fcc_surface_metadata
 
     metadata = get_fcc_surface_metadata(config.surface.metal, config.surface.facet)
     minimum_thickness_nm = config.parameterization.nonbonded_cutoff + SLAB_CUTOFF_BUFFER_NM

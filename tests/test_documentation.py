@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from sammd import build_system, load_config
-from sammd.config import CONFIG_TEMPLATE
+from sammd.core.config import CONFIG_TEMPLATE
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CURRENT_BEGINNER_DOC_PATHS = [
