@@ -7,6 +7,7 @@ import math
 import sys
 from argparse import Namespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -175,6 +176,120 @@ def test_validate_args_rejects_invalid_solvent_count() -> None:
 
     with pytest.raises(SystemExit, match="--solvent-count"):
         smoke.validate_args(args)
+
+
+def test_validate_args_rejects_zero_steps() -> None:
+    """Smoke runs should not silently accept zero integration steps."""
+
+    smoke = load_smoke_tool()
+    args = Namespace(
+        lateral_size_nm=2.0,
+        solvent_padding_nm=3.0,
+        timestep_fs=0.5,
+        friction_per_ps=1.0,
+        pd_s_sigma_angstrom=2.2,
+        pd_s_epsilon_kcal_mol=1.0,
+        duration_ns=5.0,
+        sulfur_height_nm=0.0,
+        seed=1,
+        steps=0,
+        frames=300,
+        minimize_iterations=1,
+        report_interval=1,
+        reactant_count=None,
+        solvent_count="auto",
+        water_count=None,
+    )
+
+    with pytest.raises(SystemExit, match="--steps must be positive"):
+        smoke.validate_args(args)
+
+
+def test_seed_help_distinguishes_canonical_and_sensitivity_runs(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Document that alternate smoke seeds create distinct validation systems."""
+
+    smoke = load_smoke_tool()
+
+    with pytest.raises(SystemExit) as error:
+        smoke.parse_args(["--help"])
+
+    help_text = capsys.readouterr().out
+    assert error.value.code == 0
+    assert "Finite-system construction and velocity seed" in help_text
+    assert "canonical smoke validation" in help_text
+    assert "seed-sensitivity checks" in help_text
+
+
+def test_smoke_summary_records_seed_provenance() -> None:
+    """Smoke summaries should identify canonical and alternate seed runs."""
+
+    smoke = load_smoke_tool()
+    fake_system = SimpleNamespace(getNumParticles=lambda: 2)
+    fake_scaling = SimpleNamespace(
+        pairs_added=1,
+        sigma_nm=(0.22,),
+        epsilon_delta_kj_mol=(8.368,),
+    )
+    fake_build = SimpleNamespace(
+        pd_indices=(0,),
+        sam_count=1,
+        solvent_count=1,
+        reactant_count=1,
+        system=fake_system,
+        platform_dimensions_nm=(2.0, 2.0, 6.0),
+        anchor_pairs=((1, 0),),
+        anchor_scaling=fake_scaling,
+        component_chain_ranges={},
+        ensemble="NVT",
+        pressure_bar=1.0,
+        temperature_k=300.0,
+    )
+    fake_plan = SimpleNamespace(
+        sam_placements=SimpleNamespace(selected_sites_per_side=1),
+    )
+    fake_paths = SimpleNamespace(
+        output_dir=Path("outputs"),
+        topology=Path("topology.cif"),
+        trajectory=Path("trajectory.dcd"),
+        thermodynamics=Path("thermo.csv"),
+        checkpoint=Path("state.chk"),
+        state_xml=Path("state.xml"),
+        system_xml=Path("system.xml"),
+        anchor_metadata=Path("anchor.json"),
+        summary=Path("summary.json"),
+        packmol_dir=Path("packmol"),
+    )
+    schedule = smoke.RunSchedule(
+        requested_duration_ns=1.0,
+        simulated_duration_ns=1.0,
+        total_steps=500,
+        report_interval=10,
+        frames=50,
+        timestep_fs=2.0,
+    )
+    energy = smoke.EnergyRecord(0.0, 0.0, 300.0)
+
+    summary = smoke.smoke_summary(
+        plan=fake_plan,
+        smoke_build=fake_build,
+        paths=fake_paths,
+        platform_name="CPU",
+        platform_errors=(),
+        initial=energy,
+        minimized=energy,
+        final=energy,
+        pd_displacements=(0.0,),
+        sulfur_displacements=(0.0,),
+        schedule=schedule,
+        minimize_iterations=0,
+        seed=1234,
+    )
+
+    assert summary["run"]["build_seed"] == 1234
+    assert summary["run"]["velocity_seed"] == 1234
+    assert summary["run"]["canonical_validation_seed"] == smoke.DEFAULT_SEED
 
 
 def test_smoke_tool_defaults_match_canonical_metal_sulfur_strategy() -> None:

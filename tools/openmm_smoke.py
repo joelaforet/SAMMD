@@ -60,6 +60,7 @@ SOLVENT_NAME = "ethanol"
 SOLVENT_RESIDUE_NAME = "EOH"
 SOLVENT_SMILES = "CCO"
 DEFAULT_OUTPUT_DIR = "outputs/openmm_smoke/pd111_propanethiol_cinnamaldehyde"
+DEFAULT_SEED = 2026
 DEFAULT_LATERAL_SIZE_NM = 2.0
 DEFAULT_SOLVENT_PADDING_NM = 3.0
 DEFAULT_SOLVENT_COUNT = "auto"
@@ -468,6 +469,7 @@ def main(argv: list[str] | None = None) -> int:
         sulfur_displacements=sulfur_displacements,
         schedule=schedule,
         minimize_iterations=args.minimize_iterations,
+        seed=args.seed,
     )
     write_summary(paths.summary, summary)
     write_summary_csv(paths.output_dir / "smoke_metrics.csv", summary)
@@ -485,7 +487,16 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--overwrite", action="store_true", help="Replace prior smoke outputs")
     parser.add_argument("--platform", default="auto", help="auto, CUDA, CPU, or Reference")
-    parser.add_argument("--seed", type=int, default=2026)
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=DEFAULT_SEED,
+        help=(
+            "Finite-system construction and velocity seed. Non-default seeds change SAM/site "
+            "placement and initial velocities, so use the default seed 2026 for the canonical "
+            "smoke validation and alternate seeds for seed-sensitivity checks."
+        ),
+    )
     parser.add_argument("--lateral-size-nm", type=float, default=DEFAULT_LATERAL_SIZE_NM)
     parser.add_argument("--solvent-padding-nm", type=float, default=DEFAULT_SOLVENT_PADDING_NM)
     parser.add_argument("--solvent-count", default=DEFAULT_SOLVENT_COUNT)
@@ -536,8 +547,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--sulfur-height-nm must be non-negative and finite")
     if args.seed < 0:
         raise SystemExit("--seed must be non-negative")
-    if args.steps is not None and args.steps < 0:
-        raise SystemExit("--steps must be non-negative")
+    if args.steps is not None and args.steps <= 0:
+        raise SystemExit("--steps must be positive")
     if args.minimize_iterations < 0:
         raise SystemExit("--minimize-iterations must be non-negative")
     if args.frames <= 0:
@@ -1969,6 +1980,7 @@ def smoke_summary(
     sulfur_displacements: tuple[float, ...],
     schedule: RunSchedule,
     minimize_iterations: int,
+    seed: int,
 ) -> dict[str, Any]:
     """Assemble pass/fail and provenance metrics."""
 
@@ -2031,6 +2043,9 @@ def smoke_summary(
         "run": {
             "platform": platform_name,
             "platform_errors": list(platform_errors),
+            "build_seed": seed,
+            "velocity_seed": seed,
+            "canonical_validation_seed": DEFAULT_SEED,
             "ensemble": smoke_build.ensemble,
             "pressure_bar": smoke_build.pressure_bar,
             "temperature_k": smoke_build.temperature_k,
@@ -2092,6 +2107,9 @@ def write_build_config(
         "sammd_config": config.model_dump(mode="json"),
         "smoke_overrides": {
             "platform": args.platform,
+            "build_seed": args.seed,
+            "velocity_seed": args.seed,
+            "canonical_validation_seed": DEFAULT_SEED,
             "solvent_name": SOLVENT_NAME,
             "solvent_residue_name": SOLVENT_RESIDUE_NAME,
             "solvent_smiles": SOLVENT_SMILES,
