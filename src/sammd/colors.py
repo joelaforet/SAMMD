@@ -79,7 +79,9 @@ PHASE_COLORS: dict[str, PhaseColor] = {
 }
 
 _color_support: TerminalColorSupport | None = None
+_stdout_color_support: TerminalColorSupport | None = None
 _default_scheme: ColorScheme | None = None
+_SAMMD_HANDLER_ATTR = "_sammd_colored_logging_handler"
 
 
 AMBER = ModuleColor((255, 190, 60), 214, "\033[93m")
@@ -105,12 +107,21 @@ def detect_color_support(stream: IO[str] | None = None) -> TerminalColorSupport:
 
 
 def get_color_support() -> TerminalColorSupport:
-    """Return cached terminal color support."""
+    """Return cached terminal color support for stderr logging."""
 
     global _color_support
     if _color_support is None:
         _color_support = detect_color_support()
     return _color_support
+
+
+def _get_stdout_color_support() -> TerminalColorSupport:
+    """Return cached terminal color support for stdout CLI helpers."""
+
+    global _stdout_color_support
+    if _stdout_color_support is None:
+        _stdout_color_support = detect_color_support(sys.stdout)
+    return _stdout_color_support
 
 
 def set_color_support(support: TerminalColorSupport | None) -> None:
@@ -193,16 +204,23 @@ def setup_colored_logging(verbose: bool = False, no_color: bool = False) -> None
         set_color_support(TerminalColorSupport.NONE)
 
     handler = logging.StreamHandler()
+    setattr(handler, _SAMMD_HANDLER_ATTR, True)
     handler.setFormatter(ColoredFormatter())
 
     root = logging.getLogger()
-    root.handlers.clear()
+    root.handlers[:] = [
+        existing
+        for existing in root.handlers
+        if not getattr(existing, _SAMMD_HANDLER_ATTR, False)
+    ]
     root.addHandler(handler)
     root.setLevel(logging.DEBUG if verbose else logging.INFO)
 
 
-def _escape(phase: str) -> tuple[str, str]:
-    support = get_color_support()
+def _escape(
+    phase: str, support: TerminalColorSupport | None = None
+) -> tuple[str, str]:
+    support = support or get_color_support()
     if support is TerminalColorSupport.NONE:
         return "", ""
     color = PHASE_COLORS.get(phase, PHASE_COLORS["muted"])
@@ -214,10 +232,14 @@ def _escape(phase: str) -> tuple[str, str]:
     return color.basic_ansi, "\033[0m"
 
 
-def styled(text: object, phase: str = "muted") -> str:
+def styled(
+    text: object,
+    phase: str = "muted",
+    support: TerminalColorSupport | None = None,
+) -> str:
     """Return text wrapped in the color for a CLI phase."""
 
-    open_seq, close_seq = _escape(phase)
+    open_seq, close_seq = _escape(phase, support)
     value = str(text)
     return f"{open_seq}{value}{close_seq}" if open_seq else value
 
@@ -225,7 +247,7 @@ def styled(text: object, phase: str = "muted") -> str:
 def echo(message: object = "", *, phase: str = "muted") -> None:
     """Print one colored message."""
 
-    click.echo(styled(message, phase))
+    click.echo(styled(message, phase, _get_stdout_color_support()))
 
 
 def rule(title: str, *, phase: str = "build") -> None:
@@ -237,8 +259,9 @@ def rule(title: str, *, phase: str = "build") -> None:
 def step(label: str, message: str, *, phase: str, detail: str | None = None) -> None:
     """Print a colored phase label with optional muted detail."""
 
-    label_text = styled(f"{label:<8}", phase)
+    support = _get_stdout_color_support()
+    label_text = styled(f"{label:<8}", phase, support)
     if detail is None:
         click.echo(f"{label_text} {message}")
     else:
-        click.echo(f"{label_text} {message} {styled(detail, 'muted')}")
+        click.echo(f"{label_text} {message} {styled(detail, 'muted', support)}")
