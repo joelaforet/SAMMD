@@ -19,11 +19,11 @@ LOGGER = logging.getLogger(__name__)
 
 
 @contextmanager
-def _timed(label: str, message: str) -> Iterator[None]:
+def _timed(message: str) -> Iterator[None]:
     """Log start/end messages with elapsed wall time."""
 
     start = perf_counter()
-    LOGGER.info("%s %s", label, message)
+    LOGGER.info("%s", message)
     try:
         yield
     finally:
@@ -105,9 +105,9 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
     """Build the current plan and optionally write backend files."""
 
     LOGGER.info("SAMMD Build")
-    with _timed("PLAN", "Reading config and constructing deterministic build plan"):
+    with _timed("Reading config and constructing deterministic build plan"):
         plan = build_system(config, output_dir=output_dir)
-    with _timed("CHECK", "Running lightweight validation gates"):
+    with _timed("Running lightweight validation gates"):
         build_report = validate_build_plan(plan)
         output_report = validate_output_paths(plan.output_paths)
     failed_messages = _failed_error_messages(build_report, output_report)
@@ -122,9 +122,9 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
 
     try:
         backend_files = None
-        with _timed("WRITE", "Writing SAM grafting-density visual check"):
+        with _timed("Writing SAM grafting-density visual check"):
             topology = plan.write_topology_cif(overwrite=overwrite)
-        with _timed("WRITE", "Writing resolved configuration"):
+        with _timed("Writing resolved configuration"):
             resolved_config = plan.write_resolved_config(overwrite=overwrite)
         if full:
             from sammd.backends.interchange import backend_build_summary, export_interchange_backend
@@ -135,7 +135,7 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
                 overwrite=overwrite,
             )
             backend_files = backend_result.files
-            with _timed("WRITE", "Writing backend-aware build summary"):
+            with _timed("Writing backend-aware build summary"):
                 build_summary = plan.write_build_summary(overwrite=overwrite)
                 build_summary.write_text(
                     json.dumps(
@@ -147,7 +147,7 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
                     encoding="utf-8",
                 )
         else:
-            with _timed("WRITE", "Writing build summary"):
+            with _timed("Writing build summary"):
                 build_summary = plan.write_build_summary(overwrite=overwrite)
     except FileExistsError as exc:
         raise click.ClickException(str(exc)) from exc

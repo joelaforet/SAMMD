@@ -18,10 +18,8 @@ from sammd.colors import (
 @pytest.fixture(autouse=True)
 def reset_color_support():
     set_color_support(None)
-    colors_module._stdout_color_support = None
     yield
     set_color_support(None)
-    colors_module._stdout_color_support = None
 
 
 @pytest.fixture
@@ -54,28 +52,6 @@ def test_setup_no_color_override_disables_cached_color(restore_root_logging):
     setup_colored_logging(no_color=True)
 
     assert get_color_support() is TerminalColorSupport.NONE
-
-
-def test_stdout_helper_uses_stdout_detection_when_stderr_is_tty(monkeypatch):
-    class Stdout(io.StringIO):
-        def isatty(self) -> bool:
-            return False
-
-    class Stderr(io.StringIO):
-        def isatty(self) -> bool:
-            return True
-
-    stdout = Stdout()
-    monkeypatch.setattr(colors_module.sys, "stdout", stdout)
-    monkeypatch.setattr(colors_module.sys, "stderr", Stderr())
-    monkeypatch.setenv("TERM", "xterm-256color")
-    monkeypatch.delenv("COLORTERM", raising=False)
-
-    assert get_color_support() is TerminalColorSupport.EXTENDED
-
-    colors_module.echo("plain", phase="ok")
-
-    assert stdout.getvalue() == "plain\n"
 
 
 def test_setup_colored_logging_preserves_unrelated_root_handlers(
