@@ -40,7 +40,6 @@ def test_output_paths_default_under_base_directory(tmp_path) -> None:
     assert paths.sam_grafting_density == tmp_path / "sam_grafting_density.cif"
     assert paths.solvated_system == tmp_path / "solvated_system.cif"
     assert paths.openff_interchange == tmp_path / "interchange.json"
-    assert paths.openmm_system == tmp_path / "system.xml"
     assert paths.anchor_metadata == tmp_path / "anchor_metadata.json"
     assert paths.build_summary == tmp_path / "build_summary.json"
     assert paths.resolved_config == tmp_path / "resolved_config.yaml"
@@ -54,7 +53,6 @@ def test_output_paths_support_user_overrides(tmp_path) -> None:
             sam_grafting_density="viz/sam_grafting_density.cif",
             solvated_system="coords/solvated_system.cif",
             openff_interchange="interchange/system.json",
-            openmm_system="openmm/system.xml",
             anchor_metadata="metadata/anchor_metadata.json",
             build_summary="reports/build_summary.json",
             resolved_config="reports/resolved_config.yaml",
@@ -66,7 +64,6 @@ def test_output_paths_support_user_overrides(tmp_path) -> None:
     assert paths.sam_grafting_density == tmp_path / "viz/sam_grafting_density.cif"
     assert paths.solvated_system == tmp_path / "coords/solvated_system.cif"
     assert paths.openff_interchange == tmp_path / "interchange/system.json"
-    assert paths.openmm_system == tmp_path / "openmm/system.xml"
     assert paths.anchor_metadata == tmp_path / "metadata/anchor_metadata.json"
     assert paths.build_summary == tmp_path / "reports/build_summary.json"
     assert paths.resolved_config == tmp_path / "reports/resolved_config.yaml"
@@ -78,7 +75,6 @@ def test_output_paths_support_user_overrides(tmp_path) -> None:
         ({"sam_grafting_density": "sam_grafting_density.pdb"}, "SAM grafting-density output"),
         ({"solvated_system": "solvated_system.pdb"}, "solvated system output"),
         ({"openff_interchange": "interchange.xml"}, "OpenFF Interchange output"),
-        ({"openmm_system": "system.json"}, "OpenMM system output"),
         ({"anchor_metadata": "anchor_metadata.yaml"}, "anchor metadata output"),
         ({"build_summary": "build_summary.txt"}, "build summary output"),
         ({"resolved_config": "resolved_config.json"}, "resolved config output"),

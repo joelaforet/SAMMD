@@ -21,7 +21,6 @@ class OutputPaths:
     sam_grafting_density: Path | None = None
     solvated_system: Path | None = None
     openff_interchange: Path | None = None
-    openmm_system: Path | None = None
     anchor_metadata: Path | None = None
     build_summary: Path | None = None
     resolved_config: Path | None = None
@@ -65,7 +64,6 @@ def plan_output_paths(config: Any, base_dir: str | Path = ".") -> OutputPaths:
     sam_grafting_density = _resolve_output_path(root, files.sam_grafting_density)
     solvated_system = _resolve_output_path(root, files.solvated_system)
     openff_interchange = _resolve_output_path(root, files.openff_interchange)
-    openmm_system = _resolve_output_path(root, files.openmm_system)
     anchor_metadata = _resolve_output_path(root, files.anchor_metadata)
     build_summary = _resolve_output_path(root, files.build_summary)
     resolved_config = _resolve_output_path(root, files.resolved_config)
@@ -73,7 +71,6 @@ def plan_output_paths(config: Any, base_dir: str | Path = ".") -> OutputPaths:
     _validate_suffix(sam_grafting_density, ".cif", "SAM grafting-density")
     _validate_suffix(solvated_system, ".cif", "solvated system")
     _validate_suffix(openff_interchange, ".json", "OpenFF Interchange")
-    _validate_suffix(openmm_system, ".xml", "OpenMM system")
     _validate_suffix(anchor_metadata, ".json", "anchor metadata")
     _validate_suffix(build_summary, ".json", "build summary")
     _validate_suffix(resolved_config, ".yaml", "resolved config")
@@ -81,7 +78,6 @@ def plan_output_paths(config: Any, base_dir: str | Path = ".") -> OutputPaths:
         sam_grafting_density=sam_grafting_density,
         solvated_system=solvated_system,
         openff_interchange=openff_interchange,
-        openmm_system=openmm_system,
         anchor_metadata=anchor_metadata,
         build_summary=build_summary,
         resolved_config=resolved_config,

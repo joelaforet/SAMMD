@@ -77,6 +77,14 @@ def test_generated_offxml_contains_one_atom_per_fcc_metal() -> None:
     assert {atom.attrib["id"] for atom in atoms} == set(FCC_METAL_LJ_REGISTRY)
 
 
+def test_generated_offxml_does_not_use_unsupported_atom_pair_parameters() -> None:
+    """Pair-specific metal-S overrides live in an Interchange plugin, not OFFXML."""
+
+    xml = generate_interface_metal_offxml()
+
+    assert "<AtomPair" not in xml
+
+
 def test_generated_offxml_reproduces_pd_parameters_with_units() -> None:
     """Use positive OpenFF epsilon and CHARMM Rmin/2 for Pd."""
 

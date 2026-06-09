@@ -32,7 +32,7 @@ ENGINE_EXPORT_PLAN: dict[str, dict[str, object]] = {
     "openmm": {
         "status": "reserved",
         "available": False,
-        "handoff": "Interchange primary; system.xml convenience export",
+        "handoff": "Use Interchange.to_openmm() downstream when needed",
         "teaching_scope": "student OpenMM Python API path",
     },
     "gromacs": {
@@ -230,7 +230,6 @@ class SAMMDBuildPlan:
                 "openff_interchange": self._artifact_summary(
                     "openff_interchange", "reserved"
                 ),
-                "openmm_system": self._artifact_summary("openmm_system", "reserved"),
                 "anchor_metadata": self._artifact_summary("anchor_metadata", "reserved"),
             },
             "engine_exports": ENGINE_EXPORT_PLAN,

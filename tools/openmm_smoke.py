@@ -20,7 +20,6 @@ from typing import Any
 import yaml
 
 from sammd.backends.forcefields import get_fcc_metal_parameters
-from sammd.backends.openmm_runtime import AnchorScalingMetadata, create_langevin_integrator
 from sammd.backends.packmol import (
     PackmolJob,
     PackmolStructure,
@@ -87,6 +86,44 @@ PASS_MAX_PD_DISPLACEMENT_NM = 0.15
 PASS_MAX_SULFUR_DISPLACEMENT_NM = 0.70
 
 Vector3 = tuple[float, float, float]
+
+
+@dataclass(frozen=True)
+class AnchorScalingMetadata:
+    """Summary of smoke-tool sulfur-metal nonbonded override construction."""
+
+    pairs_requested: int
+    pairs_added: int
+    force_added: bool
+    scale_factor: float
+    force_index: int | None = None
+    sigma_nm: tuple[float, ...] = ()
+    epsilon_delta_kj_mol: tuple[float, ...] = ()
+
+
+def create_langevin_integrator(
+    temperature_k: float,
+    friction_per_ps: float,
+    timestep_fs: float,
+    *,
+    openmm_module: Any,
+    unit_module: Any,
+) -> Any:
+    """Create the smoke-tool OpenMM Langevin integrator."""
+
+    for name, value in {
+        "temperature_k": temperature_k,
+        "friction_per_ps": friction_per_ps,
+        "timestep_fs": timestep_fs,
+    }.items():
+        if not math.isfinite(value) or value <= 0:
+            msg = f"{name} must be positive and finite"
+            raise ValueError(msg)
+    return openmm_module.LangevinIntegrator(
+        temperature_k * unit_module.kelvin,
+        friction_per_ps / unit_module.picosecond,
+        timestep_fs * unit_module.femtoseconds,
+    )
 
 
 @dataclass(frozen=True)

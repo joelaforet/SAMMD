@@ -139,7 +139,6 @@ def test_build_tutorial_documents_default_and_backend_outputs() -> None:
     backend_outputs = [
         "solvated_system.cif",
         "interchange.json",
-        "system.xml",
         "anchor_metadata.json",
     ]
     for backend_output in backend_outputs:
@@ -198,7 +197,7 @@ def test_building_systems_notebook_workflow_smoke(tmp_path: Path) -> None:
     assert resolved_config_path.is_file()
     assert not plan.output_paths.solvated_system.exists()
     assert not plan.output_paths.openff_interchange.exists()
-    assert not plan.output_paths.openmm_system.exists()
+    assert not plan.output_paths.anchor_metadata.exists()
     assert plan.slab.metal == "Pd"
     assert plan.slab.facet == "111"
     assert len(plan.binding_sites) > 0

@@ -47,7 +47,7 @@ def test_current_validation_gates_do_not_require_backend_artifacts(tmp_path: Pat
     assert current_gate_ids.isdisjoint(deferred_backend_gate_ids)
     assert not plan.output_paths.solvated_system.exists()
     assert not plan.output_paths.openff_interchange.exists()
-    assert not plan.output_paths.openmm_system.exists()
+    assert not plan.output_paths.anchor_metadata.exists()
 
 
 def test_bad_box_volume_fails_validation(tmp_path: Path) -> None:

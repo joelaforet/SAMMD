@@ -278,7 +278,6 @@ class OutputFilesConfig(SAMMDBaseModel):
     sam_grafting_density: str = "sam_grafting_density.cif"
     solvated_system: str = "solvated_system.cif"
     openff_interchange: str = "interchange.json"
-    openmm_system: str = "system.xml"
     anchor_metadata: str = "anchor_metadata.json"
     build_summary: str = "build_summary.json"
     resolved_config: str = "resolved_config.yaml"
@@ -289,49 +288,6 @@ class OutputsConfig(SAMMDBaseModel):
 
     directory: str = "outputs/propanethiol_cinnamaldehyde_pd111"
     files: OutputFilesConfig = Field(default_factory=OutputFilesConfig)
-
-
-class ReporterConfig(SAMMDBaseModel):
-    """OpenMM StateDataReporter field selection helper.
-
-    This model is intentionally not part of the top-level YAML system-building
-    schema. It remains available for OpenMM teaching utilities and runtime helper
-    tests that configure reporters from Python.
-    """
-
-    interval_steps: int = Field(default=1000, gt=0)
-    test_all_fields: bool = False
-    fields: list[str] = Field(
-        default_factory=lambda: [
-            "step",
-            "time",
-            "potential_energy",
-            "kinetic_energy",
-            "total_energy",
-            "temperature",
-            "volume",
-            "density",
-            "speed",
-            "elapsed_time",
-        ],
-        min_length=1,
-    )
-
-    @field_validator("fields")
-    @classmethod
-    def _validate_supported_fields(cls, value: list[str]) -> list[str]:
-        """Validate reporter field names against the lightweight registry."""
-
-        from sammd.runtime.reporting import SUPPORTED_THERMODYNAMIC_FIELDS
-
-        unknown = sorted(set(value) - set(SUPPORTED_THERMODYNAMIC_FIELDS))
-        if unknown:
-            msg = f"unsupported reporter fields: {', '.join(unknown)}"
-            raise ValueError(msg)
-        if len(set(value)) != len(value):
-            msg = "reporter fields must not contain duplicates"
-            raise ValueError(msg)
-        return value
 
 
 class SAMMDConfig(SAMMDBaseModel):
@@ -379,7 +335,7 @@ CONFIG_TEMPLATE = """# =========================================================
 #      sammd build config.yaml --output-dir outputs/my_system --overwrite
 #
 # 5. Inspect sam_grafting_density.cif, build_summary.json, and resolved_config.yaml.
-#    Use --full when you need solvated_system.cif and OpenMM files.
+#    Use --full when you need solvated_system.cif and interchange.json.
 #
 # This file defines the molecular system only.
 # It does NOT define equilibration, production MD, thermostats, barostats,
@@ -621,7 +577,6 @@ parameterization:
 # Backend artifact names written by --full:
 #   - interchange.json  # primary portable backend export
 #   - solvated_system.cif  # full slab + SAMs + reactants + solvent coordinates
-#   - system.xml        # OpenMM convenience export
 #   - anchor_metadata.json  # SAM anchor metadata export
 #
 # None of these are trajectory outputs from an MD simulation.
@@ -633,7 +588,6 @@ outputs:
     sam_grafting_density: sam_grafting_density.cif
     solvated_system: solvated_system.cif
     openff_interchange: interchange.json
-    openmm_system: system.xml
     anchor_metadata: anchor_metadata.json
     build_summary: build_summary.json
     resolved_config: resolved_config.yaml

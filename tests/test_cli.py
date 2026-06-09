@@ -119,7 +119,6 @@ def test_build_cli_writes_topology_and_summary() -> None:
         assert Path("outputs/resolved_config.yaml").is_file()
         assert not Path("outputs/solvated_system.cif").exists()
         assert not Path("outputs/interchange.json").exists()
-        assert not Path("outputs/system.xml").exists()
         assert not Path("outputs/anchor_metadata.json").exists()
 
 

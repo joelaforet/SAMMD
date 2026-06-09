@@ -82,7 +82,6 @@ def test_yaml_template_describes_current_build_contract() -> None:
     assert "resolved_config.yaml" in CONFIG_TEMPLATE
     assert "solvated_system.cif" in CONFIG_TEMPLATE
     assert "interchange.json" in CONFIG_TEMPLATE
-    assert "system.xml" in CONFIG_TEMPLATE
     assert "anchor_metadata.json" in CONFIG_TEMPLATE
 
 

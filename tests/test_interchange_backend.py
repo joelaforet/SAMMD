@@ -12,6 +12,7 @@ import pytest
 
 from sammd.core.builders import build_system
 from sammd.core.config import SAMMDConfig, load_config_dict
+from sammd.model.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
 
 
 def test_backend_module_import_does_not_import_optional_science_modules() -> None:
@@ -33,11 +34,11 @@ def test_progress_logs_and_preserves_callback_compatibility(caplog) -> None:
     messages: list[str] = []
 
     with caplog.at_level(logging.INFO, logger="sammd.backends.interchange"):
-        backend._progress(messages.append, "Writing system.xml")
+        backend._progress(messages.append, "Writing interchange.json")
 
-    assert messages == ["Writing system.xml"]
+    assert messages == ["Writing interchange.json"]
     assert [record.name for record in caplog.records] == ["sammd.backends.interchange"]
-    assert [record.getMessage() for record in caplog.records] == ["Writing system.xml"]
+    assert [record.getMessage() for record in caplog.records] == ["Writing interchange.json"]
 
 
 def test_backend_build_summary_marks_completed_exports(tmp_path: Path) -> None:
@@ -60,10 +61,14 @@ def test_backend_build_summary_marks_completed_exports(tmp_path: Path) -> None:
     assert summary["artifacts"]["openff_interchange"]["available"] is True
     assert summary["artifacts"]["openff_interchange"]["constructed"] is True
     assert summary["artifacts"]["openff_interchange"]["status"] == "current"
-    assert summary["artifacts"]["openmm_system"]["available"] is True
-    assert summary["engine_exports"]["openmm"]["available"] is True
+    assert "openmm_system" not in summary["artifacts"]
+    assert summary["engine_exports"]["openmm"]["available"] is False
     assert summary["backend_export"]["openff_interchange_version"] == "0.5.3"
     assert summary["backend_export"]["sulfur_metal_pair_count"] == 1
+    override = summary["backend_export"]["metal_sulfur_override"]
+    assert override["mode"] == "openff_interchange_plugin_collection"
+    assert override["sigma_nm"] == METAL_SULFUR_SIGMA_NM
+    assert override["epsilon_kcal_mol"] == METAL_SULFUR_EPSILON_KCAL_MOL
 
 
 def test_backend_export_rejects_salts_before_optional_imports(tmp_path: Path) -> None:
@@ -109,7 +114,7 @@ def test_pdbx_writer_terminates_final_loop_for_pymol(tmp_path: Path, monkeypatch
             handle.write("loop_\n_atom_site.id\n1\n")
 
     fake_openmm = SimpleNamespace(app=SimpleNamespace(PDBxFile=FakePDBxFile))
-    monkeypatch.setattr(backend, "require_openmm", lambda: fake_openmm)
+    monkeypatch.setattr(backend, "_require_openmm", lambda: fake_openmm)
 
     path = tmp_path / "solvated_system.cif"
     backend._write_pdbx(path, topology=object(), positions=object(), overwrite=False)

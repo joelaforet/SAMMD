@@ -83,7 +83,6 @@ def validate_output_paths(paths: Any) -> ValidationReport:
         "sam_grafting_density": ".cif",
         "solvated_system": ".cif",
         "openff_interchange": ".json",
-        "openmm_system": ".xml",
         "anchor_metadata": ".json",
         "build_summary": ".json",
         "resolved_config": ".yaml",

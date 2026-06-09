@@ -128,7 +128,7 @@ def test_parameterization_plan_from_config_records_choices_and_targets() -> None
     assert plan.metal_force_field_resource == "interface_fcc_metals.offxml"
     assert plan.nonbonded_cutoff == 1.2
     assert plan.output_targets["openff_interchange"] == "planned/target.json"
-    assert plan.output_targets["openmm_system"] == "planned/system.xml"
+    assert "openmm_system" not in plan.output_targets
     assert plan.component_counts == {"sam": 1, "solvent": 1, "reactants": 1, "salts": 0}
 
 
@@ -144,7 +144,7 @@ def test_parameterization_plan_from_build_plan_records_counts_and_keeps_lightwei
 
     assert not build_plan.full_construction_available
     assert plan.output_targets["openff_interchange"] == str(tmp_path / "interchange.json")
-    assert plan.output_targets["openmm_system"] == str(tmp_path / "system.xml")
+    assert "openmm_system" not in plan.output_targets
     assert plan.component_counts["sam_placements"] == len(build_plan.sam_placements.placements)
     assert plan.molecule_counts == build_plan.solution.molecule_counts
 

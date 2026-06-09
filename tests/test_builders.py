@@ -59,7 +59,6 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
     assert plan.output_paths.sam_grafting_density == tmp_path / "sam_grafting_density.cif"
     assert plan.output_paths.solvated_system == tmp_path / "solvated_system.cif"
     assert plan.output_paths.openff_interchange == tmp_path / "interchange.json"
-    assert plan.output_paths.openmm_system == tmp_path / "system.xml"
     assert plan.output_paths.anchor_metadata == tmp_path / "anchor_metadata.json"
     assert not plan.full_construction_available
     artifacts = plan.build_summary()["artifacts"]
@@ -91,7 +90,7 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
     assert engine_exports["openmm"] == {
         "status": "reserved",
         "available": False,
-        "handoff": "Interchange primary; system.xml convenience export",
+        "handoff": "Use Interchange.to_openmm() downstream when needed",
         "teaching_scope": "student OpenMM Python API path",
     }
     for engine in ["gromacs", "lammps", "amber"]:

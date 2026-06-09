@@ -92,7 +92,7 @@ def validate(config: Path) -> None:
 @click.option(
     "--full",
     is_flag=True,
-    help="Export full MD simulation files: solvated_system.cif, interchange.json, system.xml.",
+    help="Export full backend files: solvated_system.cif, interchange.json, anchor_metadata.json.",
 )
 @click.option(
     "--export-backend",
@@ -161,10 +161,9 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
     if backend_files is not None:
         LOGGER.info("FILE Wrote solvated system CIF: %s", backend_files["solvated_system"])
         LOGGER.info("FILE Interchange JSON: %s", backend_files["openff_interchange"])
-        LOGGER.info("FILE OpenMM system XML: %s", backend_files["openmm_system"])
         LOGGER.info("FILE Anchor metadata: %s", backend_files["anchor_metadata"])
         LOGGER.info(
-            "NEXT Use solvated_system.cif and interchange.json for OpenMM simulation setup."
+            "NEXT Load interchange.json and call Interchange.to_openmm() downstream when needed."
         )
     else:
         LOGGER.info("NEXT Inspect sam_grafting_density.cif; run --full for MD simulation files.")

@@ -13,9 +13,14 @@ from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
 from time import perf_counter
+from types import SimpleNamespace
 from typing import Any
 
 from sammd.backends.forcefields import get_fcc_metal_parameters
+from sammd.backends.interchange_plugins import (
+    create_metal_sulfur_lj_collection,
+    metal_sulfur_lj_override_summary,
+)
 from sammd.backends.openff import (
     PreparedMoleculeTemplate,
     force_field_inputs_from_config,
@@ -23,14 +28,12 @@ from sammd.backends.openff import (
     require_openff_interchange,
     require_openff_toolkit,
 )
-from sammd.backends.openmm_runtime import add_sulfur_metal_lj_exceptions, require_openmm
 from sammd.backends.packmol import (
     PackmolMoleculeTemplate,
     pack_fixed_solute_with_solvent,
     packmol_file_stem,
 )
 from sammd.core.io import AtomRecord, safe_write_text
-from sammd.model.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
 from sammd.model.sam import SAMPlacement
 from sammd.utils.geometry import (
     Vector3,
@@ -43,7 +46,6 @@ from sammd.utils.geometry import (
     subtract_vectors,
 )
 
-KCAL_TO_KJ = 4.184
 MAX_RESIDUES_PER_CHAIN = 9999
 # One-character PDB chain IDs are reserved for metal slab atoms as M, so component
 # chains intentionally skip M while keeping deterministic allocation order.
@@ -59,7 +61,7 @@ class BackendExportResult:
 
     interchange: Any
     openmm_topology: Any
-    openmm_system: Any
+    metal_sulfur_collection: Any
     positions: Any
     positions_nm: tuple[Vector3, ...]
     sulfur_indices: tuple[int, ...]
@@ -159,7 +161,7 @@ def export_interchange_backend(
 ) -> BackendExportResult:
     """Construct Interchange-backed artifacts and write them to configured paths."""
 
-    _progress(progress, "Building OpenFF Interchange and patched OpenMM System")
+    _progress(progress, "Building OpenFF Interchange export")
     result = build_interchange_backend(plan, progress=progress)
     paths = plan.output_paths
     _require_paths(paths)
@@ -182,14 +184,6 @@ def export_interchange_backend(
     )
     _timed_progress(progress, "  solvated_system.cif written", stage_start)
     stage_start = perf_counter()
-    _progress(progress, "Writing system.xml")
-    safe_write_text(
-        paths.openmm_system,
-        require_openmm().openmm.XmlSerializer.serialize(result.openmm_system),
-        overwrite=overwrite,
-    )
-    _timed_progress(progress, "  system.xml written", stage_start)
-    stage_start = perf_counter()
     _progress(progress, "Writing anchor_metadata.json")
     safe_write_text(
         paths.anchor_metadata,
@@ -200,7 +194,7 @@ def export_interchange_backend(
     return BackendExportResult(
         interchange=result.interchange,
         openmm_topology=result.openmm_topology,
-        openmm_system=result.openmm_system,
+        metal_sulfur_collection=result.metal_sulfur_collection,
         positions=result.positions,
         positions_nm=result.positions_nm,
         sulfur_indices=result.sulfur_indices,
@@ -210,7 +204,6 @@ def export_interchange_backend(
         files={
             "solvated_system": paths.solvated_system,
             "openff_interchange": paths.openff_interchange,
-            "openmm_system": paths.openmm_system,
             "anchor_metadata": paths.anchor_metadata,
         },
         openff_toolkit_version=result.openff_toolkit_version,
@@ -223,7 +216,7 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
 
     summary = plan.build_summary()
     artifacts = dict(summary["artifacts"])
-    for key in ("solvated_system", "openff_interchange", "openmm_system", "anchor_metadata"):
+    for key in ("solvated_system", "openff_interchange", "anchor_metadata"):
         artifact = dict(artifacts[key])
         artifact["status"] = "current"
         artifact["available"] = True
@@ -232,15 +225,11 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
             artifact["openff_interchange_package_version"] = result.openff_interchange_version
         artifacts[key] = artifact
     engine_exports = dict(summary["engine_exports"])
-    openmm_export = dict(engine_exports["openmm"])
-    openmm_export["status"] = "current"
-    openmm_export["available"] = True
-    engine_exports["openmm"] = openmm_export
     summary["artifacts"] = artifacts
     summary["engine_exports"] = engine_exports
     summary["full_construction_available"] = True
     summary["backend_export"] = {
-        "mode": "openff_interchange_with_openmm_pair_overrides",
+        "mode": "openff_interchange_with_plugin_pair_overrides",
         "openff_toolkit_version": result.openff_toolkit_version,
         "openff_interchange_version": result.openff_interchange_version,
         "atom_count": len(result.positions_nm),
@@ -257,7 +246,7 @@ def build_interchange_backend(
     *,
     progress: ProgressCallback | None = None,
 ) -> BackendExportResult:
-    """Build an OpenFF Interchange and patched OpenMM system from a SAMMD plan."""
+    """Build an OpenFF Interchange export from a SAMMD plan."""
 
     if plan.solution.salts:
         names = ", ".join(salt.name for salt in plan.solution.salts)
@@ -268,7 +257,7 @@ def build_interchange_backend(
     _progress(progress, "Importing OpenFF/OpenMM dependencies")
     toolkit = require_openff_toolkit()
     interchange_module = require_openff_interchange()
-    modules = require_openmm()
+    modules = _require_openmm()
     unit = _openff_unit_module()
     _timed_progress(progress, "  OpenFF/OpenMM dependencies ready", stage_start)
 
@@ -476,19 +465,10 @@ def build_interchange_backend(
     )
     _timed_progress(progress, "  OpenFF Interchange ready", stage_start)
     stage_start = perf_counter()
-    _progress(progress, "Exporting OpenMM System")
-    openmm_system = interchange.to_openmm()
-    _timed_progress(progress, "  OpenMM System ready", stage_start)
-    stage_start = perf_counter()
-    _progress(progress, f"Applying {len(anchor_pairs)} sulfur-metal pair overrides")
-    add_sulfur_metal_lj_exceptions(
-        openmm_system,
-        tuple(anchor_pairs),
-        sigma_nm=METAL_SULFUR_SIGMA_NM,
-        epsilon_kj_mol=METAL_SULFUR_EPSILON_KCAL_MOL * KCAL_TO_KJ,
-        unit_module=modules.unit,
-    )
-    _timed_progress(progress, "  sulfur-metal overrides applied", stage_start)
+    _progress(progress, f"Recording {len(anchor_pairs)} sulfur-metal pair overrides")
+    metal_sulfur_collection = create_metal_sulfur_lj_collection(tuple(anchor_pairs))
+    interchange.collections[metal_sulfur_collection.type] = metal_sulfur_collection
+    _timed_progress(progress, "  sulfur-metal override collection attached", stage_start)
     stage_start = perf_counter()
     _progress(progress, "Exporting OpenMM topology and positions")
     openmm_topology = interchange.to_openmm_topology()
@@ -503,7 +483,7 @@ def build_interchange_backend(
     return BackendExportResult(
         interchange=interchange,
         openmm_topology=openmm_topology,
-        openmm_system=openmm_system,
+        metal_sulfur_collection=metal_sulfur_collection,
         positions=openmm_positions,
         positions_nm=tuple(positions_nm),
         sulfur_indices=tuple(sulfur_indices),
@@ -709,14 +689,10 @@ def _terminal_heavy_axis_index(template: PreparedMoleculeTemplate, anchor_index:
 
 
 def _anchor_metadata(result: BackendExportResult) -> dict[str, object]:
-    return {
-        "mode": "openmm_nonbonded_exception_post_export",
-        "sulfur_indices": list(result.sulfur_indices),
-        "metal_indices": list(result.metal_indices),
-        "sulfur_metal_pairs": [list(pair) for pair in result.anchor_pairs],
-        "sigma_nm": METAL_SULFUR_SIGMA_NM,
-        "epsilon_kj_mol": METAL_SULFUR_EPSILON_KCAL_MOL * KCAL_TO_KJ,
-    }
+    metadata = metal_sulfur_lj_override_summary(result.anchor_pairs)
+    metadata["sulfur_indices"] = list(result.sulfur_indices)
+    metadata["metal_indices"] = list(result.metal_indices)
+    return metadata
 
 
 def _write_pdbx(path: Path, topology: Any, positions: Any, *, overwrite: bool) -> None:
@@ -731,7 +707,7 @@ def _write_pdbx(path: Path, topology: Any, positions: Any, *, overwrite: bool) -
             "w", encoding="utf-8", dir=destination.parent, delete=False
         ) as handle:
             temporary_name = handle.name
-            require_openmm().app.PDBxFile.writeFile(topology, positions, handle, keepIds=True)
+            _require_openmm().app.PDBxFile.writeFile(topology, positions, handle, keepIds=True)
             # PyMOL treats EOF inside the final atom_site loop as a truncated loop.
             handle.write("\n#\n")
         if overwrite:
@@ -801,12 +777,26 @@ def _require_paths(paths: Any) -> None:
     for key in (
         "solvated_system",
         "openff_interchange",
-        "openmm_system",
         "anchor_metadata",
     ):
         if getattr(paths, key) is None:
             msg = f"{key} output path is not configured"
             raise ValueError(msg)
+
+
+def _require_openmm() -> SimpleNamespace:
+    """Import OpenMM lazily for structure writing helpers only."""
+
+    try:
+        import openmm
+        from openmm import app, unit
+    except ImportError as error:
+        msg = (
+            "OpenMM is required to write solvated_system.cif from the Interchange backend. "
+            "Install and run from an environment with OpenMM available."
+        )
+        raise ImportError(msg) from error
+    return SimpleNamespace(openmm=openmm, app=app, unit=unit)
 
 
 def _package_version(distribution_name: str) -> str | None:

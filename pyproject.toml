@@ -35,6 +35,9 @@ docs = [
 [project.scripts]
 sammd = "sammd.cli:main"
 
+[project.entry-points."openff.interchange.plugins.collections"]
+SAMMDMetalSulfurLJCollection = "sammd.backends.interchange_plugins:SAMMDMetalSulfurLJCollection"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/sammd"]
 
