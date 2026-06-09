@@ -1,11 +1,14 @@
 """Tests for the minimal SAMMD CLI."""
 
+import re
 from pathlib import Path
 
 from click.testing import CliRunner
 
 from sammd.cli import main
 from sammd.core.config import load_config
+
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def test_init_cli_writes_loadable_template() -> None:
@@ -19,6 +22,39 @@ def test_init_cli_writes_loadable_template() -> None:
         assert "Created a SAMMD configuration template at sammd.yaml" in result.output
         config = load_config("sammd.yaml")
         assert config.surface.metal == "Pd"
+
+
+def test_root_help_exposes_logging_options() -> None:
+    """Expose root logging controls without changing subcommands."""
+
+    result = CliRunner().invoke(main, ["--help"])
+
+    assert result.exit_code == 0
+    assert "--verbose" in result.output
+    assert "--no-color" in result.output
+
+
+def test_no_color_init_succeeds_without_ansi_escapes() -> None:
+    """Disable color from the root option while preserving init output."""
+
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        result = runner.invoke(main, ["--no-color", "init", "-o", "sammd.yaml"])
+
+        assert result.exit_code == 0
+        assert "INIT" in result.output
+        assert "Created a SAMMD configuration template at sammd.yaml" in result.output
+        assert ANSI_ESCAPE_RE.search(result.output) is None
+
+
+def test_verbose_init_succeeds() -> None:
+    """Accept verbose root logging option for init."""
+
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        result = runner.invoke(main, ["--verbose", "init", "-o", "sammd.yaml"])
+
+        assert result.exit_code == 0
 
 
 def test_init_cli_respects_no_overwrite_unless_force() -> None:

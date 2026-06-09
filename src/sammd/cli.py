@@ -1,6 +1,7 @@
 """Command-line interface for SAMMD scaffolding."""
 
 import json
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -9,10 +10,12 @@ from typing import Any
 
 import click
 
-from sammd.colors import rule, step
+from sammd.colors import rule, setup_colored_logging, step
 from sammd.core.builders import build_system
 from sammd.core.config import CONFIG_TEMPLATE, load_config
 from sammd.core.validation import validate_build_plan, validate_output_paths
+
+LOGGER = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -37,8 +40,12 @@ def _failed_error_messages(*reports: Any) -> list[str]:
 
 
 @click.group()
-def main() -> None:
+@click.option("-v", "--verbose", is_flag=True, help="Enable verbose logging.")
+@click.option("--no-color", is_flag=True, help="Disable colored logging output.")
+def main(verbose: bool, no_color: bool) -> None:
     """Manage lightweight SAMMD configuration files."""
+
+    setup_colored_logging(verbose=verbose, no_color=no_color)
 
 
 @main.command()
