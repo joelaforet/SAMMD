@@ -241,6 +241,18 @@ The OpenMM tutorial teaches the raw OpenMM Python API with
 Use `pixi run ...` outside a pixi shell, or run `pixi shell -e default` first
 and then use the lightweight commands directly.
 
+CLI logs include a timestamp, full module path, level, and message. Add the root
+option `--verbose` before the subcommand to show DEBUG logs:
+
+```bash
+sammd --verbose build sammd.yaml --output-dir outputs --overwrite
+```
+
+Colored ANSI log output is enabled automatically on terminals that support it.
+Disable color with `sammd --no-color <command>` or `NO_COLOR=1 sammd <command>`.
+Root options such as `--verbose` and `--no-color` must appear before the
+subcommand.
+
 ## Documentation And Notebooks
 
 - Install and pixi tutorial: `docs/source/tutorials/installation.rst`
