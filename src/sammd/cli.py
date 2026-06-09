@@ -10,7 +10,7 @@ from typing import Any
 
 import click
 
-from sammd.colors import rule, setup_colored_logging, step
+from sammd.colors import setup_colored_logging
 from sammd.core.builders import build_system
 from sammd.core.config import CONFIG_TEMPLATE, load_config
 from sammd.core.validation import validate_build_plan, validate_output_paths
@@ -19,15 +19,15 @@ LOGGER = logging.getLogger(__name__)
 
 
 @contextmanager
-def _timed(label: str, message: str, *, phase: str) -> Iterator[None]:
-    """Print start/end messages with elapsed wall time."""
+def _timed(label: str, message: str) -> Iterator[None]:
+    """Log start/end messages with elapsed wall time."""
 
     start = perf_counter()
-    step(label, message, phase=phase)
+    LOGGER.info("%s %s", label, message)
     try:
         yield
     finally:
-        step("DONE", message, phase="ok", detail=f"{perf_counter() - start:.2f}s")
+        LOGGER.info("DONE %s %.2fs", message, perf_counter() - start)
 
 
 def _failed_error_messages(*reports: Any) -> list[str]:
@@ -57,7 +57,7 @@ def init(output: Path, force: bool) -> None:
     if output.exists() and not force:
         raise click.ClickException(f"{output} already exists; use --force to overwrite")
     output.write_text(CONFIG_TEMPLATE, encoding="utf-8")
-    step("INIT", f"Created a SAMMD configuration template at {output}", phase="build")
+    LOGGER.info("INIT Created a SAMMD configuration template at %s", output)
 
 
 @main.command()
@@ -67,11 +67,11 @@ def validate(config: Path) -> None:
 
     loaded = load_config(config)
     component_count = len(loaded.sam.components)
-    step(
-        "OK",
-        f"Configuration valid: {loaded.surface.metal}({loaded.surface.facet}) "
-        f"with {component_count} SAM component(s)",
-        phase="ok",
+    LOGGER.info(
+        "OK Configuration valid: %s(%s) with %s SAM component(s)",
+        loaded.surface.metal,
+        loaded.surface.facet,
+        component_count,
     )
 
 
@@ -104,36 +104,36 @@ def validate(config: Path) -> None:
 def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) -> None:
     """Build the current plan and optionally write backend files."""
 
-    rule("SAMMD Build", phase="build")
-    with _timed("PLAN", "Reading config and constructing deterministic build plan", phase="plan"):
+    LOGGER.info("SAMMD Build")
+    with _timed("PLAN", "Reading config and constructing deterministic build plan"):
         plan = build_system(config, output_dir=output_dir)
-    with _timed("CHECK", "Running lightweight validation gates", phase="plan"):
+    with _timed("CHECK", "Running lightweight validation gates"):
         build_report = validate_build_plan(plan)
         output_report = validate_output_paths(plan.output_paths)
     failed_messages = _failed_error_messages(build_report, output_report)
     if failed_messages:
         raise click.ClickException("Validation failed: " + "; ".join(failed_messages))
 
-    step("OK", "Lightweight validation gates passed", phase="ok")
-    step("SYSTEM", f"Surface: {plan.slab.metal}({plan.slab.facet})", phase="plan")
-    step("SYSTEM", f"Binding sites: {len(plan.binding_sites)}", phase="plan")
-    step("SYSTEM", f"SAM molecules: {len(plan.sam_placements.placements)}", phase="plan")
-    step("SYSTEM", f"Solution counts: {dict(plan.solution.molecule_counts)}", phase="plan")
+    LOGGER.info("OK Lightweight validation gates passed")
+    LOGGER.info("SYSTEM Surface: %s(%s)", plan.slab.metal, plan.slab.facet)
+    LOGGER.info("SYSTEM Binding sites: %s", len(plan.binding_sites))
+    LOGGER.info("SYSTEM SAM molecules: %s", len(plan.sam_placements.placements))
+    LOGGER.info("SYSTEM Solution counts: %s", dict(plan.solution.molecule_counts))
 
     try:
         backend_files = None
-        with _timed("WRITE", "Writing SAM grafting-density visual check", phase="write"):
+        with _timed("WRITE", "Writing SAM grafting-density visual check"):
             topology = plan.write_topology_cif(overwrite=overwrite)
-        with _timed("WRITE", "Writing resolved configuration", phase="write"):
+        with _timed("WRITE", "Writing resolved configuration"):
             resolved_config = plan.write_resolved_config(overwrite=overwrite)
         if full:
             from sammd.backends.interchange import backend_build_summary, export_interchange_backend
 
-            rule("Full MD Export", phase="full")
+            LOGGER.info("Full MD Export")
             export_start = perf_counter()
 
             def progress(message: str) -> None:
-                step("FULL", message, phase="full", detail=f"+{perf_counter() - export_start:.2f}s")
+                LOGGER.info("FULL %s +%.2fs", message, perf_counter() - export_start)
 
             backend_result = export_interchange_backend(
                 plan,
@@ -141,7 +141,7 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
                 progress=progress,
             )
             backend_files = backend_result.files
-            with _timed("WRITE", "Writing backend-aware build summary", phase="write"):
+            with _timed("WRITE", "Writing backend-aware build summary"):
                 build_summary = plan.write_build_summary(overwrite=overwrite)
                 build_summary.write_text(
                     json.dumps(
@@ -153,34 +153,24 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
                     encoding="utf-8",
                 )
         else:
-            with _timed("WRITE", "Writing build summary", phase="write"):
+            with _timed("WRITE", "Writing build summary"):
                 build_summary = plan.write_build_summary(overwrite=overwrite)
     except FileExistsError as exc:
         raise click.ClickException(str(exc)) from exc
     except (ImportError, NotImplementedError, RuntimeError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
-    rule("Outputs", phase="write")
-    step("FILE", f"SAM grafting-density CIF: {topology}", phase="write")
-    step("FILE", f"Build summary: {build_summary}", phase="write")
-    step("FILE", f"Resolved config: {resolved_config}", phase="write")
+    LOGGER.info("Outputs")
+    LOGGER.info("FILE SAM grafting-density CIF: %s", topology)
+    LOGGER.info("FILE Build summary: %s", build_summary)
+    LOGGER.info("FILE Resolved config: %s", resolved_config)
     if backend_files is not None:
-        step(
-            "FILE",
-            f"Wrote solvated system CIF: {backend_files['solvated_system']}",
-            phase="write",
-        )
-        step("FILE", f"Interchange JSON: {backend_files['openff_interchange']}", phase="write")
-        step("FILE", f"OpenMM system XML: {backend_files['openmm_system']}", phase="write")
-        step("FILE", f"Anchor metadata: {backend_files['anchor_metadata']}", phase="write")
-        step(
-            "NEXT",
-            "Use solvated_system.cif and interchange.json for OpenMM simulation setup.",
-            phase="next",
+        LOGGER.info("FILE Wrote solvated system CIF: %s", backend_files["solvated_system"])
+        LOGGER.info("FILE Interchange JSON: %s", backend_files["openff_interchange"])
+        LOGGER.info("FILE OpenMM system XML: %s", backend_files["openmm_system"])
+        LOGGER.info("FILE Anchor metadata: %s", backend_files["anchor_metadata"])
+        LOGGER.info(
+            "NEXT Use solvated_system.cif and interchange.json for OpenMM simulation setup."
         )
     else:
-        step(
-            "NEXT",
-            "Inspect sam_grafting_density.cif; run --full for MD simulation files.",
-            phase="next",
-        )
+        LOGGER.info("NEXT Inspect sam_grafting_density.cif; run --full for MD simulation files.")

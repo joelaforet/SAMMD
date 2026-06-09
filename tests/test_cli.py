@@ -101,6 +101,8 @@ def test_build_cli_writes_topology_and_summary() -> None:
         result = runner.invoke(main, ["build", "sammd.yaml", "--output-dir", "outputs"])
 
         assert result.exit_code == 0
+        assert "sammd.cli" in result.output
+        assert "INFO" in result.output
         assert "SAMMD Build" in result.output
         assert "Reading config and constructing deterministic build plan" in result.output
         assert "OK" in result.output
