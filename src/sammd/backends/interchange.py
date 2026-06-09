@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import tempfile
@@ -49,6 +50,7 @@ MAX_RESIDUES_PER_CHAIN = 9999
 CHAIN_LETTERS = "ABCDEFGHIJKLNOPQRSTUVWXYZ"
 PACKMOL_TOLERANCE_ANGSTROM = 1.8
 PACKMOL_NLOOP = 200
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -134,6 +136,7 @@ ProgressCallback = Callable[[str], None]
 
 
 def _progress(callback: ProgressCallback | None, message: str) -> None:
+    LOGGER.info(message)
     if callback is not None:
         callback(message)
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -23,6 +24,20 @@ def test_backend_module_import_does_not_import_optional_science_modules() -> Non
     importlib.import_module("sammd.backends.interchange")
 
     assert not any(name.startswith(("openff", "openmm", "rdkit")) for name in sys.modules)
+
+
+def test_progress_logs_and_preserves_callback_compatibility(caplog) -> None:
+    """Backend progress should log while retaining the callback contract."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    messages: list[str] = []
+
+    with caplog.at_level(logging.INFO, logger="sammd.backends.interchange"):
+        backend._progress(messages.append, "Writing system.xml")
+
+    assert messages == ["Writing system.xml"]
+    assert [record.name for record in caplog.records] == ["sammd.backends.interchange"]
+    assert [record.getMessage() for record in caplog.records] == ["Writing system.xml"]
 
 
 def test_backend_build_summary_marks_completed_exports(tmp_path: Path) -> None:

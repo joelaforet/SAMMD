@@ -130,15 +130,9 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
             from sammd.backends.interchange import backend_build_summary, export_interchange_backend
 
             LOGGER.info("Full MD Export")
-            export_start = perf_counter()
-
-            def progress(message: str) -> None:
-                LOGGER.info("FULL %s +%.2fs", message, perf_counter() - export_start)
-
             backend_result = export_interchange_backend(
                 plan,
                 overwrite=overwrite,
-                progress=progress,
             )
             backend_files = backend_result.files
             with _timed("WRITE", "Writing backend-aware build summary"):
