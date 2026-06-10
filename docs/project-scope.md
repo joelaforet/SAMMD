@@ -29,7 +29,7 @@ Recommended v0.1.0 first-release deliverables:
 - A registered Fcc(111) slab builder, defaulting to Pd(111), and propanethiol SAM placement with tunable grafting density.
 - Mixed SAM support through multiple SAM component definitions with fractions or explicit counts.
 - Centered, double-sided registered Fcc(111) slab geometry with SAMs on both faces and solvent on both sides.
-- Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices. The default build remains lightweight; `sammd build --full` performs parameterized MD-file export in a CUDA-labeled pixi environment for supported non-salt configs.
+- Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices. The default build remains dependency-light; `sammd build --full` performs OpenFF Interchange export in a CUDA-labeled pixi environment for supported non-salt configs.
 - Static CHARMM-INTERFACE-derived Fcc metal Lennard-Jones parameters packaged or identified as OpenFF-compatible OFFXML resource support.
 - Visualization-friendly build artifacts, centered on PDBx/mmCIF topology-inspection output plus machine-readable build summaries.
 - Pytest coverage for configuration validation, parameter conversion, deterministic builders, and import smoke tests.
@@ -42,8 +42,8 @@ Defer until after v0.1.0:
 - Umbrella sampling automation.
 - General surface support beyond registered Fcc(111) metals, including non-111 facets.
 - Explicit metal-sulfur bonded topology terms unless needed to correct SAM geometry.
-- OpenMM minimization, equilibration, production, DCD trajectory output, and thermodynamic reporting protocols. Tutorial-only user code may demonstrate OpenMM API usage after SAMMD exports backend artifacts, but those runs are not part of the SAMMD build/export contract.
-- Salt ion backend export and broader noncanonical chemistry coverage beyond the first supported Interchange/OpenMM export path.
+- OpenMM minimization, equilibration, production, DCD trajectory output, and thermodynamic reporting protocols. Tutorial-only user code may demonstrate OpenMM API usage after SAMMD exports Interchange artifacts, but those runs are not part of the SAMMD build/export contract.
+- Salt ion Interchange export and broader noncanonical chemistry coverage beyond the first supported Interchange/OpenMM export path.
 - Advanced analysis workflows beyond basic orientation observables.
 
 ## Reference Findings
@@ -94,7 +94,7 @@ Conversion notes:
 
 [OpenFF Interchange construction](https://docs.openforcefield.org/projects/interchange/en/stable/using/construction.html) supports constructing an `Interchange` from a SMIRNOFF `ForceField` and OpenFF `Molecule` or `Topology` objects.
 
-The SAMMD backend pipeline uses OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy is encoded in a SAMMD Interchange plugin collection rather than exposed as a beginner-facing YAML option. The explicit `sammd build --full` path writes `solvated_system.cif`, `interchange.json`, and `anchor_metadata.json` for supported non-salt configs in a CUDA-labeled pixi environment.
+The SAMMD Interchange export pipeline uses OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy is encoded in a SAMMD Interchange plugin collection rather than exposed as a beginner-facing YAML option. The explicit `sammd build --full` path writes `solvated_system.cif`, `interchange.json`, and `anchor_metadata.json` for supported non-salt configs in a CUDA-labeled pixi environment.
 
 OpenMM GPU support is tied to the NVIDIA driver and CUDA line available on the
 machine. Students should run `nvidia-smi` on the GPU node or workstation, then
@@ -122,7 +122,7 @@ The local notebook [`metal_example.ipynb`](file:///home/joelaforet/Desktop/SAMS_
 - Add `LibraryCharges` by mapped SMILES.
 - Add metal bond, angle, torsion, and `vdW` parameters directly to a `ForceField` object.
 - Build an `Interchange` from the resulting force field.
-- Minimize and convert the system to an OpenMM simulation.
+- Minimize and convert the system in a downstream OpenMM script.
 
 ### mBuild And Surface Coatings
 
@@ -164,18 +164,18 @@ Initial package modules:
 
 - `sammd.core.config`: Pydantic models, YAML loading, YAML template generation.
 - `sammd.model.surfaces`: registered Fcc(111) slab builders with lattice constants and facet metadata, defaulting to Pd(111).
-- `sammd.model.sam`: dependency-free SAM placement and sulfur anchor pose planning today; future backend work should add OpenFF/RDKit molecule creation, conformer generation, and molecule-graph sulfur anchor detection.
+- `sammd.model.sam`: dependency-free SAM placement and sulfur anchor pose planning today; future Interchange export work should add OpenFF/RDKit molecule creation, conformer generation, and molecule-graph sulfur anchor detection.
 - `sammd.backends.forcefields`: INTERFACE metal parameter registry, offxml generation, OpenFF force field assembly.
 - `sammd.model.solvation`: solvent mixture, salt, and reactant count calculations from solvent-only mole fractions and concentrations, followed by OpenFF/PACKMOL packing.
-- `sammd.core.builders`: high-level lightweight build planner.
+- `sammd.core.builders`: high-level dependency-light build planner.
 - `sammd.backends.interchange`: optional CUDA-environment OpenFF `Interchange` construction/export path for supported non-salt configs.
-- `sammd.backends.openmm_runtime`: optional/internal OpenMM utilities for development and backend validation, not a student-facing SAMMD run-wrapper API.
+- `sammd.backends.openmm_runtime`: optional/internal OpenMM utilities for development and export validation, not a student-facing SAMMD run-wrapper API.
 - `sammd.core.io`: v0.1.0 PDBx/mmCIF topology-inspection writing; post-v0.1.0 DCD trajectory naming conventions and visualization-oriented metadata helpers.
 - `sammd.runtime.reporting`: post-v0.1.0 OpenMM reporter configuration for trajectories and thermodynamic state data.
 - `sammd.analysis`: orientation metrics and later umbrella-sampling support.
 - `sammd.cli`: minimal `init` and maybe `validate` commands.
 
-The current public Python API exposes a lightweight planning workflow that avoids heavy
+The current public Python API exposes a dependency-light planning workflow that avoids heavy
 OpenFF/OpenMM construction:
 
 ```python
@@ -194,11 +194,11 @@ solvent, salts, or reactants.
 
 The current `sammd build` command writes the v0.1.0 first-release artifacts:
 
-- `sam_grafting_density.cif`: lightweight visual smoke-test CIF for the deterministic plan, with the Pd slab and SAM sulfur atoms at planned three-fold hollow-site anchors.
+- `sam_grafting_density.cif`: inspection visual smoke-test CIF for the deterministic plan, with the Pd slab and SAM sulfur atoms at planned three-fold hollow-site anchors.
 - `build_summary.json`: machine-readable summary of the validated plan and output paths.
 - `resolved_config.yaml`: validated YAML configuration used for the build.
 
-The optional CUDA-environment backend export preserves the small public API surface while
+The optional CUDA-environment Interchange export preserves the small public API surface while
 adding artifact exports for OpenMM handoff:
 
 ```bash
@@ -206,14 +206,14 @@ pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --
 ```
 
 That command writes `interchange.json`, `solvated_system.cif`, and
-`anchor_metadata.json` in addition to the lightweight artifacts. Salt-containing
-configs are rejected until salt backend export is implemented.
+`anchor_metadata.json` in addition to the default artifacts. Salt-containing
+configs are rejected until salt Interchange export is implemented.
 
 ## Scientific Design Decisions
 
 ### OpenMM Handoff Boundary
 
-SAMMD builds and exports chemistry, structure, and parameter artifacts; OpenMM runs minimization, equilibration, production MD, trajectory writing, and reporter setup. Lightweight/internal OpenMM utilities may exist for development and backend validation, but they do not establish student-facing SAMMD ownership of `create_openmm_simulation`, minimization, equilibration, production MD, trajectory writing, or reporter setup in the top-level build workflow.
+SAMMD builds and exports chemistry, structure, and parameter artifacts; OpenMM runs minimization, equilibration, production MD, trajectory writing, and reporter setup. Internal OpenMM utilities may exist for development and export validation, but they do not establish student-facing SAMMD ownership of `create_openmm_simulation`, minimization, equilibration, production MD, trajectory writing, or reporter setup in the top-level build workflow.
 
 Future SAMMD releases should improve the build/export handoff and examples without making SAMMD-owned run wrappers the canonical API. Users should be able to inspect SAMMD artifacts and pass them to the OpenMM Python API for routine runs.
 
@@ -222,15 +222,15 @@ The handoff should:
 - Accept validated configuration objects and produce build/export artifacts.
 - Return or expose the underlying OpenFF `Interchange` and OpenMM `System`, `Topology`, and positions for advanced users.
 - Keep minimization, equilibration, production, trajectory writing, and reporter setup in user-owned OpenMM scripts.
-- Keep sulfur-metal anchoring details internal to planning/backend representation until an explicit advanced attachment API is designed.
+- Keep sulfur-metal anchoring details internal to planning/export representation until an explicit advanced attachment API is designed.
 
-For the nonbonded anchor proxy, beginner users should not tune the interaction magnitude in the current MVP. Future advanced APIs may expose attachment strategy and strength choices once the backend behavior is validated, but v0.1.0 should treat these as internal planning/representation details.
+For the nonbonded anchor proxy, beginner users should not tune the interaction magnitude in the current MVP. Future advanced APIs may expose attachment strategy and strength choices once the export behavior is validated, but v0.1.0 should treat these as internal planning/representation details.
 
 ### Visualization And Output Files
 
 SAMMD-generated structures and OpenMM-run outputs should be optimized for visualization in tools such as PyMOL.
 
-Default post-v0.1.0 backend exports plus tutorial-only OpenMM run outputs should include:
+Default post-v0.1.0 Interchange exports plus tutorial-only OpenMM run outputs should include:
 
 - `solvated_system.cif`: PDBx/mmCIF topology and starting coordinates for the full slab + SAMs + reactants + solvent system.
 - `trajectory.dcd`: DCD trajectory from OpenMM.
@@ -239,10 +239,10 @@ Default post-v0.1.0 backend exports plus tutorial-only OpenMM run outputs should
 
 By default, `sammd build` writes `sam_grafting_density.cif`,
 `build_summary.json`, and `resolved_config.yaml`. The default
-`sam_grafting_density.cif` is a lightweight
+`sam_grafting_density.cif` is an inspection
 visual smoke-test CIF for the deterministic plan, showing the Pd slab and SAM
 sulfur atoms at planned three-fold hollow-site anchors. It is useful for
-checking slab geometry and SAM grafting density before full backend export; it
+checking slab geometry and SAM grafting density before full Interchange export; it
 does not include full SAM molecule, solvent, or reactant coordinates.
 With `--full` in a CUDA-labeled pixi environment, SAMMD also writes
 `solvated_system.cif`, `interchange.json`, and `anchor_metadata.json`.
@@ -284,7 +284,7 @@ The configuration should allow a list of SAM components:
 - `fraction` or `count`: surface composition control.
 - Optional per-component anchor settings for future calibration.
 
-Beginner YAML configuration should teach SAM components as neutral thiols with an HS/implicit-H thiol sulfur, such as propanethiol `CCCS`. Users should not provide pre-deprotonated thiolate inputs; SAMMD uses the sulfur atom for placement and represents metal-sulfur attachment internally during planning/backend construction.
+Beginner YAML configuration should teach SAM components as neutral thiols with an HS/implicit-H thiol sulfur, such as propanethiol `CCCS`. Users should not provide pre-deprotonated thiolate inputs; SAMMD uses the sulfur atom for placement and represents metal-sulfur attachment internally during planning/export construction.
 
 The total grafting density applies to all SAM components combined. The default grafting density is `0.25 nm^2 / molecule`, equivalent to 4 molecules per nm^2. Placement should select binding sites deterministically from a seed, then assign component identities from fractions or counts. The same composition should decorate both slab faces by default, with a future extension point for side-specific compositions.
 
@@ -307,18 +307,18 @@ For the first notebook/demo, a practical starting system is roughly 5 x 5 nm in 
 Default metal-sulfur anchoring should begin as an internal nonbonded proxy:
 
 - Keep the SAM sulfur and surface metal atoms non-covalent in topology.
-- Plan the relevant sulfur-metal interaction strength as backend/internal representation, not a beginner YAML knob.
+- Plan the relevant sulfur-metal interaction strength as export/internal representation, not a beginner YAML knob.
 - Use a selected post-export OpenMM pair-specific LJ override as the first-release strategy, not an OFFXML/Interchange-only strategy.
 - Pair each planned SAM sulfur with the three nearest metal atoms at the registered Fcc(111) hollow site.
 - Record the canonical first-release override as `mode = "nonbonded_lj_override"`, `site_kind = "fcc_hollow"`, `pairs_per_anchor = 3`, `sigma = 0.22 nm`, and `epsilon = 2.0 kcal/mol` (`8.368 kJ/mol`).
 - Treat the override as strengthened nonbonded LJ attraction for neutral thiols, not covalent, quantum, or reactive chemisorption.
-- Keep the base INTERFACE Fcc metal LJ parameters as the slab nonbonded model; the selected metal-S override is additional backend metadata for specific sulfur-metal pairs.
+- Keep the base INTERFACE Fcc metal LJ parameters as the slab nonbonded model; the selected metal-S override is additional export metadata for specific sulfur-metal pairs.
 - Defer any user-configurable scale factor, such as 4x, 5x, or 6x, until a later advanced attachment API.
 - Preserve a configuration/API path for future explicit bonded anchors.
 
 Future explicit anchor mode should be designed as a replaceable strategy:
 
-- `anchor.mode = "nonbonded_lj_override"` for MVP backend metadata.
+- `anchor.mode = "nonbonded_lj_override"` for MVP export metadata.
 - `anchor.mode = "bonded"` later for metal-sulfur bond, angle, and torsion parameters.
 - A future angle target, such as 23 degrees relative to the surface, should not require rewriting the builder API.
 - `anchor.site = "fcc_hollow"` should be the internal registered Fcc(111) hollow-placement strategy, with Pd(111) as the canonical/default surface and other site labels reserved for a later advanced attachment API.
@@ -385,7 +385,7 @@ The docs should assume undergraduate contributors and make success states explic
 - The slab should be thick enough that the two SAM/slab interfaces are separated by more than the nonbonded cutoff plus a buffer.
 - The lateral box dimensions should be user-tunable; the first demo can start near 5 x 5 nm.
 - The default sulfur site for Pd(111) should be internal `fcc_hollow` builder behavior; user-configurable site type belongs in a future advanced attachment API.
-- Sulfur-metal interaction metadata remains an internal planning/backend detail for v0.1.0; the default selected-pair strategy is a post-export OpenMM pair-specific LJ override, and any user-configurable scale factor belongs in a future advanced attachment API.
+- Sulfur-metal interaction metadata remains an internal planning/export detail for v0.1.0; the default selected-pair strategy is a post-export OpenMM pair-specific LJ override, and any user-configurable scale factor belongs in a future advanced attachment API.
 - TIP3P is the default water model.
 - The default Pd positional restraint force constant is `10000 kJ mol^-1 nm^-2`.
 - The default grafting density is `0.25 nm^2 / molecule`.
@@ -397,11 +397,11 @@ The docs should assume undergraduate contributors and make success states explic
 
 ## Remaining Open Questions
 
-- None at the current scope-planning level. Backend implementation choices remain, but the user-facing behavior is now specified.
+- None at the current scope-planning level. Export implementation choices remain, but the user-facing behavior is now specified.
 
 ## Implementation Readiness
 
-The scope is ready for v0.1.0 scaffolding. The first implementation pass should create the package skeleton, pixi/pyproject configuration, Pydantic YAML schema, template generation, INTERFACE metal registry, lightweight build/export artifacts, and tests for the resolved defaults before implementing expensive OpenFF/OpenMM build or simulation steps.
+The scope is ready for v0.1.0 scaffolding. The first implementation pass should create the package skeleton, pixi/pyproject configuration, Pydantic YAML schema, template generation, INTERFACE metal registry, dependency-light build/export artifacts, and tests for the resolved defaults before implementing expensive OpenFF/OpenMM build or simulation steps.
 
 ## Links
 

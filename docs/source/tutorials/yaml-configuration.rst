@@ -62,13 +62,12 @@ Important sections
    Defines PACKMOL packing options such as tolerance and maximum loop count.
 
 ``parameterization``
-     Records the OpenFF small-molecule force field, charge model, INTERFACE metal
-     force-field file, and nonbonded cutoff. The default builder checks and saves
-     these choices. It does not create a complete OpenMM simulation system unless
-     you run ``sammd build --full`` in a CUDA-labeled pixi environment. The
-     INTERFACE metal file gives the base slab LJ parameters. SAMMD records
-     sulfur-metal LJ changes in the build summary; you do not configure them
-     here.
+   Records the OpenFF small-molecule force field, charge model, INTERFACE metal
+   force-field file, and nonbonded cutoff. The default builder checks and saves
+   these choices. It does not create a complete OpenMM-ready system unless you
+   run ``sammd build --full`` in a CUDA-labeled pixi environment. The INTERFACE
+   metal file gives the base slab LJ parameters. SAMMD records sulfur-metal LJ
+   changes in the build summary; you do not configure them here.
 
 ``outputs``
      Names build output files. The ``sam_grafting_density`` key controls the
@@ -143,5 +142,5 @@ Beginner glossary
    planned sulfur anchor positions for the SAM. Use it to check slab geometry,
    three-fold hollow-site placement, and grafting density. Full SAM, solvent,
    and reactant coordinates are created in ``solvated_system.cif`` when you
-   export OpenMM files.
+   run the OpenFF Interchange export.
    Trajectory frames are created later by OpenMM simulation scripts.

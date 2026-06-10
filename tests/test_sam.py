@@ -1,4 +1,4 @@
-"""Tests for lightweight SAM placement planning."""
+"""Tests for deterministic SAM placement planning."""
 
 from math import dist, pi, sqrt
 
@@ -150,7 +150,7 @@ def test_placement_uses_internal_fcc_hollow_anchor_strategy() -> None:
 
 
 def test_placements_record_canonical_metal_sulfur_strategy() -> None:
-    """Record backend-ready metal-S LJ override metadata for every placement."""
+    """Record export-ready metal-S LJ override metadata for every placement."""
 
     plan = plan_sam_placements(SAMConfig(), _binding_sites(), lateral_area_nm2=1.0, seed=23)
 
@@ -194,7 +194,7 @@ def test_anchor_pose_offsets_sulfur_from_site_plane_and_preserves_metadata() -> 
 
 
 def test_plan_anchor_pose_supports_explicit_height_and_azimuth() -> None:
-    """Allow callers to build an anchor pose for a single site without backends."""
+    """Allow callers to build an anchor pose for a single site without export deps."""
 
     site = _binding_sites()[0]
     pose = plan_anchor_pose(site, sulfur_height_nm=0.25, azimuth_rad=1.5)

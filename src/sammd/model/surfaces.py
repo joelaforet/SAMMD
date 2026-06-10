@@ -173,7 +173,7 @@ def plan_fcc111_slab(
         msg = "layers must be positive"
         raise ValueError(msg)
     if not centered:
-        msg = "only centered Fcc(111) slabs are supported by the lightweight planner"
+        msg = "only centered Fcc(111) slabs are supported by the deterministic planner"
         raise ValueError(msg)
 
     spacing_nm = metadata.nearest_neighbor_spacing_nm

@@ -28,7 +28,7 @@ def test_adapter_import_does_not_import_openff_eagerly() -> None:
 def test_openff_backend_availability_reports_missing_dependencies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Return a structured unavailable report without importing optional backends."""
+    """Return a structured unavailable report without importing optional modules."""
 
     openff_adapter = importlib.import_module("sammd.backends.openff")
     optional_modules_before = _loaded_optional_modules(("openff", "openmm", "rdkit"))
@@ -50,7 +50,7 @@ def test_openff_backend_availability_reports_missing_dependencies(
 def test_openff_backend_availability_handles_absent_parent_package(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Treat find_spec absent-parent failures as unavailable optional backends."""
+    """Treat find_spec absent-parent failures as unavailable optional modules."""
 
     openff_adapter = importlib.import_module("sammd.backends.openff")
 
@@ -109,7 +109,7 @@ def test_force_field_inputs_from_config_are_inspectable_without_openff_imports()
 
 
 def test_parameterization_plan_from_config_records_choices_and_targets() -> None:
-    """Plan future backend parameterization without constructing backend objects."""
+    """Plan future Interchange parameterization without constructing objects."""
 
     openff_adapter = importlib.import_module("sammd.backends.openff")
     config = SAMMDConfig(
@@ -132,7 +132,7 @@ def test_parameterization_plan_from_config_records_choices_and_targets() -> None
     assert plan.component_counts == {"sam": 1, "solvent": 1, "reactants": 1, "salts": 0}
 
 
-def test_parameterization_plan_from_build_plan_records_counts_and_keeps_lightweight(
+def test_parameterization_plan_from_build_plan_records_counts_and_stays_inspectable(
     tmp_path,
 ) -> None:
     """Summarize build-plan molecule counts while leaving construction disabled."""
@@ -150,7 +150,7 @@ def test_parameterization_plan_from_build_plan_records_counts_and_keeps_lightwei
 
 
 def test_require_openff_toolkit_fails_with_guidance(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Explain that the optional backend requires a CUDA pixi environment."""
+    """Explain that optional OpenFF export requires a CUDA pixi environment."""
 
     openff_adapter = importlib.import_module("sammd.backends.openff")
     real_import_module = importlib.import_module
@@ -177,7 +177,7 @@ def test_interface_fcc_metal_offxml_resource_exists() -> None:
 
 
 def test_molecule_from_smiles_requires_nonnegative_conformer_count() -> None:
-    """Validate conformer count before importing optional backends."""
+    """Validate conformer count before importing optional modules."""
 
     openff_adapter = importlib.import_module("sammd.backends.openff")
 
@@ -440,7 +440,7 @@ def _quantity_text(value: object) -> str:
 
 
 def _loaded_optional_modules(prefixes: tuple[str, ...]) -> set[str]:
-    """Return loaded modules matching optional backend package roots."""
+    """Return loaded modules matching optional package roots."""
 
     return {
         name

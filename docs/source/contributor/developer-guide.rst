@@ -8,7 +8,7 @@ Current package map
    Pydantic v2 models, YAML loading, CLI template text, and validation rules.
 
 ``sammd.cli``
-   Lightweight ``sammd init``, ``sammd validate``, and ``sammd build`` commands.
+   Dependency-light ``sammd init``, ``sammd validate``, and ``sammd build`` commands.
 
 ``sammd.model.surfaces``
    Registered Fcc(111) lattice metadata, commensurate slab planning, and hollow
@@ -25,7 +25,7 @@ Current package map
    metadata.
 
 ``sammd.backends.forcefields``
-   Lightweight INTERFACE metal parameter metadata and OFFXML export helpers.
+   Dependency-free INTERFACE metal parameter metadata and OFFXML export helpers.
 
 ``sammd.analysis``
    Dependency-free orientation geometry primitives for future trajectory
@@ -35,9 +35,9 @@ Development expectations
 ------------------------
 
 Keep the MVP importable without heavy scientific dependencies. Imports of
-OpenMM, OpenFF, MDAnalysis, ParmEd, mBuild, PDBFixer, or related backend tools
+OpenMM, OpenFF, MDAnalysis, ParmEd, mBuild, PDBFixer, or related export tools
 should stay lazy and out of module top level.
 
 Full OpenFF/OpenMM system construction is deferred. New work should preserve the
-current lightweight path while making future backend integration explicit and
+current dependency-light path while making future Interchange export explicit and
 testable.

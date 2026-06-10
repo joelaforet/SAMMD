@@ -434,7 +434,7 @@ def _target_kind(selected_atom_indices: tuple[int, ...], *, atom_index: int | No
 def _validate_frame_metadata(
     *, frame_index: int | None, time: float | None, reactant_label: str | None
 ) -> None:
-    """Validate optional lightweight trajectory metadata."""
+    """Validate optional trajectory metadata."""
 
     if frame_index is not None and (
         isinstance(frame_index, bool) or not isinstance(frame_index, int) or frame_index < 0

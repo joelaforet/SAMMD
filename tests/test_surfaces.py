@@ -1,4 +1,4 @@
-"""Tests for lightweight surface metadata."""
+"""Tests for dependency-free surface metadata."""
 
 import pytest
 
@@ -24,7 +24,7 @@ def test_pd111_surface_metadata() -> None:
 
 
 def test_unsupported_surface_fails_clearly() -> None:
-    """Reject surfaces outside the lightweight metadata registry."""
+    """Reject surfaces outside the default metadata registry."""
 
     with pytest.raises(ValueError, match="unsupported Fcc surface"):
         get_fcc_surface_metadata("Fe", "111")

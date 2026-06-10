@@ -27,10 +27,10 @@ Restart your shell if the installer asks you to.
    git clone https://github.com/joelaforet/SAMMD.git
    cd SAMMD
 
-3. Use the lightweight environment
-----------------------------------
+3. Use the dependency-light environment
+---------------------------------------
 
-The default environment is for YAML files, validation, lightweight builds,
+The default environment is for YAML files, validation, default builds,
 testing, and docs. It does not need OpenMM, OpenFF, RDKit, PACKMOL, or a GPU.
 
 .. code-block:: bash
@@ -103,7 +103,7 @@ Use an environment whose CUDA version is not newer than the CUDA version shown b
      - CUDA line
      - OpenMM pin
    * - ``default``
-     - lightweight config, validation, builds, tests
+     - dependency-light config, validation, builds, tests
      - none
      - none
    * - ``docs``
@@ -111,15 +111,15 @@ Use an environment whose CUDA version is not newer than the CUDA version shown b
      - none
      - none
    * - ``cuda-12-4``
-     - OpenFF/OpenMM backend export and GPU OpenMM work
+     - OpenFF Interchange export and GPU OpenMM work
      - 12.4
      - ``openmm=8.1.2``
    * - ``cuda-12-6``
-     - OpenFF/OpenMM backend export and GPU OpenMM work
+     - OpenFF Interchange export and GPU OpenMM work
      - 12.6
      - ``openmm=8.4.0``
    * - ``cuda-13-0``
-     - OpenFF/OpenMM backend export and GPU OpenMM work
+     - OpenFF Interchange export and GPU OpenMM work
      - 13.0
      - ``openmm=8.5.1``
 
@@ -129,7 +129,7 @@ Known examples:
 * PSC Bridges2: ``cuda-12-6``
 
 When unsure, choose the older compatible environment. The SAMMD tutorials use
-``cuda-12-4`` as the default backend example.
+``cuda-12-4`` as the default Interchange export example.
 
 7. Use pixi environments as VSCode notebook kernels
 ---------------------------------------------------
@@ -153,7 +153,7 @@ shows in the notebook kernel picker.
      --name sammd-cuda-12-4 \
      --display-name "Python (SAMMD cuda-12-4)"
 
-Use ``sammd-default`` for lightweight notebooks such as building YAML configs and
+Use ``sammd-default`` for dependency-light notebooks such as building YAML configs and
 checking ``sam_grafting_density.cif``. Use a CUDA-labeled kernel, for example
 ``sammd-cuda-12-4``, when a notebook needs OpenFF, OpenMM, PACKMOL, or full MD
 export files.

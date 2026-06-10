@@ -1,4 +1,4 @@
-"""Tests for lightweight build-plan composition."""
+"""Tests for dependency-light build-plan composition."""
 
 import json
 import os
@@ -303,8 +303,8 @@ def test_seed_override_deterministically_controls_sam_site_choices() -> None:
     assert first.sam_placements.placements != different.sam_placements.placements
 
 
-def test_build_import_avoids_heavy_backend_modules() -> None:
-    """Check import-time behavior in a fresh process for heavy backend modules."""
+def test_build_import_avoids_heavy_optional_modules() -> None:
+    """Check import-time behavior in a fresh process for heavy optional modules."""
 
     heavy_modules = ("openmm", "openff", "rdkit", "mbuild", "MDAnalysis", "parmed", "pdbfixer")
     code = (

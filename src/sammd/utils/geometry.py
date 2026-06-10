@@ -1,4 +1,4 @@
-"""Shared lightweight 3D geometry helpers."""
+"""Shared dependency-free 3D geometry helpers."""
 
 from __future__ import annotations
 

@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/joelaforet/SAMMD/actions/workflows/ci.yml"><img src="https://github.com/joelaforet/SAMMD/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-%3E%3D3.10-blue.svg" alt="Python >=3.10"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-%3E%3D3.12-blue.svg" alt="Python >=3.12"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
@@ -33,10 +33,10 @@ SAMMD handles:
   placement.
 - **Composition planning**: solvent, reactant, and salt counts from the YAML
   settings.
-- **Backend export**: optional OpenFF/OpenMM files for supported non-salt
+- **Interchange export**: optional OpenFF/OpenMM files for supported non-salt
   systems.
 - **Inspection files**: `sam_grafting_density.cif`, `build_summary.json`, and
-  `resolved_config.yaml` for the default lightweight build.
+  `resolved_config.yaml` for the default dependency-light build.
 
 SAMMD builds and exports chemistry, structure, and parameter artifacts. OpenMM
 runs minimization, equilibration, production, trajectories, and reporters.
@@ -64,9 +64,9 @@ git clone https://github.com/joelaforet/SAMMD.git
 cd SAMMD
 ```
 
-### 2. Install the lightweight environment
+### 2. Install the dependency-light environment
 
-Use this environment for configuration, validation, lightweight builds, tests,
+Use this environment for configuration, validation, default builds, tests,
 and docs. It does not require OpenMM, OpenFF, RDKit, PACKMOL, or a GPU.
 
 ```bash
@@ -108,19 +108,19 @@ pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --
 Pixi does not use `conda activate`. Use `pixi shell -e <env>` instead.
 
 ```bash
-# Enter the default lightweight environment
+# Enter the default dependency-light environment
 pixi shell -e default
 
 # Leave it
 exit
 
-# Enter a CUDA backend environment
+# Enter a CUDA export environment
 pixi shell -e cuda-12-4
 
 # Leave it before switching again
 exit
 
-# Enter a different CUDA backend environment
+# Enter a different CUDA export environment
 pixi shell -e cuda-12-6
 ```
 
@@ -128,12 +128,12 @@ pixi shell -e cuda-12-6
 
 | Environment | Use case | CUDA line | OpenMM pin |
 | --- | --- | --- | --- |
-| `default` | lightweight config/build/test workflow | none | none |
+| `default` | dependency-light config/build/test workflow | none | none |
 | `dev` | same as default, explicit dev environment | none | none |
 | `docs` | Sphinx documentation build | none | none |
-| `cuda-12-4` | OpenFF/OpenMM backend export and GPU OpenMM work | 12.4 | `openmm=8.1.2` |
-| `cuda-12-6` | OpenFF/OpenMM backend export and GPU OpenMM work | 12.6 | `openmm=8.4.0` |
-| `cuda-13-0` | OpenFF/OpenMM backend export and GPU OpenMM work | 13.0 | `openmm=8.5.1` |
+| `cuda-12-4` | OpenFF Interchange export and GPU OpenMM work | 12.4 | `openmm=8.1.2` |
+| `cuda-12-6` | OpenFF Interchange export and GPU OpenMM work | 12.6 | `openmm=8.4.0` |
+| `cuda-13-0` | OpenFF Interchange export and GPU OpenMM work | 13.0 | `openmm=8.5.1` |
 
 OpenMM GPU support depends on the NVIDIA driver and CUDA version available on
 your machine. On a GPU node or workstation, run:
@@ -153,7 +153,7 @@ Known examples:
 | PSC Bridges2 | `cuda-12-6` |
 | Newer local NVIDIA drivers | `cuda-13-0`, if the driver supports CUDA 13.0 |
 
-When unsure, choose the older compatible environment. For backend examples in
+When unsure, choose the older compatible environment. For Interchange export examples in
 this README, the default is `cuda-12-4`.
 
 ## Quick Start
@@ -188,12 +188,12 @@ SAMMD writes PDBx/mmCIF structure files with the standard `.cif` extension.
 The `.mmcif` extension is also common in the broader ecosystem; SAMMD keeps
 stable `.cif` artifact names in its CLI and docs.
 
-## Backend Export For OpenMM
+## OpenFF Interchange Export For OpenMM
 
 To write parameterized OpenFF/OpenMM files, use a CUDA-labeled environment. First
-choose the environment with `nvidia-smi`, then run the backend build.
+choose the environment with `nvidia-smi`, then run the `--full` export.
 
-Example for the default CUDA 12.4 backend environment:
+Example for the default CUDA 12.4 export environment:
 
 ```bash
 pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
@@ -206,14 +206,14 @@ pixi shell -e cuda-12-4
 sammd build sammd.yaml --output-dir outputs --overwrite --full
 ```
 
-Backend mode writes these additional files:
+The `--full` export writes these additional files:
 
 - `interchange.json`: OpenFF Interchange JSON
 - `solvated_system.cif`: PDBx/mmCIF topology and coordinates for the
   constructed system
 - `anchor_metadata.json`: SAM anchor and sulfur-metal pair metadata
 
-Salt-containing configs are rejected until salt backend export is implemented.
+Salt-containing configs are rejected until salt Interchange export is implemented.
 
 The Interchange JSON write/reload path uses `Interchange.model_dump_json` and
 `Interchange.model_validate_json` after registering SAMMD's plugin collection;
@@ -240,11 +240,11 @@ The OpenMM tutorial teaches the raw OpenMM Python API with
 | --- | --- |
 | `sammd init -o sammd.yaml` | Write a starter YAML file |
 | `sammd validate sammd.yaml` | Check the YAML before building |
-| `sammd build sammd.yaml --output-dir outputs --overwrite` | Write default lightweight output files |
-| `sammd build sammd.yaml --output-dir outputs --overwrite --full` | Write full MD simulation files from a CUDA pixi environment |
+| `sammd build sammd.yaml --output-dir outputs --overwrite` | Write default inspection output files |
+| `sammd build sammd.yaml --output-dir outputs --overwrite --full` | Write OpenFF Interchange export files from a CUDA pixi environment |
 
 Use `pixi run ...` outside a pixi shell, or run `pixi shell -e default` first
-and then use the lightweight commands directly.
+and then use the default commands directly.
 
 CLI logs include a timestamp, full module path, level, and message. Add the root
 option `--verbose` before the subcommand to show DEBUG logs:
@@ -270,7 +270,7 @@ subcommand.
 
 ## Developer Checks
 
-Use the lightweight development environment for routine checks:
+Use the dependency-light development environment for routine checks:
 
 ```bash
 pixi run lint

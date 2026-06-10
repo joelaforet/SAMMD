@@ -58,7 +58,7 @@ The result includes the validated configuration and resolved output paths. It
 also includes a centered registered Fcc(111) slab, using Pd(111) by default,
 internal ``fcc_hollow`` binding sites, sulfur atoms marking the planned SAM
 anchors, and approximate solution counts. SAMMD writes full SAM molecule
-coordinates and a parameterized backend system only when you run from a
+coordinates and a parameterized Interchange export only when you run from a
 CUDA-labeled pixi environment with ``--full``.
 
 4. Inspect outputs
@@ -76,11 +76,11 @@ machine-readable form. Use ``outputs/resolved_config.yaml`` when you need the
 exact validated YAML that produced the plan.
 
 You may see those filenames in resolved paths or metadata, but the default
-lightweight command does not write ``solvated_system.cif``, ``interchange.json``,
+command does not write ``solvated_system.cif``, ``interchange.json``,
 or ``anchor_metadata.json``.
 
-5. Optional backend output files
---------------------------------
+5. Optional Interchange output files
+------------------------------------
 
 Use a CUDA-labeled pixi environment when you want SAMMD to write files for
 OpenFF/OpenMM. Run ``nvidia-smi`` on the machine first, then choose an
@@ -103,16 +103,16 @@ The ``interchange.json`` file is OpenFF Interchange JSON written with
 ``Interchange.model_dump_json`` and reloaded with
 ``Interchange.model_validate_json``. Pre-1.0 Interchange JSON compatibility is
 not guaranteed across OpenFF Interchange versions. Configs that include salt are
-rejected until backend export supports salt.
+rejected until Interchange export supports salt.
 
-After backend export, inspect ``outputs/solvated_system.cif`` if you want to see
+After Interchange export, inspect ``outputs/solvated_system.cif`` if you want to see
 full SAM molecules, solvent, and reactants. ``outputs/sam_grafting_density.cif``
 remains the separate grafting-density smoke test.
 
 6. Use these files with OpenMM
 ------------------------------
 
-After backend export writes ``interchange.json`` and the other output files,
+After Interchange export writes ``interchange.json`` and the other output files,
 students use them in their own OpenMM Python API script. Follow these steps:
 
 * reload the OpenFF Interchange data from ``interchange.json`` with
@@ -124,7 +124,7 @@ students use them in their own OpenMM Python API script. Follow these steps:
   production, and reporters
 
 SAMMD does not include helper wrappers for OpenMM simulations. Students use the
-OpenMM Python API directly after SAMMD writes the backend output files. The key
+OpenMM Python API directly after SAMMD writes the export output files. The key
 idea is unchanged: SAMMD builds; OpenMM runs.
 
 7. Other engines
@@ -138,4 +138,4 @@ Notebook version
 ----------------
 
 The related notebook ``notebooks/building_systems_with_sammd.ipynb`` demonstrates the
-default lightweight build and inspection steps interactively.
+default build and inspection steps interactively.

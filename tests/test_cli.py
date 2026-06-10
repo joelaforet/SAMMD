@@ -92,7 +92,7 @@ def test_cli_contract_exposes_only_config_builder_commands() -> None:
 
 
 def test_build_cli_writes_topology_and_summary() -> None:
-    """Build a lightweight plan from the CLI without requiring user Python code."""
+    """Build a default plan from the CLI without requiring user Python code."""
 
     runner = CliRunner()
     with runner.isolated_filesystem():
@@ -106,7 +106,7 @@ def test_build_cli_writes_topology_and_summary() -> None:
         assert "SAMMD Build" in result.output
         assert "Reading config and constructing deterministic build plan" in result.output
         assert "OK" in result.output
-        assert "Lightweight validation gates passed" in result.output
+        assert "Dependency-free validation gates passed" in result.output
         assert "Surface: Pd(111)" in result.output
         assert "SAM grafting-density CIF" in result.output
         assert "Build summary" in result.output
@@ -141,7 +141,7 @@ def test_build_cli_respects_no_overwrite_unless_requested() -> None:
 
 
 def test_build_help_exposes_full_not_backend_alias() -> None:
-    """Show the intuitive MD export flag while hiding the old backend wording."""
+    """Show the intuitive export flag while hiding the old backend wording."""
 
     result = CliRunner().invoke(main, ["build", "--help"])
 

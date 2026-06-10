@@ -45,8 +45,8 @@ def test_public_api_contract_excludes_simulation_wrappers() -> None:
         assert not hasattr(sammd, public_name)
 
 
-def test_build_system_returns_lightweight_plan() -> None:
-    """Keep docs workflow importable while backend construction is deferred."""
+def test_build_system_returns_dependency_light_plan() -> None:
+    """Keep docs workflow importable while Interchange construction is deferred."""
 
     from sammd import build_system
     from sammd.core.config import SAMMDConfig

@@ -110,7 +110,7 @@ def test_structure_artifact_terminology_is_documented() -> None:
 
 
 def test_cuda_pixi_environment_guidance_is_documented() -> None:
-    """Keep backend/OpenMM setup tied to explicit CUDA pixi environments."""
+    """Keep export/OpenMM setup tied to explicit CUDA pixi environments."""
 
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     openmm_page = (
@@ -138,8 +138,8 @@ def test_cuda_pixi_environment_guidance_is_documented() -> None:
     assert "[feature.science" not in pixi
 
 
-def test_build_tutorial_documents_default_and_backend_outputs() -> None:
-    """Keep the first tutorial clear about default vs backend build files."""
+def test_build_tutorial_documents_default_and_export_outputs() -> None:
+    """Keep the first tutorial clear about default vs export build files."""
 
     tutorial = (
         PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst"
@@ -153,15 +153,15 @@ def test_build_tutorial_documents_default_and_backend_outputs() -> None:
         "resolved_config.yaml",
     ]:
         assert default_output in combined
-    backend_outputs = [
+    export_outputs = [
         "solvated_system.cif",
         "interchange.json",
         "anchor_metadata.json",
     ]
-    for backend_output in backend_outputs:
-        assert backend_output in combined
+    for export_output in export_outputs:
+        assert export_output in combined
     assert "--full" in combined
-    assert "RUN_BACKEND_EXPORT = False" in notebook
+    assert "RUN_INTERCHANGE_EXPORT = False" in notebook
     assert "SAMMD_PIXI_ENV = \"cuda-12-4\"" in notebook
 
 
@@ -197,7 +197,7 @@ def test_openmm_tutorial_teaches_raw_openmm_route() -> None:
 
 
 def test_building_systems_notebook_workflow_smoke(tmp_path: Path) -> None:
-    """Reproduce the lightweight notebook workflow with package APIs."""
+    """Reproduce the dependency-light notebook workflow with package APIs."""
 
     config_path = tmp_path / "sammd.yaml"
     output_dir = tmp_path / "outputs"

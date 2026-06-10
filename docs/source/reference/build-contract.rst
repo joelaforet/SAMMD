@@ -29,7 +29,7 @@ The supported first-release command-line surface is:
        ``--overwrite`` is supplied.
    * - ``sammd build CONFIG --output-dir DIR --overwrite --full``
      - In a CUDA-labeled pixi environment, write OpenFF Interchange and OpenMM
-       backend artifacts in addition to the lightweight artifacts. Salt-containing
+       export artifacts in addition to the default artifacts. Salt-containing
        configs are rejected until salt export is implemented.
 
 The ``build`` command does not run minimization, equilibration, production MD,
@@ -50,7 +50,7 @@ The supported first-release Python surface is:
    * - ``load_config_dict(data)``
      - Validate an already parsed mapping into ``SAMMDConfig``.
    * - ``build_system(config, output_dir=None, seed=None)``
-     - Return a lightweight ``SAMMDBuildPlan`` from a ``SAMMDConfig``, YAML path,
+     - Return a dependency-light ``SAMMDBuildPlan`` from a ``SAMMDConfig``, YAML path,
        or parsed mapping.
 
 The object returned by ``build_system`` is documented as ``SAMMDBuildPlan``. It
@@ -58,18 +58,18 @@ exposes deterministic slab, SAM placement, solution composition, output paths,
 ``build_summary()``, and artifact writers for the current plan, but it is not a
 top-level public import in ``sammd.__all__``. ``SAMMDBuildPlan`` is not an OpenMM
 ``System``, an OpenFF ``Interchange``, or a simulation wrapper. Code that needs
-full backend construction should use the explicit CLI backend export path or the
-internal backend module from a CUDA-labeled pixi environment.
+full Interchange construction should use the explicit CLI ``--full`` export path or the
+internal Interchange module from a CUDA-labeled pixi environment.
 
 The ``build_summary()`` SAM section records the first-release metal-S interaction
 strategy as dependency-free metadata. The canonical mode is
-``nonbonded_lj_override``: for each neutral thiol anchor, the backend should use
+``nonbonded_lj_override``: for each neutral thiol anchor, the export should use
 the three nearest registered Fcc(111) hollow-site metal atoms as selected pairs
 for a post-export OpenMM pair-specific LJ override with ``sigma = 0.22 nm`` and
 ``epsilon = 2.0 kcal/mol``. This is a strengthened nonbonded attraction layered
 on top of the base INTERFACE metal LJ model, not covalent, quantum, or reactive
 chemisorption. The first release records the strategy and selected pair indices
-in lightweight mode. The explicit backend export applies those selected pairs as
+in dependency-light mode. The explicit Interchange export applies those selected pairs as
 post-Interchange OpenMM ``NonbondedForce`` exceptions and records them in
 ``anchor_metadata.json``.
 
@@ -77,21 +77,21 @@ Validation gates
 ----------------
 
 The internal ``sammd.core.validation`` module provides dependency-free gates for the
-current lightweight build plan and topology CIF text. These gates check surface
+current build plan and topology CIF text. These gates check surface
 atom metadata lengths, non-empty top and bottom binding-site labels, SAM counts,
 solution-volume/box-volume agreement, finite positive box dimensions/bounds and
 volume consistency, slab/box lateral-size agreement, SAM anchor metadata,
 metal-S pair counts and slab-local indices, canonical metal-S strategy metadata,
-current/reserved output suffixes, and lightweight topology CIF atom counts and
+current/reserved output suffixes, and inspection topology CIF atom counts and
 cell lengths.
 
-These gates intentionally do not require OpenMM, OpenFF, or full backend
-artifacts. Missing backend artifacts such as ``solvated_system.cif``,
+These gates intentionally do not require OpenMM, OpenFF, or full Interchange export
+artifacts. Missing export artifacts such as ``solvated_system.cif``,
 ``interchange.json`` and ``anchor_metadata.json`` are not failures unless
 ``--full`` is requested.
 
-Backend validation gates should stay skipped/not required when optional
-dependencies or backend artifacts are absent. Once ``--full`` writes
+Interchange export validation gates should stay skipped/not required when optional
+dependencies or export artifacts are absent. Once ``--full`` writes
 concrete artifacts, those gates should check that:
 
 * ``interchange.json`` reloads with ``Interchange.model_validate_json``.
@@ -104,7 +104,7 @@ Artifact contract
 -----------------
 
 The output names are stable so user scripts and documentation can refer to one
-set of paths. Backend exports treat ``interchange.json`` as the primary portable
+set of paths. Interchange exports treat ``interchange.json`` as the primary portable
 system artifact.
 
 SAMMD writes PDBx/mmCIF structure artifacts using the standard ``.cif``
@@ -125,28 +125,28 @@ beginner workflow.
      - Contract
    * - ``sam_grafting_density.cif``
      - Current
-     - Lightweight visual smoke-test PDBx/mmCIF ``.cif`` file for the
+     - Inspection visual smoke-test PDBx/mmCIF ``.cif`` file for the
        deterministic plan, including the Pd slab and SAM sulfur atoms at planned
        three-fold hollow-site anchor positions. In default builds, this file is
        meant for checking slab geometry and grafting density; it does not include
        full SAM, solvent, or reactant coordinates and is not a parameterized
-       backend system. Backend export leaves this smoke-test file separate from
-       the full solvated-system structure.
+       Interchange export system. Interchange export leaves this smoke-test file
+       separate from the full solvated-system structure.
    * - ``build_summary.json``
      - Current
      - Machine-readable summary of the validated plan, output paths, and
-       backend-ready metal-S LJ override metadata.
+       Interchange-ready metal-S LJ override metadata.
    * - ``resolved_config.yaml``
      - Current
      - Validated YAML configuration used for the build.
    * - ``solvated_system.cif``
-     - Backend
+     - Interchange Export
      - Written by ``--full`` for fully constructed SAM, solvent, and
        reactant coordinates. This is a human-inspectable/OpenMM-loadable
-       PDBx/mmCIF ``.cif`` structure file paired with the backend system
+       PDBx/mmCIF ``.cif`` structure file paired with the Interchange export
        artifact.
    * - ``interchange.json``
-     - Backend
+     - Interchange Export
      - Written by ``--full`` as the primary portable OpenFF
        Interchange export. The JSON path is ``Interchange.model_dump_json`` for
        saving and ``Interchange.model_validate_json`` for reload. SAMMD records
@@ -154,7 +154,7 @@ beginner workflow.
        written and treats pre-1.0 Interchange JSON compatibility as not
        guaranteed across versions.
    * - ``anchor_metadata.json``
-     - Backend
+     - Interchange Export
      - Written by ``--full`` for selected sulfur-metal pair metadata.
 
 Current limitation

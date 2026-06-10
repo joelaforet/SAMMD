@@ -1,4 +1,4 @@
-"""Small colored terminal and logging helpers for SAMMD CLI output."""
+"""Colored terminal and logging helpers for SAMMD CLI output."""
 
 from __future__ import annotations
 
@@ -60,8 +60,8 @@ _default_scheme: ColorScheme | None = None
 _SAMMD_HANDLER_ATTR = "_sammd_colored_logging_handler"
 
 
-AMBER = ModuleColor((255, 190, 60), 214, "\033[93m")
-RED = ModuleColor((255, 80, 80), 196, "\033[91m")
+AMBER = ModuleColor((255, 190, 60), 214, "\033[93m")  # amber
+RED = ModuleColor((255, 80, 80), 196, "\033[91m")  # red
 
 
 def detect_color_support(stream: IO[str] | None = None) -> TerminalColorSupport:
@@ -103,16 +103,22 @@ def default_scheme() -> ColorScheme:
 
     return ColorScheme(
         {
-            "sammd.cli": ModuleColor((120, 170, 255), 75, "\033[94m"),
-            "sammd.core": ModuleColor((80, 200, 120), 78, "\033[92m"),
-            "sammd.backends": ModuleColor((175, 215, 175), 151, "\033[92m"),
-            "sammd.backends.interchange": ModuleColor((120, 215, 215), 80, "\033[96m"),
-            "sammd.backends.openff": ModuleColor((175, 135, 255), 141, "\033[95m"),
-            "sammd.backends.packmol": ModuleColor((215, 175, 215), 182, "\033[95m"),
-            "sammd.model": ModuleColor((205, 175, 215), 182, "\033[95m"),
-            "sammd.runtime": ModuleColor((255, 200, 120), 222, "\033[93m"),
-            "sammd.analysis": ModuleColor((120, 215, 170), 79, "\033[92m"),
-            "sammd.utils": ModuleColor((150, 150, 150), 246, "\033[90m"),
+            "sammd.cli": ModuleColor((120, 170, 255), 75, "\033[94m"),  # sky blue
+            "sammd.core": ModuleColor((80, 200, 120), 78, "\033[92m"),  # green
+            "sammd.backends": ModuleColor((175, 215, 175), 151, "\033[92m"),  # sage
+            "sammd.backends.interchange": ModuleColor(
+                (120, 215, 215), 80, "\033[96m"
+            ),  # cyan
+            "sammd.backends.openff": ModuleColor(
+                (175, 135, 255), 141, "\033[95m"
+            ),  # violet
+            "sammd.backends.packmol": ModuleColor(
+                (215, 175, 215), 182, "\033[95m"
+            ),  # lavender
+            "sammd.model": ModuleColor((205, 175, 215), 182, "\033[95m"),  # mauve
+            "sammd.runtime": ModuleColor((255, 200, 120), 222, "\033[93m"),  # gold
+            "sammd.analysis": ModuleColor((120, 215, 170), 79, "\033[92m"),  # mint
+            "sammd.utils": ModuleColor((150, 150, 150), 246, "\033[90m"),  # gray
         },
         {
             logging.WARNING: AMBER,

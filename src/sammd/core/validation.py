@@ -1,4 +1,4 @@
-"""Dependency-free validation gates for lightweight SAMMD build plans."""
+"""Dependency-free validation gates for SAMMD build plans."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ class ValidationReport:
 
 
 def validate_build_plan(plan: Any) -> ValidationReport:
-    """Validate the current lightweight build-plan contract without backend imports."""
+    """Validate the current build-plan contract without optional imports."""
 
     gates = [
         _validate_surface_atom_counts(plan),
@@ -75,8 +75,8 @@ def validate_build_plan(plan: Any) -> ValidationReport:
 def validate_output_paths(paths: Any) -> ValidationReport:
     """Validate configured current and reserved output path suffixes.
 
-    Missing optional paths are not failures because future backend artifacts are
-    reserved but not required by the current lightweight builder.
+    Missing optional paths are not failures because future Interchange export
+    artifacts are reserved but not required by the current default builder.
     """
 
     expected_suffixes = {
@@ -114,7 +114,7 @@ def validate_topology_cif_text(
     expected_atom_count: int | None = None,
     expected_box_nm: tuple[float, float, float] | None = None,
 ) -> ValidationReport:
-    """Validate lightweight topology CIF text emitted by the current builder."""
+    """Validate inspection topology CIF text emitted by the current builder."""
 
     atom_count = sum(1 for line in text.splitlines() if line.startswith("HETATM "))
     gates = [

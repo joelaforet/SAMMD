@@ -1,4 +1,4 @@
-"""Tests for dependency-free lightweight validation gates."""
+"""Tests for dependency-free validation gates."""
 
 import json
 import os
@@ -17,7 +17,7 @@ from sammd.core.validation import (
 
 
 def test_default_build_plan_passes_validation(tmp_path: Path) -> None:
-    """The default lightweight plan satisfies all current gates."""
+    """The default plan satisfies all current gates."""
 
     plan = build_system({}, output_dir=tmp_path)
 
@@ -29,14 +29,14 @@ def test_default_build_plan_passes_validation(tmp_path: Path) -> None:
     assert report.to_summary()["passed"] is True
 
 
-def test_current_validation_gates_do_not_require_backend_artifacts(tmp_path: Path) -> None:
-    """Backend reload/export/minimization gates stay deferred for this release."""
+def test_current_validation_gates_do_not_require_export_artifacts(tmp_path: Path) -> None:
+    """Interchange reload/export/minimization gates stay deferred for this release."""
 
     plan = build_system({}, output_dir=tmp_path)
     report = validate_build_plan(plan)
     output_report = validate_output_paths(plan.output_paths)
     current_gate_ids = {gate.gate_id for gate in report.gates + output_report.gates}
-    deferred_backend_gate_ids = {
+    deferred_export_gate_ids = {
         "interchange_json_reload",
         "interchange_openmm_export",
         "topology_positions_system_atom_counts",
@@ -44,7 +44,7 @@ def test_current_validation_gates_do_not_require_backend_artifacts(tmp_path: Pat
         "minimization_energy_finite_not_increased",
     }
 
-    assert current_gate_ids.isdisjoint(deferred_backend_gate_ids)
+    assert current_gate_ids.isdisjoint(deferred_export_gate_ids)
     assert not plan.output_paths.solvated_system.exists()
     assert not plan.output_paths.openff_interchange.exists()
     assert not plan.output_paths.anchor_metadata.exists()
@@ -108,7 +108,7 @@ def test_bad_output_suffix_fails_validation(tmp_path: Path) -> None:
 
 
 def test_topology_cif_atom_count_mismatch_fails_validation(tmp_path: Path) -> None:
-    """Lightweight topology CIF atom count is checked without mmCIF dependencies."""
+    """Inspection topology CIF atom count is checked without mmCIF dependencies."""
 
     plan = build_system({}, output_dir=tmp_path)
     path = plan.write_topology_cif()
@@ -140,8 +140,8 @@ def test_topology_cif_cell_mismatch_fails_validation(tmp_path: Path) -> None:
     assert _gate(report, "topology_cif_cell_lengths").passed is False
 
 
-def test_module_import_avoids_heavy_backend_modules() -> None:
-    """Validation import should not pull OpenMM/OpenFF-style backend modules."""
+def test_module_import_avoids_heavy_optional_modules() -> None:
+    """Validation import should not pull OpenMM/OpenFF-style optional modules."""
 
     heavy_modules = ("openmm", "openff", "rdkit", "mbuild", "MDAnalysis", "parmed", "pdbfixer")
     code = (

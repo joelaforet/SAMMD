@@ -53,7 +53,7 @@ def test_epsilon_sign_conversion_and_sigma_helper() -> None:
 
 
 def test_unsupported_metal_fails_clearly() -> None:
-    """Reject metals outside the lightweight Fcc registry."""
+    """Reject metals outside the default Fcc registry."""
 
     with pytest.raises(ValueError, match="unsupported Fcc metal"):
         get_fcc_metal_parameters("Fe")

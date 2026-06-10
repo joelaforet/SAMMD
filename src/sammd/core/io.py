@@ -1,4 +1,4 @@
-"""Output path planning and lightweight PDBx/mmCIF ``.cif`` writing helpers."""
+"""Output path planning and inspection PDBx/mmCIF ``.cif`` writing helpers."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ class OutputPaths:
 
 @dataclass(frozen=True)
 class AtomRecord:
-    """Lightweight atom record for PDBx/mmCIF visualization scaffolds."""
+    """Inspection atom record for PDBx/mmCIF visualization scaffolds."""
 
     serial: int
     atom_name: str
@@ -132,7 +132,7 @@ def format_mmcif(
     data_name: str = "sammd_scaffold",
     cell_lengths_nm: Vector3 | None = None,
 ) -> str:
-    """Format lightweight atom records as PDBx/mmCIF text.
+    """Format inspection atom records as PDBx/mmCIF text.
 
     Parameters
     ----------
@@ -249,7 +249,7 @@ def write_mmcif(
     cell_lengths_nm: Vector3 | None = None,
     overwrite: bool = False,
 ) -> Path:
-    """Write lightweight PDBx/mmCIF atom records to a ``.cif`` path.
+    """Write inspection PDBx/mmCIF atom records to a ``.cif`` path.
 
     Parameters
     ----------
@@ -411,7 +411,7 @@ def _validate_cell_lengths(cell_lengths_nm: Vector3) -> None:
 
 
 def _validate_cif_text_value(value: str, field_name: str) -> None:
-    """Validate lightweight mmCIF string values before quoting."""
+    """Validate mmCIF string values before quoting."""
 
     if not isinstance(value, str) or not value:
         msg = f"atom record {field_name} must be a non-empty string"

@@ -251,7 +251,7 @@ class PackmolConfig(SAMMDBaseModel):
 
 
 class PackingConfig(SAMMDBaseModel):
-    """Packing backend configuration."""
+    """Packing engine configuration."""
 
     packmol: PackmolConfig = Field(default_factory=PackmolConfig)
 
@@ -385,7 +385,7 @@ surface:
 # Larger grafting_density values mean fewer SAM molecules on the surface.
 #
 # extended_length_nm is an optional advanced override for the fully extended SAM
-# length from sulfur anchor to tail tip. If omitted, SAMMD uses a lightweight,
+# length from sulfur anchor to tail tip. If omitted, SAMMD uses a dependency-free,
 # conservative SMILES heuristic with a 0.95 nm minimum default.
 #
 sam:
@@ -548,7 +548,7 @@ packing:
 # ============================================================================
 # Parameterization
 # ============================================================================
-# Force-field choices recorded and validated by the current lightweight builder.
+# Force-field choices recorded and validated by the current default builder.
 #
 # The small-molecule force field is used for SAM molecules, reactants,
 # solvent molecules, and salts.
@@ -569,13 +569,13 @@ parameterization:
 # ============================================================================
 # Outputs
 # ============================================================================
-# Current files written by the lightweight system builder:
+# Current files written by the default system builder:
 #   - sam_grafting_density.cif  # Pd slab + sulfur anchors for grafting-density checks
 #   - build_summary.json
 #   - resolved_config.yaml
 #
-# Backend artifact names written by --full:
-#   - interchange.json  # primary portable backend export
+# OpenFF Interchange artifact names written by --full:
+#   - interchange.json  # primary portable Interchange export
 #   - solvated_system.cif  # full slab + SAMs + reactants + solvent coordinates
 #   - anchor_metadata.json  # SAM anchor metadata export
 #

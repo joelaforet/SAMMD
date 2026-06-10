@@ -1,4 +1,4 @@
-"""OpenFF Interchange backend construction for SAMMD system exports."""
+"""OpenFF Interchange construction for SAMMD system exports."""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class BackendExportResult:
-    """Artifacts and metadata from a completed Interchange backend export."""
+    """Artifacts and metadata from a completed Interchange export."""
 
     interchange: Any
     openmm_topology: Any
@@ -123,7 +123,7 @@ class _ComponentResidueAssigner:
 
     def _next_chain_id(self) -> str:
         if self._next_chain_index >= len(CHAIN_LETTERS):
-            msg = "backend export exceeded available one-character chain identifiers"
+            msg = "Interchange export exceeded available one-character chain identifiers"
             raise RuntimeError(msg)
         chain_id = CHAIN_LETTERS[self._next_chain_index]
         self._next_chain_index += 1
@@ -208,7 +208,7 @@ def export_interchange_backend(
 
 
 def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, object]:
-    """Return a build summary updated for completed backend exports."""
+    """Return a build summary updated for completed Interchange exports."""
 
     summary = plan.build_summary()
     artifacts = dict(summary["artifacts"])
@@ -246,7 +246,7 @@ def build_interchange_backend(
 
     if plan.solution.salts:
         names = ", ".join(salt.name for salt in plan.solution.salts)
-        msg = f"Interchange backend export does not yet support salts: {names}"
+        msg = f"Interchange export does not yet support salts: {names}"
         raise NotImplementedError(msg)
 
     stage_start = perf_counter()
@@ -388,7 +388,10 @@ def build_interchange_backend(
     _progress(progress, f"Preparing {solvent_count} solvent molecules")
     for solvent in plan.solution.solvent_components:
         if solvent.smiles is None:
-            msg = f"solvent component {solvent.name!r} requires explicit SMILES for backend export"
+            msg = (
+                f"solvent component {solvent.name!r} requires explicit SMILES for "
+                "Interchange export"
+            )
             raise ValueError(msg)
         template = _prepare_template(
             toolkit,
@@ -746,7 +749,7 @@ def _apply_openmm_atom_identities(
     atoms = tuple(topology.atoms())
     if len(atoms) != len(atom_records):
         msg = (
-            "OpenMM topology atom count does not match backend identity ledger: "
+            "OpenMM topology atom count does not match Interchange export identity ledger: "
             f"{len(atoms)} topology atoms, {len(atom_records)} atom records"
         )
         raise ValueError(msg)
@@ -798,7 +801,7 @@ def _require_openmm() -> SimpleNamespace:
         from openmm import app, unit
     except ImportError as error:
         msg = (
-            "OpenMM is required to write solvated_system.cif from the Interchange backend. "
+            "OpenMM is required to write solvated_system.cif from the Interchange export. "
             "Install and run from an environment with OpenMM available."
         )
         raise ImportError(msg) from error

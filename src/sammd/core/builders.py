@@ -85,7 +85,7 @@ class BoxPlan:
 
 @dataclass(frozen=True)
 class SAMMDBuildPlan:
-    """Lightweight system build artifact assembled from deterministic planners."""
+    """Dependency-light system build artifact assembled from deterministic planners."""
 
     config: SAMMDConfig
     slab: SurfaceSlab
@@ -98,7 +98,7 @@ class SAMMDBuildPlan:
 
     @property
     def full_construction_available(self) -> bool:
-        """Return whether full backend construction is available in this milestone."""
+        """Return whether full Interchange export construction is available."""
 
         return self.openmm_construction_implemented
 
@@ -109,7 +109,7 @@ class SAMMDBuildPlan:
             return
         msg = (
             "Full OpenFF/OpenMM construction is not implemented yet; this object is a "
-            "lightweight deterministic build plan."
+            "deterministic inspection build plan."
         )
         raise NotImplementedError(msg)
 
@@ -237,7 +237,7 @@ class SAMMDBuildPlan:
         }
 
     def _artifact_summary(self, key: str, status: str) -> dict[str, object]:
-        """Return path and lightweight-release availability for one artifact."""
+        """Return path and first-release availability for one artifact."""
 
         path = getattr(self.output_paths, key)
         summary: dict[str, object] = {
@@ -304,7 +304,7 @@ def build_system(
     output_dir: str | Path | None = None,
     seed: int | None = None,
 ) -> SAMMDBuildPlan:
-    """Compose a deterministic lightweight SAMMD build plan.
+    """Compose a deterministic SAMMD inspection build plan.
 
     Parameters
     ----------
@@ -318,7 +318,7 @@ def build_system(
     Returns
     -------
     SAMMDBuildPlan
-        Lightweight artifact containing slab, SAM, solution, and output plans.
+        Dependency-light artifact containing slab, SAM, solution, and output plans.
     """
 
     loaded_config = _load_build_config(config)

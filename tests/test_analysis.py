@@ -1,4 +1,4 @@
-"""Tests for lightweight orientation analysis primitives."""
+"""Tests for dependency-free orientation analysis primitives."""
 
 import math
 
@@ -105,7 +105,7 @@ def test_analyze_orientation_validates_side_with_explicit_normal() -> None:
 
 
 def test_analyze_orientation_populates_selection_and_frame_metadata() -> None:
-    """Store deterministic selection and lightweight trajectory metadata."""
+    """Store deterministic selection and trajectory metadata."""
 
     coordinates = [(0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (4.0, 0.0, 0.0)]
 

@@ -1,4 +1,4 @@
-"""Tests for lightweight solution composition planning."""
+"""Tests for dependency-free solution composition planning."""
 
 import pytest
 

@@ -43,7 +43,7 @@ def _failed_error_messages(*reports: Any) -> list[str]:
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose logging.")
 @click.option("--no-color", is_flag=True, help="Disable colored logging output.")
 def main(verbose: bool, no_color: bool) -> None:
-    """Manage lightweight SAMMD configuration files."""
+    """Manage SAMMD configuration files."""
 
     setup_colored_logging(verbose=verbose, no_color=no_color)
 
@@ -92,7 +92,10 @@ def validate(config: Path) -> None:
 @click.option(
     "--full",
     is_flag=True,
-    help="Export full backend files: solvated_system.cif, interchange.json, anchor_metadata.json.",
+    help=(
+        "Export OpenFF Interchange files: solvated_system.cif, interchange.json, "
+        "anchor_metadata.json."
+    ),
 )
 @click.option(
     "--export-backend",
@@ -102,26 +105,26 @@ def validate(config: Path) -> None:
     help="Deprecated alias for --full.",
 )
 def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) -> None:
-    """Build the current plan and optionally write backend files."""
+    """Build the current plan and optionally write Interchange export files."""
 
     LOGGER.info("SAMMD Build")
     with _timed("Reading config and constructing deterministic build plan"):
         plan = build_system(config, output_dir=output_dir)
-    with _timed("Running lightweight validation gates"):
+    with _timed("Running dependency-free validation gates"):
         build_report = validate_build_plan(plan)
         output_report = validate_output_paths(plan.output_paths)
     failed_messages = _failed_error_messages(build_report, output_report)
     if failed_messages:
         raise click.ClickException("Validation failed: " + "; ".join(failed_messages))
 
-    LOGGER.info("OK Lightweight validation gates passed")
+    LOGGER.info("OK Dependency-free validation gates passed")
     LOGGER.info("SYSTEM Surface: %s(%s)", plan.slab.metal, plan.slab.facet)
     LOGGER.info("SYSTEM Binding sites: %s", len(plan.binding_sites))
     LOGGER.info("SYSTEM SAM molecules: %s", len(plan.sam_placements.placements))
     LOGGER.info("SYSTEM Solution counts: %s", dict(plan.solution.molecule_counts))
 
     try:
-        backend_files = None
+        export_files = None
         with _timed("Writing SAM grafting-density visual check"):
             topology = plan.write_topology_cif(overwrite=overwrite)
         with _timed("Writing resolved configuration"):
@@ -129,17 +132,17 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
         if full:
             from sammd.backends.interchange import backend_build_summary, export_interchange_backend
 
-            LOGGER.info("Full MD Export")
-            backend_result = export_interchange_backend(
+            LOGGER.info("OpenFF Interchange Export")
+            export_result = export_interchange_backend(
                 plan,
                 overwrite=overwrite,
             )
-            backend_files = backend_result.files
-            with _timed("Writing backend-aware build summary"):
+            export_files = export_result.files
+            with _timed("Writing Interchange export build summary"):
                 build_summary = plan.write_build_summary(overwrite=overwrite)
                 build_summary.write_text(
                     json.dumps(
-                        backend_build_summary(plan, backend_result),
+                        backend_build_summary(plan, export_result),
                         indent=2,
                         ensure_ascii=False,
                     )
@@ -158,12 +161,14 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
     LOGGER.info("FILE SAM grafting-density CIF: %s", topology)
     LOGGER.info("FILE Build summary: %s", build_summary)
     LOGGER.info("FILE Resolved config: %s", resolved_config)
-    if backend_files is not None:
-        LOGGER.info("FILE Wrote solvated system CIF: %s", backend_files["solvated_system"])
-        LOGGER.info("FILE Interchange JSON: %s", backend_files["openff_interchange"])
-        LOGGER.info("FILE Anchor metadata: %s", backend_files["anchor_metadata"])
+    if export_files is not None:
+        LOGGER.info("FILE Wrote solvated system CIF: %s", export_files["solvated_system"])
+        LOGGER.info("FILE Interchange JSON: %s", export_files["openff_interchange"])
+        LOGGER.info("FILE Anchor metadata: %s", export_files["anchor_metadata"])
         LOGGER.info(
             "NEXT Load interchange.json and call Interchange.to_openmm() downstream when needed."
         )
     else:
-        LOGGER.info("NEXT Inspect sam_grafting_density.cif; run --full for MD simulation files.")
+        LOGGER.info(
+            "NEXT Inspect sam_grafting_density.cif; run --full for OpenFF Interchange files."
+        )

@@ -25,7 +25,7 @@ Configuration model
 Orientation analysis helper
 ---------------------------
 
-This lightweight analysis helper is available for tutorial inspection workflows.
+This dependency-free analysis helper is available for tutorial inspection workflows.
 It is not part of the system build/export contract.
 
 .. autofunction:: sammd.analysis.analyze_orientation

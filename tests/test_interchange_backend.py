@@ -1,4 +1,4 @@
-"""Tests for OpenFF Interchange backend export scaffolding."""
+"""Tests for OpenFF Interchange export scaffolding."""
 
 from __future__ import annotations
 
@@ -16,8 +16,8 @@ from sammd.core.config import SAMMDConfig, load_config_dict
 from sammd.model.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
 
 
-def test_backend_module_import_does_not_import_optional_science_modules() -> None:
-    """Keep backend helpers lazy until export functions are called."""
+def test_interchange_module_import_does_not_import_optional_science_modules() -> None:
+    """Keep Interchange helpers lazy until export functions are called."""
 
     code = """
 import importlib
@@ -39,7 +39,7 @@ if loaded:
 
 
 def test_progress_logs_and_preserves_callback_compatibility(caplog) -> None:
-    """Backend progress should log while retaining the callback contract."""
+    """Interchange export progress should log while retaining the callback contract."""
 
     backend = importlib.import_module("sammd.backends.interchange")
     messages: list[str] = []
@@ -52,8 +52,8 @@ def test_progress_logs_and_preserves_callback_compatibility(caplog) -> None:
     assert [record.getMessage() for record in caplog.records] == ["Writing interchange.json"]
 
 
-def test_backend_build_summary_marks_completed_exports(tmp_path: Path) -> None:
-    """Completed backend export metadata updates reserved artifact summaries."""
+def test_interchange_build_summary_marks_completed_exports(tmp_path: Path) -> None:
+    """Completed Interchange export metadata updates reserved artifact summaries."""
 
     backend = importlib.import_module("sammd.backends.interchange")
     plan = build_system(SAMMDConfig(), output_dir=tmp_path)
@@ -82,8 +82,8 @@ def test_backend_build_summary_marks_completed_exports(tmp_path: Path) -> None:
     assert override["epsilon_kcal_mol"] == METAL_SULFUR_EPSILON_KCAL_MOL
 
 
-def test_backend_export_rejects_salts_before_optional_imports(tmp_path: Path) -> None:
-    """Avoid silently omitting schema-supported salts from backend artifacts."""
+def test_interchange_export_rejects_salts_before_optional_imports(tmp_path: Path) -> None:
+    """Avoid silently omitting schema-supported salts from export artifacts."""
 
     backend = importlib.import_module("sammd.backends.interchange")
     config = load_config_dict(

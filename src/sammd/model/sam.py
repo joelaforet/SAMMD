@@ -1,4 +1,4 @@
-"""Deterministic SAM placement planning without molecular backends."""
+"""Deterministic SAM placement planning without molecular export dependencies."""
 
 from __future__ import annotations
 

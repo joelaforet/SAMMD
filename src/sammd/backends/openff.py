@@ -12,23 +12,23 @@ from typing import Any
 from sammd.utils.geometry import Vector3
 
 OPENFF_INSTALL_GUIDANCE = (
-    "OpenFF Toolkit is an optional SAMMD backend dependency. Install and use the "
+    "OpenFF Toolkit is an optional SAMMD export dependency. Install and use the "
     "appropriate SAMMD CUDA pixi environment, such as cuda-12-6, with OpenFF "
     "Toolkit available before calling "
     "OpenFF adapter utilities."
 )
 
 OPENFF_INTERCHANGE_INSTALL_GUIDANCE = (
-    "OpenFF Interchange is an optional SAMMD backend dependency. Install and use the "
+    "OpenFF Interchange is an optional SAMMD export dependency. Install and use the "
     "appropriate SAMMD CUDA pixi environment, such as cuda-12-6, with OpenFF "
     "Interchange available before calling "
-    "OpenFF backend construction utilities."
+    "OpenFF Interchange export utilities."
 )
 
 
 @dataclass(frozen=True)
 class OpenFFBackendAvailability:
-    """Structured optional-backend availability report without importing backends."""
+    """Structured optional OpenFF availability report without importing modules."""
 
     toolkit_available: bool
     interchange_available: bool
@@ -44,7 +44,7 @@ class OpenFFBackendAvailability:
 
 @dataclass(frozen=True)
 class OpenFFParameterizationPlan:
-    """Lightweight record of future OpenFF parameterization choices and targets."""
+    """Inspectable record of future OpenFF parameterization choices and targets."""
 
     small_molecule_force_field: str
     charge_model: str
@@ -125,7 +125,7 @@ def _dotted_module_is_available(name: str) -> bool:
 
 
 def check_openff_backend_availability() -> OpenFFBackendAvailability:
-    """Check optional OpenFF backend module availability without importing it."""
+    """Check optional OpenFF module availability without importing it."""
 
     toolkit_available = _dotted_module_is_available("openff.toolkit")
     interchange_available = _dotted_module_is_available("openff.interchange")
@@ -174,7 +174,7 @@ def force_field_inputs_from_config(config: Any) -> tuple[Any, ...]:
 
 
 def parameterization_plan_from_config(config: Any) -> OpenFFParameterizationPlan:
-    """Create a lightweight OpenFF parameterization plan from validated config."""
+    """Create an inspectable OpenFF parameterization plan from validated config."""
 
     from sammd.core.io import plan_output_paths
 
@@ -192,7 +192,7 @@ def parameterization_plan_from_config(config: Any) -> OpenFFParameterizationPlan
 
 
 def parameterization_plan_from_build_plan(plan: Any) -> OpenFFParameterizationPlan:
-    """Create a lightweight OpenFF parameterization plan from a SAMMD build plan."""
+    """Create an inspectable OpenFF parameterization plan from a SAMMD build plan."""
 
     component_counts = {
         "sam_components": len(tuple(_iter_config_items(plan.config.sam, "components"))),
