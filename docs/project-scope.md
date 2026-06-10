@@ -1,10 +1,10 @@
 # SAMMD Project Scope
 
-This document captures the initial research context and scope interpretation for SAMMD: a Python package that builds and exports chemistry, structure, and parameter artifacts for self-assembled monolayers on metal supports. OpenMM owns minimization, equilibration, production runs, trajectories, and reporters after those artifacts exist.
+This document captures the initial research context and scope interpretation for SAMMD: a Python package that builds and exports chemistry, structure, and parameter artifacts for self-assembled monolayers on metal supports. Downstream OpenMM scripts can run minimization, equilibration, production, trajectories, and reporters after those artifacts exist.
 
 ## Goal
 
-SAMMD should let a user specify a metal surface, one or more thiol SAM components, solvent mixture, salts, and reactant molecules from a validated YAML file, then build/export OpenFF/OpenMM-ready chemistry, structure, and parameter artifacts that can be inspected and handed to user-controlled OpenMM Python scripts.
+SAMMD should let a user specify a metal surface, one or more thiol SAM components, solvent mixture, salts, and reactant molecules from a validated YAML file, then build/export OpenFF Interchange-ready chemistry, structure, and parameter artifacts that can be inspected and handed to user-controlled simulation scripts.
 
 The first scientific target is a propanethiol SAM (`CCCS`) on Pd(111), with small molecule ligands approaching the monolayer-covered metal surface.
 
@@ -43,7 +43,7 @@ Defer until after v0.1.0:
 - General surface support beyond registered Fcc(111) metals, including non-111 facets.
 - Explicit metal-sulfur bonded topology terms unless needed to correct SAM geometry.
 - OpenMM minimization, equilibration, production, DCD trajectory output, and thermodynamic reporting protocols. Tutorial-only user code may demonstrate OpenMM API usage after SAMMD exports Interchange artifacts, but those runs are not part of the SAMMD build/export contract.
-- Salt ion Interchange export and broader noncanonical chemistry coverage beyond the first supported Interchange/OpenMM export path.
+- Salt ion Interchange export and broader noncanonical chemistry coverage beyond the first supported Interchange export path.
 - Advanced analysis workflows beyond basic orientation observables.
 
 ## Reference Findings
@@ -114,15 +114,8 @@ Relevant behavior:
 - `Interchange` stores topology, parameter collections, positions, box vectors, and velocities.
 - Conformers on OpenFF `Molecule` objects can seed positions.
 - Box vectors can be passed during construction or assigned afterward.
-- `Interchange` can export to OpenMM `System`, `Topology`, positions, and `Simulation` objects.
+- `Interchange` can export to OpenMM `System`, `Topology`, and positions for downstream simulation scripts.
 - [SMIRNOFF](https://docs.openforcefield.org/projects/toolkit/en/stable/users/smirnoff.html) parameters are defined by SMIRKS patterns and explicit units.
-
-The local notebook [`metal_example.ipynb`](file:///home/joelaforet/Desktop/SAMS_MD/metal_example.ipynb) demonstrates the exact OpenFF extension mechanism needed here:
-
-- Add `LibraryCharges` by mapped SMILES.
-- Add metal bond, angle, torsion, and `vdW` parameters directly to a `ForceField` object.
-- Build an `Interchange` from the resulting force field.
-- Minimize and convert the system in a downstream OpenMM script.
 
 ### mBuild And Surface Coatings
 
@@ -134,7 +127,7 @@ The local notebook [`metal_example.ipynb`](file:///home/joelaforet/Desktop/SAMS_
 - `SolvatedMonolayer` fills a solvent box above the monolayer.
 - The Au surface example uses `mb.Lattice` and `TiledCompound`-style construction for Fcc metals.
 
-SAMMD should own its registered Fcc(111) builder, defaulting to Pd(111), rather than depend on surface_coatings directly, because the MVP needs metal/facet-aware parameters, grafting-density controls, sulfur anchoring behavior, and OpenFF-ready topology handling.
+SAMMD should own its registered Fcc(111) builder for v0.1.0, defaulting to Pd(111), because the MVP needs metal/facet-aware parameters, grafting-density controls, sulfur anchoring behavior, and OpenFF-ready topology handling. Longer term, mBuild or another surface-construction library may own more of this geometry if it reduces SAMMD-maintained code without weakening the scientific contract.
 
 ### Solvent And Packing
 
@@ -298,29 +291,29 @@ Bulk solvent -> Bottom SAM -> Fcc(111) slab -> Top SAM -> Bulk solvent
 
 The bottom SAM should point toward negative `z`; the top SAM should point toward positive `z`. Through PBC, the two bulk solvent regions are one continuous bulk phase.
 
-The registered Fcc(111) slab should be restrained by default. We are not simulating SAM assembly or metal reconstruction; the surface mainly provides geometry and INTERFACE-derived nonbonded parameters. Use positional restraints to keep metal atoms near ideal lattice coordinates. The default positional restraint force constant is `10000 kJ mol^-1 nm^-2`, with the exact units and restraint form documented in the generated YAML template.
+The registered Fcc(111) slab atoms are not restrained by SAMMD. They are represented with INTERFACE-derived Lennard-Jones parameters in the Interchange export, and any later restraint or freezing policy belongs in user-owned simulation code.
 
-The slab must be thick enough that the two decorated interfaces do not see each other through the nonbonded cutoff. With a typical 0.9-1.2 nm cutoff and registered Fcc(111) layer spacing of roughly `a / sqrt(3)`, a safe starting point is 8-10 layers for the default Pd(111) target. This should be configurable, validated against the chosen cutoff, and documented with a warning if the requested slab is too thin.
+SAMMD chooses the number of slab layers automatically from the registered metal geometry, configured nonbonded cutoff, and an internal buffer so the two decorated interfaces do not see each other through the slab in the `z` direction. Users choose the metal, facet, and lateral size; slab thickness is treated as a modeling detail handled by the builder.
 
-For the first notebook/demo, a practical starting system is roughly 5 x 5 nm in the lateral plane, 8 layers of the default Pd(111) slab, SAMs on both faces, and at least 3 nm solvent padding from the fully extended SAM tips to the box boundary on each side before PBC wrapping. This is large enough for a full SAM coating and multiple cinnamaldehyde reactants (`C1=CC=C(C=C1)/C=C/C=O`) while still being plausible for prototype runs.
+For the first notebook/demo, a practical starting system is roughly 5 x 5 nm in the lateral plane, an automatically selected default Pd(111) slab thickness, SAMs on both faces, and at least 3 nm solvent padding from the fully extended SAM tips to the box boundary on each side before PBC wrapping. This is large enough for a full SAM coating and multiple cinnamaldehyde reactants (`C1=CC=C(C=C1)/C=C/C=O`) while still being plausible for prototype runs.
 
 Default metal-sulfur anchoring should begin as an internal nonbonded proxy:
 
 - Keep the SAM sulfur and surface metal atoms non-covalent in topology.
-- Plan the relevant sulfur-metal interaction strength as export/internal representation, not a beginner YAML knob.
-- Use a selected post-export OpenMM pair-specific LJ override as the first-release strategy, not an OFFXML/Interchange-only strategy.
+- Plan the relevant sulfur-metal interaction strength as an export/internal representation, not a beginner YAML knob.
+- Encode selected sulfur-metal pair-specific LJ overrides in a SAMMD OpenFF Interchange plugin collection.
 - Pair each planned SAM sulfur with the three nearest metal atoms at the registered Fcc(111) hollow site.
 - Record the canonical first-release override as `mode = "nonbonded_lj_override"`, `site_kind = "fcc_hollow"`, `pairs_per_anchor = 3`, `sigma = 0.22 nm`, and `epsilon = 2.0 kcal/mol` (`8.368 kJ/mol`).
 - Treat the override as strengthened nonbonded LJ attraction for neutral thiols, not covalent, quantum, or reactive chemisorption.
-- Keep the base INTERFACE Fcc metal LJ parameters as the slab nonbonded model; the selected metal-S override is additional export metadata for specific sulfur-metal pairs.
+- Keep the base INTERFACE Fcc metal LJ parameters as the slab nonbonded model; the selected metal-S override is a serialized Interchange plugin collection for specific sulfur-metal pairs.
 - Defer any user-configurable scale factor, such as 4x, 5x, or 6x, until a later advanced attachment API.
 - Preserve a configuration/API path for future explicit bonded anchors.
 
 Future explicit anchor mode should be designed as a replaceable strategy:
 
-- `anchor.mode = "nonbonded_lj_override"` for MVP export metadata.
+- `anchor.mode = "nonbonded_lj_override"` for the MVP Interchange plugin representation.
 - `anchor.mode = "bonded"` later for metal-sulfur bond, angle, and torsion parameters.
-- A future angle target, such as 23 degrees relative to the surface, should not require rewriting the builder API.
+- Future angle targets, calibrated against experimental SAM tilt data for different metal surfaces, should not require rewriting the builder API.
 - `anchor.site = "fcc_hollow"` should be the internal registered Fcc(111) hollow-placement strategy, with Pd(111) as the canonical/default surface and other site labels reserved for a later advanced attachment API.
 
 Solvent and reactant composition should be converted from user-facing units:
@@ -346,7 +339,7 @@ An angle near 90 degrees means the selected reactant vector lies roughly paralle
 High-value unit tests for the first implementation:
 
 - YAML template loads into the Pydantic model.
-- YAML template defaults include TIP3P, `0.25 nm^2 / molecule`, and `10000 kJ mol^-1 nm^-2` Pd restraints; the Pd(111) sulfur site remains an internal builder default rather than a beginner template field.
+- YAML template defaults include TIP3P and `0.25 nm^2 / molecule`; the Pd(111) sulfur site and automatically selected slab thickness remain internal builder defaults rather than beginner template fields.
 - YAML template includes v0.1.0 configurable output sections for PDBx/mmCIF `.cif` build artifacts; DCD and thermodynamic state data remain post-v0.1.0/tutorial-only simulation conventions.
 - Invalid metal, facet, grafting density, solvent fraction, or concentration fails clearly.
 - Mixed SAM fractions must sum to one, or explicit counts must match selected grafting sites.
@@ -354,7 +347,7 @@ High-value unit tests for the first implementation:
 - CHARMM epsilon sign conversion is tested.
 - Generated offxml can be loaded by OpenFF `ForceField`.
 - Registered Fcc(111) builder returns deterministic atom counts and box dimensions.
-- Registered Fcc(111) slab thickness validation warns or fails when the slab is thinner than the configured nonbonded cutoff plus buffer.
+- Registered Fcc(111) slab layer selection automatically exceeds the configured nonbonded cutoff plus buffer.
 - Propanethiol sulfur anchor detection is deterministic for `CCCS`.
 - Cinnamaldehyde reactant parsing is deterministic for `C1=CC=C(C=C1)/C=C/C=O`.
 - Post-v0.1.0 reporter configuration maps user field names to OpenMM reporter arguments.
@@ -380,14 +373,13 @@ The docs should assume undergraduate contributors and make success states explic
 
 ## Resolved Decisions
 
-- Pd(111) atoms should be restrained by default, not freely mobile.
+- Pd(111) atoms are not restrained by SAMMD; any restraint or freezing policy belongs in downstream simulation code.
 - The MVP slab should be centered and decorated on both faces to use PBC in `z` cleanly.
-- The slab should be thick enough that the two SAM/slab interfaces are separated by more than the nonbonded cutoff plus a buffer.
+- SAMMD should choose enough slab layers automatically that the two SAM/slab interfaces are separated by more than the nonbonded cutoff plus a buffer.
 - The lateral box dimensions should be user-tunable; the first demo can start near 5 x 5 nm.
 - The default sulfur site for Pd(111) should be internal `fcc_hollow` builder behavior; user-configurable site type belongs in a future advanced attachment API.
-- Sulfur-metal interaction metadata remains an internal planning/export detail for v0.1.0; the default selected-pair strategy is a post-export OpenMM pair-specific LJ override, and any user-configurable scale factor belongs in a future advanced attachment API.
+- Sulfur-metal interaction metadata remains an internal planning/export detail for v0.1.0; the default selected-pair strategy is serialized in a SAMMD Interchange plugin collection, and any user-configurable scale factor belongs in a future advanced attachment API.
 - TIP3P is the default water model.
-- The default Pd positional restraint force constant is `10000 kJ mol^-1 nm^-2`.
 - The default grafting density is `0.25 nm^2 / molecule`.
 - Solvent and reactant placement should use OpenFF/PACKMOL-style packing, with counts derived from target composition.
 - Reactant orientation analysis can begin with a configurable COM-to-selection vector relative to the surface normal.
@@ -401,7 +393,7 @@ The docs should assume undergraduate contributors and make success states explic
 
 ## Implementation Readiness
 
-The scope is ready for v0.1.0 scaffolding. The first implementation pass should create the package skeleton, pixi/pyproject configuration, Pydantic YAML schema, template generation, INTERFACE metal registry, dependency-light build/export artifacts, and tests for the resolved defaults before implementing expensive OpenFF/OpenMM build or simulation steps.
+The scope is ready for v0.1.0 scaffolding. The first implementation pass should create the package skeleton, pixi/pyproject configuration, Pydantic YAML schema, template generation, INTERFACE metal registry, dependency-light inspection artifacts, Interchange export artifacts, and tests for the resolved defaults before implementing broader chemistry coverage or downstream simulation examples.
 
 ## Links
 
@@ -414,7 +406,6 @@ The scope is ready for v0.1.0 scaffolding. The first implementation pass should 
 - [mBuild](https://github.com/mosdef-hub/mbuild)
 - [mBuild data structures](https://mbuild.mosdef.org/en/stable/topic_guides/data_structures.html)
 - [surface_coatings](https://github.com/daico007/surface_coatings)
-- [Local metal OpenFF notebook](file:///home/joelaforet/Desktop/SAMS_MD/metal_example.ipynb)
 - [PolyzyMD solvent builder](https://github.com/joelaforet/polyzymd/blob/main/src/polyzymd/builders/solvent.py)
 - [Alkanethiol SAM assembly on Pd surfaces](https://doi.org/10.1021/acs.langmuir.7b04351)
 - [Biomolecular force fields for alkanethiol SAM simulations](https://doi.org/10.1021/acs.jpcc.7b08092)
