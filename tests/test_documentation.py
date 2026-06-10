@@ -92,6 +92,23 @@ def test_build_export_and_openmm_ownership_boundary_is_documented() -> None:
     assert "not a student-facing SAMMD run-wrapper API" in combined
 
 
+def test_structure_artifact_terminology_is_documented() -> None:
+    """Keep PDBx/mmCIF wording aligned with stable .cif artifact names."""
+
+    readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+    build_contract = (
+        PROJECT_ROOT / "docs" / "source" / "reference" / "build-contract.rst"
+    ).read_text(encoding="utf-8")
+    project_scope = (PROJECT_ROOT / "docs" / "project-scope.md").read_text(encoding="utf-8")
+    combined = "\n".join([readme, build_contract, project_scope])
+
+    assert "topology.cif" not in readme
+    assert "sam_grafting_density.cif" in readme
+    assert "PDBx/mmCIF" in combined
+    assert ".cif" in combined
+    assert ".mmcif" in combined
+
+
 def test_cuda_pixi_environment_guidance_is_documented() -> None:
     """Keep backend/OpenMM setup tied to explicit CUDA pixi environments."""
 

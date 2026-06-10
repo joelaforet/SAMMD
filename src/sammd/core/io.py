@@ -1,4 +1,4 @@
-"""Output path planning and lightweight mmCIF writing helpers."""
+"""Output path planning and lightweight PDBx/mmCIF ``.cif`` writing helpers."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ class OutputPaths:
 
 @dataclass(frozen=True)
 class AtomRecord:
-    """Lightweight atom record for mmCIF visualization scaffolds."""
+    """Lightweight atom record for PDBx/mmCIF visualization scaffolds."""
 
     serial: int
     atom_name: str
@@ -132,21 +132,21 @@ def format_mmcif(
     data_name: str = "sammd_scaffold",
     cell_lengths_nm: Vector3 | None = None,
 ) -> str:
-    """Format lightweight atom records as mmCIF/PDBx text.
+    """Format lightweight atom records as PDBx/mmCIF text.
 
     Parameters
     ----------
     atom_records
         Atom records with coordinates in nanometers.
     data_name
-        mmCIF data block name.
+        PDBx/mmCIF data block name.
     cell_lengths_nm
         Optional periodic cell lengths in nanometers.
 
     Returns
     -------
     str
-        mmCIF text with ``_atom_site`` rows and Angstrom coordinates.
+        PDBx/mmCIF text with ``_atom_site`` rows and Angstrom coordinates.
     """
 
     validated_data_name = _validate_data_name(data_name)
@@ -249,16 +249,17 @@ def write_mmcif(
     cell_lengths_nm: Vector3 | None = None,
     overwrite: bool = False,
 ) -> Path:
-    """Write lightweight mmCIF/PDBx atom records to disk.
+    """Write lightweight PDBx/mmCIF atom records to a ``.cif`` path.
 
     Parameters
     ----------
     path
-        Destination ``.cif`` path.
+        Destination ``.cif`` path. ``.mmcif`` is common elsewhere, but SAMMD
+        keeps stable ``.cif`` artifact names.
     atom_records
         Atom records with nanometer coordinates.
     data_name
-        mmCIF data block name.
+        PDBx/mmCIF data block name.
     cell_lengths_nm
         Optional periodic cell lengths in nanometers.
     overwrite

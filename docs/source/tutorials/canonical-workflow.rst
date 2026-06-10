@@ -49,8 +49,8 @@ Build the starting model:
 
 In this version, this command writes exactly three output files:
 
-* ``sam_grafting_density.cif`` as a visual smoke test for the Pd slab and SAM
-  sulfur anchor positions
+* ``sam_grafting_density.cif`` as a PDBx/mmCIF visual smoke test for the Pd
+  slab and SAM sulfur anchor positions
 * ``build_summary.json`` for a JSON build report that scripts can read
 * ``resolved_config.yaml`` for the exact validated input used for the build
 
@@ -96,7 +96,7 @@ That command writes these additional files:
 
 * ``interchange.json`` for the primary OpenFF Interchange export
 * ``solvated_system.cif`` for the full slab + SAMs + reactants + solvent
-  coordinates you can inspect and load in OpenMM
+  PDBx/mmCIF coordinates you can inspect and load in OpenMM
 * ``anchor_metadata.json`` for SAM anchor metadata
 
 The ``interchange.json`` file is OpenFF Interchange JSON written with

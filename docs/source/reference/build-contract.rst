@@ -107,6 +107,10 @@ The output names are stable so user scripts and documentation can refer to one
 set of paths. Backend exports treat ``interchange.json`` as the primary portable
 system artifact.
 
+SAMMD writes PDBx/mmCIF structure artifacts using the standard ``.cif``
+extension. The ``.mmcif`` extension is also used elsewhere in the ecosystem, but
+SAMMD keeps stable ``.cif`` names for the artifacts below.
+
 The build summary also records engine export planning metadata. OpenMM is the
 student teaching path through the OpenMM Python API, while OpenFF Interchange
 remains the primary handoff. GROMACS, LAMMPS, Amber, and OpenMM XML are reserved
@@ -121,13 +125,13 @@ beginner workflow.
      - Contract
    * - ``sam_grafting_density.cif``
      - Current
-     - Lightweight visual smoke-test CIF for the deterministic plan, including
-       the Pd slab and SAM sulfur atoms at planned three-fold hollow-site anchor
-       positions. In default builds, this file is meant for checking slab
-       geometry and grafting density; it does not include full SAM, solvent, or
-       reactant coordinates and is not a parameterized backend system. Backend
-       export leaves this smoke-test file separate from the full solvated-system
-       structure.
+     - Lightweight visual smoke-test PDBx/mmCIF ``.cif`` file for the
+       deterministic plan, including the Pd slab and SAM sulfur atoms at planned
+       three-fold hollow-site anchor positions. In default builds, this file is
+       meant for checking slab geometry and grafting density; it does not include
+       full SAM, solvent, or reactant coordinates and is not a parameterized
+       backend system. Backend export leaves this smoke-test file separate from
+       the full solvated-system structure.
    * - ``build_summary.json``
      - Current
      - Machine-readable summary of the validated plan, output paths, and
@@ -139,7 +143,8 @@ beginner workflow.
      - Backend
      - Written by ``--full`` for fully constructed SAM, solvent, and
        reactant coordinates. This is a human-inspectable/OpenMM-loadable
-       structure file paired with the backend system artifact.
+       PDBx/mmCIF ``.cif`` structure file paired with the backend system
+       artifact.
    * - ``interchange.json``
      - Backend
      - Written by ``--full`` as the primary portable OpenFF

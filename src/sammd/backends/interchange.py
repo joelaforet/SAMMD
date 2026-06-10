@@ -700,6 +700,8 @@ def _anchor_metadata(result: BackendExportResult) -> dict[str, object]:
 
 
 def _write_pdbx(path: Path, topology: Any, positions: Any, *, overwrite: bool) -> None:
+    """Write OpenMM PDBx/mmCIF text to SAMMD's stable ``.cif`` artifact path."""
+
     destination = Path(path)
     if destination.exists() and not overwrite:
         raise FileExistsError(f"refusing to overwrite existing file: {destination}")

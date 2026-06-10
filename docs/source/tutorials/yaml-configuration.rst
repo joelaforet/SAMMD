@@ -138,9 +138,10 @@ Beginner glossary
    trajectories; students will learn OpenMM simulation control separately.
 
 ``sam_grafting_density.cif``
-   The first structure file to inspect after the default ``sammd build``. It is
-   a visual smoke test showing the configured surface and planned sulfur anchor
-   positions for the SAM. Use it to check slab geometry, three-fold hollow-site
-   placement, and grafting density. Full SAM, solvent, and reactant coordinates
-   are created in ``solvated_system.cif`` when you export OpenMM files.
+   The first PDBx/mmCIF ``.cif`` structure file to inspect after the default
+   ``sammd build``. It is a visual smoke test showing the configured surface and
+   planned sulfur anchor positions for the SAM. Use it to check slab geometry,
+   three-fold hollow-site placement, and grafting density. Full SAM, solvent,
+   and reactant coordinates are created in ``solvated_system.cif`` when you
+   export OpenMM files.
    Trajectory frames are created later by OpenMM simulation scripts.

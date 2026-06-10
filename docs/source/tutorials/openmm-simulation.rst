@@ -27,8 +27,9 @@ Bridges2. The default example here uses ``cuda-12-4``:
    pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
 
 This writes files such as ``interchange.json``, ``solvated_system.cif``, and
-``anchor_metadata.json``. In this tutorial we load ``interchange.json`` first,
-then ask OpenFF Interchange for the OpenMM objects.
+``anchor_metadata.json``. The ``solvated_system.cif`` file is a PDBx/mmCIF
+structure using SAMMD's stable ``.cif`` artifact name. In this tutorial we load
+``interchange.json`` first, then ask OpenFF Interchange for the OpenMM objects.
 
 Full copy/paste script
 ----------------------

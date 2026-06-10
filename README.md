@@ -35,7 +35,7 @@ SAMMD handles:
   settings.
 - **Backend export**: optional OpenFF/OpenMM files for supported non-salt
   systems.
-- **Inspection files**: `topology.cif`, `build_summary.json`, and
+- **Inspection files**: `sam_grafting_density.cif`, `build_summary.json`, and
   `resolved_config.yaml` for the default lightweight build.
 
 SAMMD builds and exports chemistry, structure, and parameter artifacts. OpenMM
@@ -177,12 +177,16 @@ pixi run sammd build sammd.yaml --output-dir outputs --overwrite
 
 The default build command writes:
 
-- `outputs/topology.cif`
+- `outputs/sam_grafting_density.cif`
 - `outputs/build_summary.json`
 - `outputs/resolved_config.yaml`
 
-Open `outputs/topology.cif` in a molecule viewer such as PyMOL to inspect the
-configured surface and SAM anchor placements before moving on.
+Open `outputs/sam_grafting_density.cif` in a molecule viewer such as PyMOL to
+inspect the configured surface and SAM anchor placements before moving on.
+
+SAMMD writes PDBx/mmCIF structure files with the standard `.cif` extension.
+The `.mmcif` extension is also common in the broader ecosystem; SAMMD keeps
+stable `.cif` artifact names in its CLI and docs.
 
 ## Backend Export For OpenMM
 
@@ -205,7 +209,8 @@ sammd build sammd.yaml --output-dir outputs --overwrite --full
 Backend mode writes these additional files:
 
 - `interchange.json`: OpenFF Interchange JSON
-- `solvated_system.cif`: topology and coordinates for the constructed system
+- `solvated_system.cif`: PDBx/mmCIF topology and coordinates for the
+  constructed system
 - `anchor_metadata.json`: SAM anchor and sulfur-metal pair metadata
 
 Salt-containing configs are rejected until salt backend export is implemented.

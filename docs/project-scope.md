@@ -31,7 +31,7 @@ Recommended v0.1.0 first-release deliverables:
 - Centered, double-sided registered Fcc(111) slab geometry with SAMs on both faces and solvent on both sides.
 - Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices. The default build remains lightweight; `sammd build --full` performs parameterized MD-file export in a CUDA-labeled pixi environment for supported non-salt configs.
 - Static CHARMM-INTERFACE-derived Fcc metal Lennard-Jones parameters packaged or identified as OpenFF-compatible OFFXML resource support.
-- Visualization-friendly build artifacts, centered on mmCIF/PDBx topology-inspection output plus machine-readable build summaries.
+- Visualization-friendly build artifacts, centered on PDBx/mmCIF topology-inspection output plus machine-readable build summaries.
 - Pytest coverage for configuration validation, parameter conversion, deterministic builders, and import smoke tests.
 - ReadTheDocs/Sphinx scaffold with a canonical workflow tutorial and YAML configuration tutorial.
 
@@ -170,7 +170,7 @@ Initial package modules:
 - `sammd.core.builders`: high-level lightweight build planner.
 - `sammd.backends.interchange`: optional CUDA-environment OpenFF `Interchange` construction/export path for supported non-salt configs.
 - `sammd.backends.openmm_runtime`: optional/internal OpenMM utilities for development and backend validation, not a student-facing SAMMD run-wrapper API.
-- `sammd.core.io`: v0.1.0 mmCIF/PDBx topology-inspection writing; post-v0.1.0 DCD trajectory naming conventions and visualization-oriented metadata helpers.
+- `sammd.core.io`: v0.1.0 PDBx/mmCIF topology-inspection writing; post-v0.1.0 DCD trajectory naming conventions and visualization-oriented metadata helpers.
 - `sammd.runtime.reporting`: post-v0.1.0 OpenMM reporter configuration for trajectories and thermodynamic state data.
 - `sammd.analysis`: orientation metrics and later umbrella-sampling support.
 - `sammd.cli`: minimal `init` and maybe `validate` commands.
@@ -232,7 +232,7 @@ SAMMD-generated structures and OpenMM-run outputs should be optimized for visual
 
 Default post-v0.1.0 backend exports plus tutorial-only OpenMM run outputs should include:
 
-- `solvated_system.cif`: mmCIF/PDBx topology and starting coordinates for the full slab + SAMs + reactants + solvent system.
+- `solvated_system.cif`: PDBx/mmCIF topology and starting coordinates for the full slab + SAMs + reactants + solvent system.
 - `trajectory.dcd`: DCD trajectory from OpenMM.
 - `thermodynamics.csv`: tabular OpenMM state data from a thermodynamic reporter.
 - Optional OpenMM restart/checkpoint artifacts for continuing simulations.
@@ -252,7 +252,7 @@ plugin collection; the concrete
 `openff-interchange` package version is recorded when SAMMD writes the artifact,
 and pre-1.0 JSON compatibility is not guaranteed across versions.
 
-mmCIF/PDBx should be preferred over legacy PDB because SAMMD systems may have many atoms, many solvent/reactant molecules, nonstandard residues, and metal particles. Atom names, residue names, chain IDs, molecule labels, and component metadata should be chosen so PyMOL sessions are easy to inspect: metal slab, top SAM, bottom SAM, solvent, salts, and reactants should be distinguishable by selection.
+PDBx/mmCIF should be preferred over legacy PDB because SAMMD systems may have many atoms, many solvent/reactant molecules, nonstandard residues, and metal particles. SAMMD uses stable `.cif` artifact names for these PDBx/mmCIF files; `.mmcif` is also used elsewhere in the ecosystem. Atom names, residue names, chain IDs, molecule labels, and component metadata should be chosen so PyMOL sessions are easy to inspect: metal slab, top SAM, bottom SAM, solvent, salts, and reactants should be distinguishable by selection.
 
 DCD should be the canonical post-v0.1.0/tutorial OpenMM trajectory convention, not a v0.1.0 build artifact. The topology/trajectory pair should load cleanly as `solvated_system.cif` plus `trajectory.dcd` in PyMOL or common Python analysis tools after user-owned OpenMM scripts run from SAMMD-exported artifacts.
 
@@ -347,7 +347,7 @@ High-value unit tests for the first implementation:
 
 - YAML template loads into the Pydantic model.
 - YAML template defaults include TIP3P, `0.25 nm^2 / molecule`, and `10000 kJ mol^-1 nm^-2` Pd restraints; the Pd(111) sulfur site remains an internal builder default rather than a beginner template field.
-- YAML template includes v0.1.0 configurable output sections for mmCIF build artifacts; DCD and thermodynamic state data remain post-v0.1.0/tutorial-only simulation conventions.
+- YAML template includes v0.1.0 configurable output sections for PDBx/mmCIF `.cif` build artifacts; DCD and thermodynamic state data remain post-v0.1.0/tutorial-only simulation conventions.
 - Invalid metal, facet, grafting density, solvent fraction, or concentration fails clearly.
 - Mixed SAM fractions must sum to one, or explicit counts must match selected grafting sites.
 - INTERFACE Fcc metal registry reproduces the table above.
@@ -359,7 +359,7 @@ High-value unit tests for the first implementation:
 - Cinnamaldehyde reactant parsing is deterministic for `C1=CC=C(C=C1)/C=C/C=O`.
 - Post-v0.1.0 reporter configuration maps user field names to OpenMM reporter arguments.
 - Post-v0.1.0 test reporter defaults request all supported thermodynamic fields.
-- v0.1.0 mmCIF output paths are deterministic and can be overridden; DCD output paths are post-v0.1.0/tutorial-only simulation conventions.
+- v0.1.0 PDBx/mmCIF `.cif` output paths are deterministic and can be overridden; DCD output paths are post-v0.1.0/tutorial-only simulation conventions.
 - Python public imports are stable.
 
 Integration tests should be marked separately because OpenFF/OpenMM/packmol can be slow or environment-sensitive.
@@ -391,7 +391,7 @@ The docs should assume undergraduate contributors and make success states explic
 - The default grafting density is `0.25 nm^2 / molecule`.
 - Solvent and reactant placement should use OpenFF/PACKMOL-style packing, with counts derived from target composition.
 - Reactant orientation analysis can begin with a configurable COM-to-selection vector relative to the surface normal.
-- mmCIF/PDBx is the default topology/starting-coordinate output format.
+- PDBx/mmCIF is the default topology/starting-coordinate output format, written with stable `.cif` artifact names.
 - DCD is the default post-v0.1.0/tutorial-only OpenMM trajectory output convention, not a v0.1.0 build artifact.
 - OpenMM thermodynamic state data should be written during post-v0.1.0/tutorial-only OpenMM runs, with future tests requesting all supported fields and users allowed to override fields/intervals.
 
