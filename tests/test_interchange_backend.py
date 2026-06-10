@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,13 +19,23 @@ from sammd.model.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR
 def test_backend_module_import_does_not_import_optional_science_modules() -> None:
     """Keep backend helpers lazy until export functions are called."""
 
-    for name in list(sys.modules):
-        if name.startswith(("openff", "openmm", "rdkit")):
-            sys.modules.pop(name, None)
+    code = """
+import importlib
+import sys
 
-    importlib.import_module("sammd.backends.interchange")
+optional_prefixes = ("openff", "openmm", "rdkit")
+for name in list(sys.modules):
+    if name.startswith(optional_prefixes):
+        sys.modules.pop(name, None)
 
-    assert not any(name.startswith(("openff", "openmm", "rdkit")) for name in sys.modules)
+importlib.import_module("sammd.backends.interchange")
+
+loaded = [name for name in sys.modules if name.startswith(optional_prefixes)]
+if loaded:
+    raise SystemExit(f"optional science modules imported: {loaded!r}")
+"""
+
+    subprocess.run([sys.executable, "-c", code], check=True, capture_output=True, text=True)
 
 
 def test_progress_logs_and_preserves_callback_compatibility(caplog) -> None:
