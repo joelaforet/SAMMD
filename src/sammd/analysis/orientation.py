@@ -1,4 +1,4 @@
-"""Lightweight orientation analysis primitives for SAMMD trajectories."""
+"""Dependency-free orientation analysis primitives for SAMMD trajectories."""
 
 from __future__ import annotations
 

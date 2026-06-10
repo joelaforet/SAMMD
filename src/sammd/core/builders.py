@@ -1,4 +1,4 @@
-"""Lightweight public build-plan composition for SAMMD MVP workflows."""
+"""Public build-plan composition for deterministic SAMMD workflows."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Lightweight CHARMM-INTERFACE metal parameter registry."""
+"""CHARMM-INTERFACE metal parameter registry for SAMMD exports."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Lightweight solution composition planning for SAMMD systems."""
+"""Deterministic solution composition planning for SAMMD systems."""
 
 from __future__ import annotations
 
@@ -152,8 +152,8 @@ def plan_solution_composition(config: SAMMDConfig, box_volume_nm3: float) -> Sol
     config
         Validated SAMMD configuration.
     box_volume_nm3
-        Volume in nm^3 used for solution count planning. Lightweight build plans may pass an
-        approximate composition-planning volume rather than a final simulation cell volume.
+        Volume in nm^3 used for solution count planning. Build planners may pass an approximate
+        composition-planning volume rather than a final simulation cell volume.
 
     Returns
     -------

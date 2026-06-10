@@ -1,4 +1,4 @@
-"""Lightweight surface metadata and deterministic slab planning."""
+"""Surface metadata and deterministic slab planning."""
 
 from __future__ import annotations
 
