@@ -68,7 +68,7 @@ cuda-13-0 = ["dev", "interchange", "cuda-13-0"]
 
 [tasks]
 test = "python -m pytest --cov=sammd --cov-report=term-missing"
-lint = "ruff check src/sammd tests tools"
+lint = "ruff check src/sammd tests"
 interchange-tests = "python -m pytest tests/test_forcefields.py tests/test_openff.py tests/test_interchange_backend.py tests/test_packmol.py -q"
-real-system-smoke = "python tools/openmm_smoke.py --platform CUDA --output-dir outputs/openmm_smoke/pd111_propanethiol_cinnamaldehyde --overwrite"
+temporary-openmm-smoke = "python temporary/openmm_smoke.py --platform CUDA --output-dir outputs/openmm_smoke/pd111_propanethiol_cinnamaldehyde --overwrite"
 install-cuda-kernel = "python -m ipykernel install --user --name sammd-cuda --display-name 'Python (SAMMD CUDA)'"

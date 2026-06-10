@@ -1,8 +1,8 @@
-"""Run a small real OpenMM smoke system for SAMMD.
+"""Temporary developer utility for running a small real OpenMM smoke system.
 
-This script is intentionally outside the public package API. It exercises the current
-deterministic planners with optional OpenFF/OpenMM dependencies from a CUDA-labeled
-pixi environment and builds a pragmatic OpenMM system directly for backend validation.
+This script is dev-only, not part of the SAMMD public API or v0.1.0 release
+contract, and may be deleted. SAMMD should prepare/export build artifacts;
+OpenMM simulation workflows belong in docs and notebooks examples.
 """
 
 from __future__ import annotations
@@ -610,7 +610,10 @@ def require_openmm_modules() -> Any:
         import openmm
         from openmm import app, unit
     except ImportError as error:
-        msg = "OpenMM is required; run this through `pixi run -e cuda-12-4 real-system-smoke`."
+        msg = (
+            "OpenMM is required; run this temporary utility through "
+            "`pixi run -e cuda-13-0 temporary-openmm-smoke`."
+        )
         raise SystemExit(msg) from error
     return type("OpenMMModules", (), {"openmm": openmm, "app": app, "unit": unit})
 
@@ -624,8 +627,8 @@ def require_openff_modules() -> Any:
         from openff.toolkit.utils.rdkit_wrapper import RDKitToolkitWrapper
     except ImportError as error:
         msg = (
-            "OpenFF Toolkit with NAGL support is required; run this through "
-            "`pixi run -e cuda-12-4 real-system-smoke`."
+            "OpenFF Toolkit with NAGL support is required; run this temporary utility through "
+            "`pixi run -e cuda-13-0 temporary-openmm-smoke`."
         )
         raise SystemExit(msg) from error
     return type(

@@ -35,7 +35,7 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Lint
-        run: ruff check src/sammd tests tools
+        run: ruff check src/sammd tests
 
       - name: Test with coverage
         run: python -m pytest --cov=sammd --cov-report=term-missing

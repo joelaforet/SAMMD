@@ -16115,7 +16115,7 @@ packages:
 - pypi: ./
   name: sammd
   version: 0.1.0
-  sha256: 0f57d5d96e05ada36c4e087aa47abc56fe173b68f3335ab7878c3f54a4d649d1
+  sha256: fc1ab7c1bdd3b9056a85f61395e07807adc4a78fd27ebf8dbd68c653497c54d5
   requires_dist:
   - click>=8.1
   - pydantic>=2

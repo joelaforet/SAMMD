@@ -1,4 +1,4 @@
-"""Tests for the optional real-system OpenMM smoke runner."""
+"""Temporary tests for the developer-only OpenMM smoke runner."""
 
 from __future__ import annotations
 
@@ -17,9 +17,9 @@ from sammd.utils.geometry import norm
 
 
 def load_smoke_tool():
-    """Load the tools/openmm_smoke.py module without requiring tools as a package."""
+    """Load the sibling temporary/openmm_smoke.py module."""
 
-    path = Path(__file__).resolve().parents[1] / "tools" / "openmm_smoke.py"
+    path = Path(__file__).resolve().with_name("openmm_smoke.py")
     spec = importlib.util.spec_from_file_location("sammd_openmm_smoke_tool", path)
     assert spec is not None
     assert spec.loader is not None

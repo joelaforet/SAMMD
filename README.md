@@ -278,13 +278,6 @@ pixi run pytest -q
 pixi run -e docs python -m sphinx -W -b html docs/source docs/build/html
 ```
 
-To run the real-system smoke test from the default CUDA backend environment:
-
-```bash
-pixi install -e cuda-12-4
-pixi run -e cuda-12-4 real-system-smoke
-```
-
 To register the selected CUDA environment as a Jupyter kernel:
 
 ```bash

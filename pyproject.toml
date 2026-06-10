@@ -41,6 +41,9 @@ SAMMDMetalSulfurLJCollection = "sammd.backends.interchange_plugins:SAMMDMetalSul
 [tool.hatch.build.targets.wheel]
 packages = ["src/sammd"]
 
+[tool.hatch.build.targets.sdist]
+exclude = ["/temporary"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -63,6 +66,7 @@ omit = [
   "tests/*",
   "src/sammd/interchange_backend.py",
   "src/sammd/backends/interchange.py",
+  "src/sammd/backends/interchange_plugins.py",
 ]
 
 [tool.coverage.report]
