@@ -62,3 +62,25 @@ jobs:
 
       - name: Build docs
         run: python -m sphinx -W -b html docs/source docs/build/html
+
+  interchange:
+    name: Interchange integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Pixi
+        uses: prefix-dev/setup-pixi@v0.9.0
+        with:
+          environments: interchange
+          cache: true
+
+      - name: Check Interchange dependencies
+        run: |
+          pixi run -e interchange python -c "import openff.toolkit, openff.interchange, rdkit"
+          pixi run -e interchange bash -lc "command -v packmol"
+
+      - name: Run Interchange integration tests
+        run: pixi run -e interchange interchange-tests

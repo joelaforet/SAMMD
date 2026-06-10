@@ -26,7 +26,7 @@ myst-parser = ">=4"
 sphinx-copybutton = ">=0.5"
 furo = ">=2024.8.6"
 
-[feature.backend.dependencies]
+[feature.interchange.dependencies]
 rdkit = "*"
 mbuild = "*"
 openff-toolkit = "*"
@@ -50,7 +50,7 @@ cuda-version = "=12.6"
 cuda = "12.6"
 
 [feature.cuda-13-0.dependencies]
-# CUDA 13.0 driver line, matching the previous generic backend environment.
+# CUDA 13.0 driver line, matching the previous generic Interchange environment.
 openmm = "=8.5.1"
 cuda-version = "=13.0"
 
@@ -61,12 +61,14 @@ cuda = "13.0"
 default = ["dev"]
 dev = ["dev"]
 docs = ["dev", "docs"]
-cuda-12-4 = ["dev", "backend", "cuda-12-4"]
-cuda-12-6 = ["dev", "backend", "cuda-12-6"]
-cuda-13-0 = ["dev", "backend", "cuda-13-0"]
+interchange = ["dev", "interchange"]
+cuda-12-4 = ["dev", "interchange", "cuda-12-4"]
+cuda-12-6 = ["dev", "interchange", "cuda-12-6"]
+cuda-13-0 = ["dev", "interchange", "cuda-13-0"]
 
 [tasks]
 test = "python -m pytest --cov=sammd --cov-report=term-missing"
 lint = "ruff check src/sammd tests tools"
+interchange-tests = "python -m pytest tests/test_forcefields.py tests/test_openff.py tests/test_interchange_backend.py tests/test_packmol.py -q"
 real-system-smoke = "python tools/openmm_smoke.py --platform CUDA --output-dir outputs/openmm_smoke/pd111_propanethiol_cinnamaldehyde --overwrite"
 install-cuda-kernel = "python -m ipykernel install --user --name sammd-cuda --display-name 'Python (SAMMD CUDA)'"
