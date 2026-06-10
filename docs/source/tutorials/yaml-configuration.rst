@@ -74,14 +74,12 @@ Important sections
      Names build output files. The ``sam_grafting_density`` key controls the
      slab-and-sulfur visual check file. The ``solvated_system`` key controls the
      full CIF written by ``--full`` with slab, SAMs, reactants, and
-     solvent. It also names files such as ``interchange.json``, ``system.xml``,
-     ``anchor_metadata.json``, ``build_summary.json``, and
-     ``resolved_config.yaml``.
+     solvent. It also names files such as ``interchange.json``,
+     ``anchor_metadata.json``, ``build_summary.json``, and ``resolved_config.yaml``.
      These are not MD trajectory files. ``interchange.json`` stores OpenFF
      Interchange data. Interchange is not yet at version 1.0, so this JSON
      format may change between versions. For this tutorial, use OpenMM.
-     ``system.xml`` is an OpenMM file only. This version does not include
-     GROMACS, LAMMPS, or Amber exports.
+     This version does not include GROMACS, LAMMPS, Amber, or OpenMM XML exports.
 
 Resolved defaults to notice
 ---------------------------

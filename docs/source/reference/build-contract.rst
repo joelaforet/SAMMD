@@ -87,8 +87,8 @@ cell lengths.
 
 These gates intentionally do not require OpenMM, OpenFF, or full backend
 artifacts. Missing backend artifacts such as ``solvated_system.cif``,
-``interchange.json``, ``system.xml``, and ``anchor_metadata.json`` are not
-failures unless ``--full`` is requested.
+``interchange.json`` and ``anchor_metadata.json`` are not failures unless
+``--full`` is requested.
 
 Backend validation gates should stay skipped/not required when optional
 dependencies or backend artifacts are absent. Once ``--full`` writes
@@ -98,8 +98,6 @@ concrete artifacts, those gates should check that:
 * The reloaded ``Interchange`` exports to an OpenMM ``System``.
 * Topology atom count, positions atom count, and OpenMM ``System`` particle
   count agree.
-* ``system.xml`` deserializes if written and its particle count agrees with the
-  topology/positions/backend system count.
 * Minimization produces finite energies and the final energy is not increased.
 
 Artifact contract
@@ -110,10 +108,10 @@ set of paths. Backend exports treat ``interchange.json`` as the primary portable
 system artifact.
 
 The build summary also records engine export planning metadata. OpenMM is the
-student teaching path through the OpenMM Python API; ``system.xml`` is only a
-convenience export derived from the backend, while OpenFF Interchange remains the
-primary handoff. GROMACS, LAMMPS, and Amber are reserved only as future
-downstream exports from Interchange and are not taught in the beginner workflow.
+student teaching path through the OpenMM Python API, while OpenFF Interchange
+remains the primary handoff. GROMACS, LAMMPS, Amber, and OpenMM XML are reserved
+only as future downstream exports from Interchange and are not taught in the
+beginner workflow.
 
 .. list-table::
    :header-rows: 1
@@ -150,10 +148,6 @@ downstream exports from Interchange and are not taught in the beginner workflow.
        the concrete ``openff-interchange`` package version when the artifact is
        written and treats pre-1.0 Interchange JSON compatibility as not
        guaranteed across versions.
-   * - ``system.xml``
-     - Backend
-     - Written by ``--full`` as an OpenMM convenience export derived
-       from the backend system, not the primary portable SAMMD artifact.
    * - ``anchor_metadata.json``
      - Backend
      - Written by ``--full`` for selected sulfur-metal pair metadata.
@@ -164,6 +158,6 @@ Current limitation
 By default, ``sammd build`` writes only ``sam_grafting_density.cif``,
 ``build_summary.json``, and ``resolved_config.yaml``. With ``--full``
 in a CUDA-labeled pixi environment, it also writes ``solvated_system.cif``,
-``interchange.json``, ``system.xml``, and ``anchor_metadata.json``. Public SAMMD
-APIs should not add equilibration, production simulation helpers, or direct
-GROMACS/LAMMPS/Amber command workflows as part of this contract.
+``interchange.json``, and ``anchor_metadata.json``. Public SAMMD APIs should not
+add equilibration, production simulation helpers, or direct GROMACS/LAMMPS/Amber
+command workflows as part of this contract.

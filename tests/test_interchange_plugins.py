@@ -52,3 +52,53 @@ def test_interchange_plugin_collection_entry_point_is_registered() -> None:
         == "sammd.backends.interchange_plugins:SAMMDMetalSulfurLJCollection"
         for entry_point in entry_points
     )
+
+
+def test_interchange_plugin_collection_reload_applies_openmm_exception() -> None:
+    """Persisted Interchange JSON reloads and still applies metal-S exceptions."""
+
+    pytest.importorskip("openff.interchange")
+    pytest.importorskip("openff.toolkit")
+    pytest.importorskip("openmm")
+
+    from openff.interchange import Interchange
+    from openff.toolkit import ForceField, Molecule
+    from openff.units import unit
+    from openmm import NonbondedForce
+    from openmm import unit as openmm_unit
+
+    plugins.register_interchange_plugin_collection()
+
+    molecule = Molecule.from_smiles("C")
+    molecule.generate_conformers(n_conformers=1)
+    molecule.assign_partial_charges("zeros")
+    topology = molecule.to_topology()
+    topology.box_vectors = [[3, 0, 0], [0, 3, 0], [0, 0, 3]] * unit.nanometer
+    force_field = ForceField("openff_unconstrained-2.2.1.offxml")
+    interchange = Interchange.from_smirnoff(
+        force_field,
+        topology,
+        positions=molecule.conformers[0],
+        charge_from_molecules=[molecule],
+    )
+    collection = plugins.create_metal_sulfur_lj_collection(((0, 1),))
+    interchange.collections[collection.type] = collection
+
+    reloaded = Interchange.model_validate_json(interchange.model_dump_json())
+    system = reloaded.to_openmm(combine_nonbonded_forces=True)
+
+    nonbonded_force = next(
+        force for force in system.getForces() if isinstance(force, NonbondedForce)
+    )
+    exceptions = [
+        nonbonded_force.getExceptionParameters(index)
+        for index in range(nonbonded_force.getNumExceptions())
+    ]
+    _, _, charge_product, sigma, epsilon = next(
+        params for params in exceptions if {int(params[0]), int(params[1])} == {0, 1}
+    )
+    assert charge_product.value_in_unit(openmm_unit.elementary_charge**2) == pytest.approx(0.0)
+    assert sigma.value_in_unit(openmm_unit.nanometer) == pytest.approx(METAL_SULFUR_SIGMA_NM)
+    assert epsilon.value_in_unit(openmm_unit.kilocalorie_per_mole) == pytest.approx(
+        METAL_SULFUR_EPSILON_KCAL_MOL
+    )

@@ -94,7 +94,7 @@ Conversion notes:
 
 [OpenFF Interchange construction](https://docs.openforcefield.org/projects/interchange/en/stable/using/construction.html) supports constructing an `Interchange` from a SMIRNOFF `ForceField` and OpenFF `Molecule` or `Topology` objects.
 
-The SAMMD backend pipeline uses OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy is applied after export to the selected OpenMM pair representation rather than encoded as a beginner-facing YAML option. The explicit `sammd build --full` path writes `solvated_system.cif`, `interchange.json`, `system.xml`, and `anchor_metadata.json` for supported non-salt configs in a CUDA-labeled pixi environment.
+The SAMMD backend pipeline uses OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy is encoded in a SAMMD Interchange plugin collection rather than exposed as a beginner-facing YAML option. The explicit `sammd build --full` path writes `solvated_system.cif`, `interchange.json`, and `anchor_metadata.json` for supported non-salt configs in a CUDA-labeled pixi environment.
 
 OpenMM GPU support is tied to the NVIDIA driver and CUDA line available on the
 machine. Students should run `nvidia-smi` on the GPU node or workstation, then
@@ -107,7 +107,7 @@ version shown there. Current teaching environments are:
 | `cuda-12-6` | 12.6 | `openmm=8.4.0` | PSC Bridges2 |
 | `cuda-13-0` | 13.0 | `openmm=8.5.1` | newer local NVIDIA drivers |
 
-The `interchange.json` artifact is OpenFF Interchange JSON serialization with `Interchange.model_dump_json` and reload through `Interchange.model_validate_json`. SAMMD records the concrete `openff-interchange` package version when a real artifact is written, because pre-1.0 Interchange JSON compatibility is not guaranteed across versions.
+The `interchange.json` artifact is OpenFF Interchange JSON serialization with `Interchange.model_dump_json` and reload through `Interchange.model_validate_json` after registering SAMMD's plugin collection. SAMMD records the concrete `openff-interchange` package version when a real artifact is written, because pre-1.0 Interchange JSON compatibility is not guaranteed across versions.
 
 Relevant behavior:
 
@@ -205,7 +205,7 @@ adding artifact exports for OpenMM handoff:
 pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
 ```
 
-That command writes `interchange.json`, `solvated_system.cif`, `system.xml`, and
+That command writes `interchange.json`, `solvated_system.cif`, and
 `anchor_metadata.json` in addition to the lightweight artifacts. Salt-containing
 configs are rejected until salt backend export is implemented.
 
@@ -245,10 +245,10 @@ sulfur atoms at planned three-fold hollow-site anchors. It is useful for
 checking slab geometry and SAM grafting density before full backend export; it
 does not include full SAM molecule, solvent, or reactant coordinates.
 With `--full` in a CUDA-labeled pixi environment, SAMMD also writes
-`solvated_system.cif`, `interchange.json`, `system.xml`, and
-`anchor_metadata.json`.
+`solvated_system.cif`, `interchange.json`, and `anchor_metadata.json`.
 The `interchange.json` artifact is JSON from `Interchange.model_dump_json` with
-reload through `Interchange.model_validate_json`; the concrete
+reload through `Interchange.model_validate_json` after registering SAMMD's
+plugin collection; the concrete
 `openff-interchange` package version is recorded when SAMMD writes the artifact,
 and pre-1.0 JSON compatibility is not guaranteed across versions.
 

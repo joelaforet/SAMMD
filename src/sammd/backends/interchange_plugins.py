@@ -14,145 +14,215 @@ from sammd.model.metal_sulfur import (
 
 SAMMD_METAL_SULFUR_COLLECTION_TYPE = "SAMMDMetalSulfurLJ"
 SAMMD_METAL_SULFUR_EXPRESSION = "4*epsilon*((sigma/r)**12-(sigma/r)**6)"
+_INTERCHANGE_PLUGIN_COLLECTION_REGISTERED = False
+_SAMMD_METAL_SULFUR_LJ_COLLECTION: type[Any] | None = None
 
-try:  # pragma: no cover - exercised only in optional OpenFF environments
-    from openff.interchange.components.potentials import Potential
-    from openff.interchange.models import PotentialKey, TopologyKey
-    from openff.interchange.smirnoff import SMIRNOFFCollection
-    from openff.units import unit
-except ImportError as error:  # pragma: no cover - dependency-light tests assert helpers
-    OPENFF_PLUGIN_IMPORT_ERROR: ImportError | None = error
-    Potential = PotentialKey = TopologyKey = unit = None  # type: ignore[assignment]
-
-    class SMIRNOFFCollection:  # type: ignore[no-redef]
-        """Placeholder base so this module remains importable without OpenFF."""
-
-else:  # pragma: no cover - OpenFF is not installed in the default test env
-    OPENFF_PLUGIN_IMPORT_ERROR = None
+def __getattr__(name: str) -> Any:
+    if name == "SAMMDMetalSulfurLJCollection":
+        return _collection_class()
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)
 
 
-class SAMMDMetalSulfurLJCollection(SMIRNOFFCollection):
-    """Exact SAMMD-selected sulfur-metal LJ overrides for Interchange exports."""
+def _collection_class() -> type[Any]:
+    global _SAMMD_METAL_SULFUR_LJ_COLLECTION
 
-    type: str = SAMMD_METAL_SULFUR_COLLECTION_TYPE
-    is_plugin: bool = True
-    expression: str = SAMMD_METAL_SULFUR_EXPRESSION
+    if _SAMMD_METAL_SULFUR_LJ_COLLECTION is not None:
+        return _SAMMD_METAL_SULFUR_LJ_COLLECTION
 
-    @classmethod
-    def allowed_parameter_handlers(cls) -> list[type]:
-        """No SMIRNOFF handler owns these exact topology-index pairs."""
+    try:
+        from openff.interchange.components.potentials import Potential
+        from openff.interchange.models import PotentialKey, TopologyKey
+        from openff.interchange.smirnoff import SMIRNOFFCollection
+        from openff.units import unit
+    except ImportError as error:  # pragma: no cover - dependency-light environments
+        msg = "OpenFF Interchange is required to construct the SAMMD metal-S plugin collection."
+        raise ImportError(msg) from error
 
-        return []
+    class SAMMDMetalSulfurLJCollection(SMIRNOFFCollection):
+        """Exact SAMMD-selected sulfur-metal LJ overrides for Interchange exports."""
 
-    @classmethod
-    def supported_parameters(cls) -> list[str]:
-        """Return the parameter names stored by this plugin collection."""
+        type: str = SAMMD_METAL_SULFUR_COLLECTION_TYPE
+        is_plugin: bool = True
+        expression: str = SAMMD_METAL_SULFUR_EXPRESSION
 
-        return ["id", "sigma", "epsilon", "charge_product"]
+        @classmethod
+        def allowed_parameter_handlers(cls) -> list[type]:
+            """No SMIRNOFF handler owns these exact topology-index pairs."""
 
-    @classmethod
-    def potential_parameters(cls) -> list[str]:
-        """Return parameters stored on each selected pair potential."""
+            return []
 
-        return ["sigma", "epsilon", "charge_product"]
+        @classmethod
+        def supported_parameters(cls) -> list[str]:
+            """Return the parameter names stored by this plugin collection."""
 
-    def store_matches(self, *args: Any, **kwargs: Any) -> None:
-        """Disable SMIRNOFF matching; SAMMD provides exact topology pairs."""
+            return ["id", "sigma", "epsilon", "charge_product"]
 
-        raise NotImplementedError("SAMMD metal-S pairs are assigned by atom index")
+        @classmethod
+        def potential_parameters(cls) -> list[str]:
+            """Return parameters stored on each selected pair potential."""
 
-    def store_potentials(self, *args: Any, **kwargs: Any) -> None:
-        """Disable SMIRNOFF parameter storage; SAMMD provides exact potentials."""
+            return ["sigma", "epsilon", "charge_product"]
 
-        raise NotImplementedError("SAMMD metal-S potentials are assigned by atom index")
+        def store_matches(self, *args: Any, **kwargs: Any) -> None:
+            """Disable SMIRNOFF matching; SAMMD provides exact topology pairs."""
 
-    @classmethod
-    def from_anchor_pairs(
-        cls,
-        anchor_pairs: Iterable[tuple[int, int]],
-        *,
-        sigma_nm: float = METAL_SULFUR_SIGMA_NM,
-        epsilon_kcal_mol: float = METAL_SULFUR_EPSILON_KCAL_MOL,
-    ) -> SAMMDMetalSulfurLJCollection:
-        """Build a plugin collection from exact sulfur-metal atom-index pairs."""
+            raise NotImplementedError("SAMMD metal-S pairs are assigned by atom index")
 
-        if OPENFF_PLUGIN_IMPORT_ERROR is not None:
-            raise ImportError(
-                "OpenFF Interchange is required to construct the SAMMD metal-S plugin collection."
-            ) from OPENFF_PLUGIN_IMPORT_ERROR
-        validated_pairs = validate_anchor_pairs(anchor_pairs)
-        _validate_positive_finite(sigma_nm, "sigma_nm")
-        _validate_positive_finite(epsilon_kcal_mol, "epsilon_kcal_mol")
+        def store_potentials(self, *args: Any, **kwargs: Any) -> None:
+            """Disable SMIRNOFF parameter storage; SAMMD provides exact potentials."""
 
-        collection = cls()
-        for sulfur_index, metal_index in validated_pairs:
-            topology_key = TopologyKey(atom_indices=(sulfur_index, metal_index))
-            potential_key = PotentialKey(
-                id=f"{SAMMD_METAL_SULFUR_COLLECTION_TYPE}-{sulfur_index}-{metal_index}",
-                associated_handler=SAMMD_METAL_SULFUR_COLLECTION_TYPE,
-            )
-            collection.key_map[topology_key] = potential_key
-            collection.potentials[potential_key] = Potential(
-                parameters={
-                    "sigma": sigma_nm * unit.nanometer,
-                    "epsilon": epsilon_kcal_mol * unit.kilocalorie_per_mole,
-                    "charge_product": 0.0 * unit.elementary_charge**2,
-                }
-            )
-        return collection
+            raise NotImplementedError("SAMMD metal-S potentials are assigned by atom index")
 
-    def to_summary(self) -> dict[str, object]:
-        """Return JSON-friendly metadata for this plugin collection."""
+        @classmethod
+        def from_anchor_pairs(
+            cls,
+            anchor_pairs: Iterable[tuple[int, int]],
+            *,
+            sigma_nm: float = METAL_SULFUR_SIGMA_NM,
+            epsilon_kcal_mol: float = METAL_SULFUR_EPSILON_KCAL_MOL,
+        ) -> Any:
+            """Build a plugin collection from exact sulfur-metal atom-index pairs."""
 
-        return metal_sulfur_lj_override_summary(_pairs_from_collection(self))
+            validated_pairs = validate_anchor_pairs(anchor_pairs)
+            _validate_positive_finite(sigma_nm, "sigma_nm")
+            _validate_positive_finite(epsilon_kcal_mol, "epsilon_kcal_mol")
 
-    @classmethod
-    def check_openmm_requirements(cls, combine_nonbonded_forces: bool) -> None:
-        """Require a combined NonbondedForce that can receive exceptions."""
+            collection = cls()
+            for sulfur_index, metal_index in validated_pairs:
+                topology_key = TopologyKey(atom_indices=(sulfur_index, metal_index))
+                potential_key = PotentialKey(
+                    id=f"{SAMMD_METAL_SULFUR_COLLECTION_TYPE}-{sulfur_index}-{metal_index}",
+                    associated_handler=SAMMD_METAL_SULFUR_COLLECTION_TYPE,
+                )
+                collection.key_map[topology_key] = potential_key
+                collection.potentials[potential_key] = Potential(
+                    parameters={
+                        "sigma": sigma_nm * unit.nanometer,
+                        "epsilon": epsilon_kcal_mol * unit.kilocalorie_per_mole,
+                        "charge_product": 0.0 * unit.elementary_charge**2,
+                    }
+                )
+            return collection
 
-        assert combine_nonbonded_forces
+        def to_summary(self) -> dict[str, object]:
+            """Return JSON-friendly metadata for this plugin collection."""
 
-    def modify_openmm_forces(
-        self,
-        interchange: Any,
-        system: Any,
-        add_constrained_forces: bool,
-        constrained_pairs: set[tuple[int, ...]],
-        particle_map: dict[Any, int],
-    ) -> None:
-        """Apply selected pair overrides as OpenMM NonbondedForce exceptions."""
+            return metal_sulfur_lj_override_summary(_pairs_from_collection(self))
 
-        del interchange, add_constrained_forces, constrained_pairs
-        nonbonded_force = _find_nonbonded_force(system)
-        if nonbonded_force is None:
-            msg = "system must contain an OpenMM NonbondedForce for SAMMD metal-S overrides"
-            raise ValueError(msg)
+        @classmethod
+        def check_openmm_requirements(cls, combine_nonbonded_forces: bool) -> None:
+            """Require a combined NonbondedForce that can receive exceptions."""
 
-        openmm_unit = _require_openmm_unit()
-        for topology_key, potential_key in self.key_map.items():
-            sulfur_index, metal_index = topology_key.atom_indices
-            potential = self.potentials[potential_key]
-            sigma_nm = _quantity_to_float(potential.parameters["sigma"], "nanometer")
-            epsilon_kj_mol = _quantity_to_float(
-                potential.parameters["epsilon"],
-                "kilojoule_per_mole",
-            )
-            nonbonded_force.addException(
-                _map_particle_index(sulfur_index, particle_map),
-                _map_particle_index(metal_index, particle_map),
-                0.0 * openmm_unit.elementary_charge**2,
-                sigma_nm * openmm_unit.nanometer,
-                epsilon_kj_mol * openmm_unit.kilojoule_per_mole,
-                replace=True,
-            )
+            assert combine_nonbonded_forces
+
+        def modify_openmm_forces(
+            self,
+            interchange: Any,
+            system: Any,
+            add_constrained_forces: bool,
+            constrained_pairs: set[tuple[int, ...]],
+            particle_map: dict[Any, int],
+        ) -> None:
+            """Apply selected pair overrides as OpenMM NonbondedForce exceptions."""
+
+            del interchange, add_constrained_forces, constrained_pairs
+            nonbonded_force = _find_nonbonded_force(system)
+            if nonbonded_force is None:
+                msg = "system must contain an OpenMM NonbondedForce for SAMMD metal-S overrides"
+                raise ValueError(msg)
+
+            openmm_unit = _require_openmm_unit()
+            for topology_key, potential_key in self.key_map.items():
+                sulfur_index, metal_index = topology_key.atom_indices
+                potential = self.potentials[potential_key]
+                sigma_nm = _quantity_to_float(potential.parameters["sigma"], "nanometer")
+                epsilon_kj_mol = _quantity_to_float(
+                    potential.parameters["epsilon"],
+                    "kilojoule_per_mole",
+                )
+                nonbonded_force.addException(
+                    _map_particle_index(sulfur_index, particle_map),
+                    _map_particle_index(metal_index, particle_map),
+                    0.0 * openmm_unit.elementary_charge**2,
+                    sigma_nm * openmm_unit.nanometer,
+                    epsilon_kj_mol * openmm_unit.kilojoule_per_mole,
+                    replace=True,
+                )
+
+    SAMMDMetalSulfurLJCollection.__module__ = __name__
+    SAMMDMetalSulfurLJCollection.__qualname__ = "SAMMDMetalSulfurLJCollection"
+    _SAMMD_METAL_SULFUR_LJ_COLLECTION = SAMMDMetalSulfurLJCollection
+    return SAMMDMetalSulfurLJCollection
 
 
 def create_metal_sulfur_lj_collection(
     anchor_pairs: Iterable[tuple[int, int]],
-) -> SAMMDMetalSulfurLJCollection:
+) -> Any:
     """Return the SAMMD Interchange plugin collection for selected anchor pairs."""
 
-    return SAMMDMetalSulfurLJCollection.from_anchor_pairs(anchor_pairs)
+    return _collection_class().from_anchor_pairs(anchor_pairs)
+
+
+def register_interchange_plugin_collection() -> None:
+    """Teach installed Interchange JSON validation about SAMMD's collection type."""
+
+    global _INTERCHANGE_PLUGIN_COLLECTION_REGISTERED
+
+    if _INTERCHANGE_PLUGIN_COLLECTION_REGISTERED:
+        return
+
+    _collection_class()
+    from openff.interchange.components import potentials
+
+    validate_collections = potentials.validate_collections
+    if getattr(validate_collections, "_sammd_accepts_metal_sulfur_plugin", False):
+        _INTERCHANGE_PLUGIN_COLLECTION_REGISTERED = True
+        return
+
+    validate_collections.__code__ = _validate_collections_with_sammd_plugins.__code__
+    validate_collections.__defaults__ = _validate_collections_with_sammd_plugins.__defaults__
+    validate_collections.__kwdefaults__ = _validate_collections_with_sammd_plugins.__kwdefaults__
+    validate_collections._sammd_accepts_metal_sulfur_plugin = True
+    _INTERCHANGE_PLUGIN_COLLECTION_REGISTERED = True
+
+
+def _validate_collections_with_sammd_plugins(v: Any, handler: Any, info: Any) -> dict[str, Any]:
+    """Replacement for Interchange 0.5.x's hard-coded collection validator."""
+
+    del handler
+    from openff.interchange.smirnoff import (
+        SMIRNOFFAngleCollection,
+        SMIRNOFFBondCollection,
+        SMIRNOFFConstraintCollection,
+        SMIRNOFFElectrostaticsCollection,
+        SMIRNOFFImproperTorsionCollection,
+        SMIRNOFFProperTorsionCollection,
+        SMIRNOFFvdWCollection,
+        SMIRNOFFVirtualSiteCollection,
+    )
+
+    from sammd.backends.interchange_plugins import SAMMDMetalSulfurLJCollection
+
+    class_mapping = {
+        "Bonds": SMIRNOFFBondCollection,
+        "Angles": SMIRNOFFAngleCollection,
+        "Constraints": SMIRNOFFConstraintCollection,
+        "ProperTorsions": SMIRNOFFProperTorsionCollection,
+        "ImproperTorsions": SMIRNOFFImproperTorsionCollection,
+        "vdW": SMIRNOFFvdWCollection,
+        "Electrostatics": SMIRNOFFElectrostaticsCollection,
+        "VirtualSites": SMIRNOFFVirtualSiteCollection,
+        "SAMMDMetalSulfurLJ": SAMMDMetalSulfurLJCollection,
+    }
+    if info.mode in ("json", "python"):
+        return {
+            collection_name: class_mapping[collection_name].model_validate(collection_data)
+            for collection_name, collection_data in v.items()
+        }
+
+    msg = f"Validation mode {info.mode} not implemented."
+    raise ValueError(msg)
 
 
 def metal_sulfur_lj_override_summary(
@@ -211,7 +281,7 @@ def validate_anchor_pairs(
     return tuple(validated_pairs)
 
 
-def _pairs_from_collection(collection: SAMMDMetalSulfurLJCollection) -> tuple[tuple[int, int], ...]:
+def _pairs_from_collection(collection: Any) -> tuple[tuple[int, int], ...]:
     return tuple(tuple(key.atom_indices) for key in collection.key_map)
 
 

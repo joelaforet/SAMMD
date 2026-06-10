@@ -205,15 +205,15 @@ sammd build sammd.yaml --output-dir outputs --overwrite --full
 Backend mode writes these additional files:
 
 - `interchange.json`: OpenFF Interchange JSON
-- `positions.cif`: coordinates for the constructed system
-- `system.xml`: OpenMM convenience export
+- `solvated_system.cif`: topology and coordinates for the constructed system
 - `anchor_metadata.json`: SAM anchor and sulfur-metal pair metadata
 
 Salt-containing configs are rejected until salt backend export is implemented.
 
 The Interchange JSON write/reload path uses `Interchange.model_dump_json` and
-`Interchange.model_validate_json`; pre-1.0 Interchange JSON compatibility is not
-guaranteed across OpenFF Interchange versions.
+`Interchange.model_validate_json` after registering SAMMD's plugin collection;
+pre-1.0 Interchange JSON compatibility is not guaranteed across OpenFF
+Interchange versions.
 
 ## OpenMM Simulation
 

@@ -17,10 +17,6 @@ from types import SimpleNamespace
 from typing import Any
 
 from sammd.backends.forcefields import get_fcc_metal_parameters
-from sammd.backends.interchange_plugins import (
-    create_metal_sulfur_lj_collection,
-    metal_sulfur_lj_override_summary,
-)
 from sammd.backends.openff import (
     PreparedMoleculeTemplate,
     force_field_inputs_from_config,
@@ -259,6 +255,12 @@ def build_interchange_backend(
     interchange_module = require_openff_interchange()
     modules = _require_openmm()
     unit = _openff_unit_module()
+    from sammd.backends.interchange_plugins import (
+        create_metal_sulfur_lj_collection,
+        register_interchange_plugin_collection,
+    )
+
+    register_interchange_plugin_collection()
     _timed_progress(progress, "  OpenFF/OpenMM dependencies ready", stage_start)
 
     stage_start = perf_counter()
@@ -689,6 +691,8 @@ def _terminal_heavy_axis_index(template: PreparedMoleculeTemplate, anchor_index:
 
 
 def _anchor_metadata(result: BackendExportResult) -> dict[str, object]:
+    from sammd.backends.interchange_plugins import metal_sulfur_lj_override_summary
+
     metadata = metal_sulfur_lj_override_summary(result.anchor_pairs)
     metadata["sulfur_indices"] = list(result.sulfur_indices)
     metadata["metal_indices"] = list(result.metal_indices)

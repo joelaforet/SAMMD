@@ -77,7 +77,7 @@ exact validated YAML that produced the plan.
 
 You may see those filenames in resolved paths or metadata, but the default
 lightweight command does not write ``solvated_system.cif``, ``interchange.json``,
-``system.xml``, or ``anchor_metadata.json``.
+or ``anchor_metadata.json``.
 
 5. Optional backend output files
 --------------------------------
@@ -97,7 +97,6 @@ That command writes these additional files:
 * ``interchange.json`` for the primary OpenFF Interchange export
 * ``solvated_system.cif`` for the full slab + SAMs + reactants + solvent
   coordinates you can inspect and load in OpenMM
-* ``system.xml`` for an OpenMM file, not the primary OpenFF Interchange output
 * ``anchor_metadata.json`` for SAM anchor metadata
 
 The ``interchange.json`` file is OpenFF Interchange JSON written with
@@ -121,7 +120,6 @@ students use them in their own OpenMM Python API script. Follow these steps:
 * export an OpenMM ``System`` from that Interchange object with
   ``interchange.to_openmm()``
 * load positions from ``solvated_system.cif`` for the constructed coordinates
-* optionally use ``system.xml`` only as an OpenMM file
 * create and run a raw OpenMM ``Simulation`` for minimization, equilibration,
   production, and reporters
 

@@ -26,9 +26,9 @@ Bridges2. The default example here uses ``cuda-12-4``:
 
    pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
 
-This writes files such as ``interchange.json``, ``solvated_system.cif``,
-``system.xml``, and ``anchor_metadata.json``. In this tutorial we load
-``interchange.json`` first, then ask OpenFF Interchange for the OpenMM objects.
+This writes files such as ``interchange.json``, ``solvated_system.cif``, and
+``anchor_metadata.json``. In this tutorial we load ``interchange.json`` first,
+then ask OpenFF Interchange for the OpenMM objects.
 
 Full copy/paste script
 ----------------------
@@ -46,6 +46,7 @@ repository root.
    from openff.interchange import Interchange
    from openmm import LangevinMiddleIntegrator, MonteCarloAnisotropicBarostat, MonteCarloBarostat, Vec3, unit
    from openmm.app import DCDReporter, Simulation, StateDataReporter
+   from sammd.backends.interchange_plugins import register_interchange_plugin_collection
 
    output_dir = Path("outputs")
    interchange_path = output_dir / "interchange.json"
@@ -58,6 +59,7 @@ repository root.
        missing = ", ".join(str(path) for path in missing_paths)
        raise FileNotFoundError(f"Missing SAMMD output file(s): {missing}")
 
+   register_interchange_plugin_collection()
    interchange = Interchange.model_validate_json(interchange_path.read_text(encoding="utf-8"))
    system = interchange.to_openmm()
    topology = interchange.to_openmm_topology()
@@ -207,15 +209,13 @@ allow only ``z`` to change. Use ``MonteCarloAnisotropicBarostat`` before creatin
 A barostat does not replace the thermostat. Keep the ``LangevinMiddleIntegrator``
 for temperature control.
 
-About system.xml
-----------------
+About Interchange Reload
+------------------------
 
-``system.xml`` is an OpenMM convenience output. The main route in this tutorial
-loads ``interchange.json`` through OpenFF Interchange and then creates the OpenMM
-``System`` in Python. If you later make OpenMM-only changes, such as some
-post-Interchange metal-S pair edits, those changes may be present only in
-``system.xml`` unless you apply the same changes again in your Python script.
-Do not assume ``interchange.json`` contains every later OpenMM-only change.
+SAMMD stores the sulfur-metal pair overrides in a plugin collection inside
+``interchange.json``. Register that collection before calling
+``Interchange.model_validate_json`` so ``interchange.to_openmm()`` can apply the
+OpenMM exceptions from the reloaded artifact.
 
 View the DCD in PyMOL
 ---------------------
