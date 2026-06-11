@@ -277,6 +277,7 @@ class OutputFilesConfig(SAMMDBaseModel):
 
     sam_grafting_density: str = "sam_grafting_density.cif"
     solvated_system: str = "solvated_system.cif"
+    pymol_system: str = "solvated_system_pymol.pdb"
     openff_interchange: str = "interchange.json"
     anchor_metadata: str = "anchor_metadata.json"
     build_summary: str = "build_summary.json"
@@ -577,6 +578,7 @@ parameterization:
 # OpenFF Interchange artifact names written by --full:
 #   - interchange.json  # primary portable Interchange export
 #   - solvated_system.cif  # full slab + SAMs + reactants + solvent coordinates
+#   - solvated_system_pymol.pdb  # PyMOL-friendly coordinates with CONECT records
 #   - anchor_metadata.json  # SAM anchor metadata export
 #
 # None of these are trajectory outputs from an MD simulation.
@@ -587,6 +589,7 @@ outputs:
   files:
     sam_grafting_density: sam_grafting_density.cif
     solvated_system: solvated_system.cif
+    pymol_system: solvated_system_pymol.pdb
     openff_interchange: interchange.json
     anchor_metadata: anchor_metadata.json
     build_summary: build_summary.json

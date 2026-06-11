@@ -20,6 +20,7 @@ class OutputPaths:
 
     sam_grafting_density: Path | None = None
     solvated_system: Path | None = None
+    pymol_system: Path | None = None
     openff_interchange: Path | None = None
     anchor_metadata: Path | None = None
     build_summary: Path | None = None
@@ -63,6 +64,7 @@ def plan_output_paths(config: Any, base_dir: str | Path = ".") -> OutputPaths:
     root = Path(base_dir)
     sam_grafting_density = _resolve_output_path(root, files.sam_grafting_density)
     solvated_system = _resolve_output_path(root, files.solvated_system)
+    pymol_system = _resolve_output_path(root, files.pymol_system)
     openff_interchange = _resolve_output_path(root, files.openff_interchange)
     anchor_metadata = _resolve_output_path(root, files.anchor_metadata)
     build_summary = _resolve_output_path(root, files.build_summary)
@@ -70,6 +72,7 @@ def plan_output_paths(config: Any, base_dir: str | Path = ".") -> OutputPaths:
 
     _validate_suffix(sam_grafting_density, ".cif", "SAM grafting-density")
     _validate_suffix(solvated_system, ".cif", "solvated system")
+    _validate_suffix(pymol_system, ".pdb", "PyMOL system")
     _validate_suffix(openff_interchange, ".json", "OpenFF Interchange")
     _validate_suffix(anchor_metadata, ".json", "anchor metadata")
     _validate_suffix(build_summary, ".json", "build summary")
@@ -77,6 +80,7 @@ def plan_output_paths(config: Any, base_dir: str | Path = ".") -> OutputPaths:
     return OutputPaths(
         sam_grafting_density=sam_grafting_density,
         solvated_system=solvated_system,
+        pymol_system=pymol_system,
         openff_interchange=openff_interchange,
         anchor_metadata=anchor_metadata,
         build_summary=build_summary,

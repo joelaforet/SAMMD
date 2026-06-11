@@ -155,6 +155,7 @@ def test_build_tutorial_documents_default_and_export_outputs() -> None:
         assert default_output in combined
     export_outputs = [
         "solvated_system.cif",
+        "solvated_system_pymol.pdb",
         "interchange.json",
         "anchor_metadata.json",
     ]

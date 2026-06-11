@@ -73,8 +73,10 @@ Important sections
      Names build output files. The ``sam_grafting_density`` key controls the
      slab-and-sulfur visual check file. The ``solvated_system`` key controls the
      full CIF written by ``--full`` with slab, SAMs, reactants, and
-     solvent. It also names files such as ``interchange.json``,
-     ``anchor_metadata.json``, ``build_summary.json``, and ``resolved_config.yaml``.
+     solvent. The ``pymol_system`` key controls the PDB written by ``--full``
+     with explicit connectivity for PyMOL. It also names files such as
+     ``interchange.json``, ``anchor_metadata.json``, ``build_summary.json``, and
+     ``resolved_config.yaml``.
      These are not MD trajectory files. ``interchange.json`` stores OpenFF
      Interchange data. Interchange is not yet at version 1.0, so this JSON
      format may change between versions. For this tutorial, use OpenMM.

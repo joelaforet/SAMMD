@@ -180,6 +180,15 @@ def export_interchange_backend(
     )
     _timed_progress(progress, "  solvated_system.cif written", stage_start)
     stage_start = perf_counter()
+    _progress(progress, "Writing solvated_system_pymol.pdb")
+    _write_pdb(
+        paths.pymol_system,
+        result.openmm_topology,
+        result.positions,
+        overwrite=overwrite,
+    )
+    _timed_progress(progress, "  solvated_system_pymol.pdb written", stage_start)
+    stage_start = perf_counter()
     _progress(progress, "Writing anchor_metadata.json")
     safe_write_text(
         paths.anchor_metadata,
@@ -199,6 +208,7 @@ def export_interchange_backend(
         component_ranges=result.component_ranges,
         files={
             "solvated_system": paths.solvated_system,
+            "pymol_system": paths.pymol_system,
             "openff_interchange": paths.openff_interchange,
             "anchor_metadata": paths.anchor_metadata,
         },
@@ -212,7 +222,7 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
 
     summary = plan.build_summary()
     artifacts = dict(summary["artifacts"])
-    for key in ("solvated_system", "openff_interchange", "anchor_metadata"):
+    for key in ("solvated_system", "pymol_system", "openff_interchange", "anchor_metadata"):
         artifact = dict(artifacts[key])
         artifact["status"] = "current"
         artifact["available"] = True
@@ -729,6 +739,31 @@ def _write_pdbx(path: Path, topology: Any, positions: Any, *, overwrite: bool) -
             Path(temporary_name).unlink()
 
 
+def _write_pdb(path: Path, topology: Any, positions: Any, *, overwrite: bool) -> None:
+    """Write PDB text with explicit CONECT records for PyMOL visualization."""
+
+    destination = Path(path)
+    if destination.exists() and not overwrite:
+        raise FileExistsError(f"refusing to overwrite existing file: {destination}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    temporary_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=destination.parent, delete=False
+        ) as handle:
+            temporary_name = handle.name
+            _require_openmm().app.PDBFile.writeFile(topology, positions, handle, keepIds=True)
+        if overwrite:
+            os.replace(temporary_name, destination)
+        else:
+            os.link(temporary_name, destination)
+            os.unlink(temporary_name)
+    finally:
+        if temporary_name is not None and Path(temporary_name).exists():
+            Path(temporary_name).unlink()
+
+
 def _ensure_openmm_atom_names(topology: Any) -> None:
     """Fill missing atom names so PDBx/mmCIF rows have all declared fields."""
 
@@ -785,6 +820,7 @@ def _metal_residue_name(symbol: str) -> str:
 def _require_paths(paths: Any) -> None:
     for key in (
         "solvated_system",
+        "pymol_system",
         "openff_interchange",
         "anchor_metadata",
     ):

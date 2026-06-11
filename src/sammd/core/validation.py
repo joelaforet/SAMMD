@@ -82,6 +82,7 @@ def validate_output_paths(paths: Any) -> ValidationReport:
     expected_suffixes = {
         "sam_grafting_density": ".cif",
         "solvated_system": ".cif",
+        "pymol_system": ".pdb",
         "openff_interchange": ".json",
         "anchor_metadata": ".json",
         "build_summary": ".json",

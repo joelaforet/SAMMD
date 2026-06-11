@@ -26,9 +26,11 @@ Bridges2. The default example here uses ``cuda-12-4``:
 
    pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
 
-This writes files such as ``interchange.json``, ``solvated_system.cif``, and
-``anchor_metadata.json``. The ``solvated_system.cif`` file is a PDBx/mmCIF
-structure using SAMMD's stable ``.cif`` artifact name. In this tutorial we load
+This writes files such as ``interchange.json``, ``solvated_system.cif``,
+``solvated_system_pymol.pdb``, and ``anchor_metadata.json``. The
+``solvated_system.cif`` file is a PDBx/mmCIF structure using SAMMD's stable
+``.cif`` artifact name. The ``solvated_system_pymol.pdb`` file includes explicit
+``CONECT`` records for PyMOL visualization. In this tutorial we load
 ``interchange.json`` first, then ask OpenFF Interchange for the OpenMM objects.
 
 Full copy/paste script
@@ -226,8 +228,9 @@ trajectory into the same object:
 
 .. code-block:: text
 
-   load outputs/solvated_system.cif, sammd_system
+   load outputs/solvated_system_pymol.pdb, sammd_system
    load_traj outputs/trajectory.dcd, sammd_system
 
-The DCD uses the atom order from the OpenMM topology. Loading the SAMMD structure
-first gives PyMOL the atoms, then ``load_traj`` adds the frames.
+The DCD uses the atom order from the OpenMM topology. Loading the PyMOL PDB first
+gives PyMOL the atoms and explicit connectivity, then ``load_traj`` adds the
+frames.

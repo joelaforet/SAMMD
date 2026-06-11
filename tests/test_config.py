@@ -48,6 +48,7 @@ def test_resolved_defaults_match_approved_student_schema() -> None:
     assert config.solvent.components[0].residue_name == "EOH"
     assert config.solvent.components[0].density == 0.789
     assert config.parameterization.nonbonded_cutoff == 1.0
+    assert config.outputs.files.pymol_system == "solvated_system_pymol.pdb"
     assert config.outputs.files.openff_interchange == "interchange.json"
     assert config.outputs.files.anchor_metadata == "anchor_metadata.json"
 
@@ -81,6 +82,7 @@ def test_yaml_template_describes_current_build_contract() -> None:
     assert "build_summary.json" in CONFIG_TEMPLATE
     assert "resolved_config.yaml" in CONFIG_TEMPLATE
     assert "solvated_system.cif" in CONFIG_TEMPLATE
+    assert "solvated_system_pymol.pdb" in CONFIG_TEMPLATE
     assert "interchange.json" in CONFIG_TEMPLATE
     assert "anchor_metadata.json" in CONFIG_TEMPLATE
 

@@ -97,6 +97,8 @@ That command writes these additional files:
 * ``interchange.json`` for the primary OpenFF Interchange export
 * ``solvated_system.cif`` for the full slab + SAMs + reactants + solvent
   PDBx/mmCIF coordinates you can inspect and load in OpenMM
+* ``solvated_system_pymol.pdb`` for PyMOL visualization with explicit ``CONECT``
+  records
 * ``anchor_metadata.json`` for SAM anchor metadata
 
 The ``interchange.json`` file is OpenFF Interchange JSON written with

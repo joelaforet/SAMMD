@@ -92,6 +92,7 @@ def test_bad_output_suffix_fails_validation(tmp_path: Path) -> None:
 
     paths = OutputPaths(
         sam_grafting_density=tmp_path / "sam_grafting_density.txt",
+        pymol_system=tmp_path / "solvated_system_pymol.cif",
         anchor_metadata=tmp_path / "anchor_metadata.yaml",
     )
 
@@ -103,6 +104,7 @@ def test_bad_output_suffix_fails_validation(tmp_path: Path) -> None:
     assert not report.passed
     assert gate.details["failures"] == {
         "sam_grafting_density": "expected .cif, found .txt",
+        "pymol_system": "expected .pdb, found .cif",
         "anchor_metadata": "expected .json, found .yaml",
     }
 

@@ -72,6 +72,7 @@ def test_interchange_build_summary_marks_completed_exports(tmp_path: Path) -> No
     assert summary["artifacts"]["openff_interchange"]["available"] is True
     assert summary["artifacts"]["openff_interchange"]["constructed"] is True
     assert summary["artifacts"]["openff_interchange"]["status"] == "current"
+    assert summary["artifacts"]["pymol_system"]["status"] == "current"
     assert "openmm_system" not in summary["artifacts"]
     assert summary["engine_exports"]["openmm"]["available"] is False
     assert summary["backend_export"]["openff_interchange_version"] == "0.5.3"
@@ -131,6 +132,30 @@ def test_pdbx_writer_terminates_final_loop_for_pymol(tmp_path: Path, monkeypatch
     backend._write_pdbx(path, topology=object(), positions=object(), overwrite=False)
 
     assert path.read_text(encoding="utf-8").endswith("\n#\n")
+
+
+def test_pdb_writer_uses_pdbfile_with_kept_ids(tmp_path: Path, monkeypatch) -> None:
+    """PyMOL visualization PDBs should preserve explicit OpenMM connectivity."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    calls = []
+
+    class FakePDBFile:
+        @staticmethod
+        def writeFile(topology, positions, handle, *, keepIds):  # noqa: N802, N803
+            calls.append((topology, positions, keepIds))
+            handle.write("HEADER    PYMOL\nCONECT    1    2\nEND\n")
+
+    fake_openmm = SimpleNamespace(app=SimpleNamespace(PDBFile=FakePDBFile))
+    monkeypatch.setattr(backend, "_require_openmm", lambda: fake_openmm)
+
+    path = tmp_path / "solvated_system_pymol.pdb"
+    topology = object()
+    positions = object()
+    backend._write_pdb(path, topology=topology, positions=positions, overwrite=False)
+
+    assert calls == [(topology, positions, True)]
+    assert "CONECT" in path.read_text(encoding="utf-8")
 
 
 def test_openmm_atom_name_sanitizer_fills_blank_metal_names() -> None:

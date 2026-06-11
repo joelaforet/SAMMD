@@ -227,6 +227,7 @@ class SAMMDBuildPlan:
                 "build_summary": self._artifact_summary("build_summary", "current"),
                 "resolved_config": self._artifact_summary("resolved_config", "current"),
                 "solvated_system": self._artifact_summary("solvated_system", "reserved"),
+                "pymol_system": self._artifact_summary("pymol_system", "reserved"),
                 "openff_interchange": self._artifact_summary(
                     "openff_interchange", "reserved"
                 ),

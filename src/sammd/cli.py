@@ -93,7 +93,8 @@ def validate(config: Path) -> None:
     "--full",
     is_flag=True,
     help=(
-        "Export OpenFF Interchange files: solvated_system.cif, interchange.json, "
+        "Export OpenFF Interchange files: solvated_system.cif, "
+        "solvated_system_pymol.pdb, interchange.json, "
         "anchor_metadata.json."
     ),
 )
@@ -163,6 +164,7 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
     LOGGER.info("FILE Resolved config: %s", resolved_config)
     if export_files is not None:
         LOGGER.info("FILE Wrote solvated system CIF: %s", export_files["solvated_system"])
+        LOGGER.info("FILE PyMOL PDB with CONECT records: %s", export_files["pymol_system"])
         LOGGER.info("FILE Interchange JSON: %s", export_files["openff_interchange"])
         LOGGER.info("FILE Anchor metadata: %s", export_files["anchor_metadata"])
         LOGGER.info(

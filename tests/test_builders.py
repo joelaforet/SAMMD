@@ -58,6 +58,7 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
     assert plan.solution.reactants[0].residue_name == "CIN"
     assert plan.output_paths.sam_grafting_density == tmp_path / "sam_grafting_density.cif"
     assert plan.output_paths.solvated_system == tmp_path / "solvated_system.cif"
+    assert plan.output_paths.pymol_system == tmp_path / "solvated_system_pymol.pdb"
     assert plan.output_paths.openff_interchange == tmp_path / "interchange.json"
     assert plan.output_paths.anchor_metadata == tmp_path / "anchor_metadata.json"
     assert not plan.full_construction_available
@@ -69,6 +70,11 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
     }
     assert artifacts["anchor_metadata"] == {
         "path": str(tmp_path / "anchor_metadata.json"),
+        "status": "reserved",
+        "available": False,
+    }
+    assert artifacts["pymol_system"] == {
+        "path": str(tmp_path / "solvated_system_pymol.pdb"),
         "status": "reserved",
         "available": False,
     }

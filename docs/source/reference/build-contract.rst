@@ -145,6 +145,10 @@ beginner workflow.
        reactant coordinates. This is a human-inspectable/OpenMM-loadable
        PDBx/mmCIF ``.cif`` structure file paired with the Interchange export
        artifact.
+   * - ``solvated_system_pymol.pdb``
+     - Interchange Export
+     - Written by ``--full`` with explicit PDB ``CONECT`` records for PyMOL
+       visualization of DCD trajectories without PyMOL inferring extra bonds.
    * - ``interchange.json``
      - Interchange Export
      - Written by ``--full`` as the primary portable OpenFF
@@ -163,6 +167,7 @@ Current limitation
 By default, ``sammd build`` writes only ``sam_grafting_density.cif``,
 ``build_summary.json``, and ``resolved_config.yaml``. With ``--full``
 in a CUDA-labeled pixi environment, it also writes ``solvated_system.cif``,
-``interchange.json``, and ``anchor_metadata.json``. Public SAMMD APIs should not
+``solvated_system_pymol.pdb``, ``interchange.json``, and
+``anchor_metadata.json``. Public SAMMD APIs should not
 add equilibration, production simulation helpers, or direct GROMACS/LAMMPS/Amber
 command workflows as part of this contract.
