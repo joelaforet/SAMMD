@@ -23,14 +23,12 @@ The supported first-release command-line surface is:
        unless ``--force`` is supplied.
    * - ``sammd validate CONFIG``
      - Load and validate a YAML configuration without writing build artifacts.
-   * - ``sammd build CONFIG --output-dir DIR --overwrite``
-     - Build the current deterministic plan and write the currently implemented
-       artifacts into ``DIR``. Existing artifacts are protected unless
-       ``--overwrite`` is supplied.
-   * - ``sammd build CONFIG --output-dir DIR --overwrite --full``
-     - In a CUDA-labeled pixi environment, write OpenFF Interchange and OpenMM
-       export artifacts in addition to the default artifacts. Salt-containing
-       configs are rejected until salt export is implemented.
+    * - ``sammd build CONFIG --output-dir DIR --overwrite``
+      - In a CUDA-labeled pixi environment, build the current deterministic plan
+        and write inspection, OpenFF Interchange, and OpenMM handoff artifacts
+        into ``DIR``. Existing artifacts are protected unless ``--overwrite`` is
+        supplied. Salt-containing configs are rejected until salt export is
+        implemented.
 
 The ``build`` command does not run minimization, equilibration, production MD,
 trajectory writing, or reporter setup.
@@ -58,8 +56,8 @@ exposes deterministic slab, SAM placement, solution composition, output paths,
 ``build_summary()``, and artifact writers for the current plan, but it is not a
 top-level public import in ``sammd.__all__``. ``SAMMDBuildPlan`` is not an OpenMM
 ``System``, an OpenFF ``Interchange``, or a simulation wrapper. Code that needs
-full Interchange construction should use the explicit CLI ``--full`` export path or the
-internal Interchange module from a CUDA-labeled pixi environment.
+full Interchange construction should use the CLI build command or the internal
+Interchange module from a CUDA-labeled pixi environment.
 
 The ``build_summary()`` SAM section records the first-release metal-S interaction
 strategy as dependency-free metadata. The canonical mode is
@@ -86,13 +84,13 @@ current/reserved output suffixes, and inspection topology CIF atom counts and
 cell lengths.
 
 These gates intentionally do not require OpenMM, OpenFF, or full Interchange export
-artifacts. Missing export artifacts such as ``solvated_system.cif``,
-``interchange.json`` and ``anchor_metadata.json`` are not failures unless
-``--full`` is requested.
+artifacts before the export step runs. Missing export artifacts such as
+``solvated_system.cif``, ``interchange.json`` and ``anchor_metadata.json`` are
+not failures during dependency-free plan validation.
 
 Interchange export validation gates should stay skipped/not required when optional
-dependencies or export artifacts are absent. Once ``--full`` writes
-concrete artifacts, those gates should check that:
+dependencies or export artifacts are absent. Once ``sammd build`` writes concrete
+artifacts, those gates should check that:
 
 * ``interchange.json`` reloads with ``Interchange.model_validate_json``.
 * The reloaded ``Interchange`` exports to an OpenMM ``System``.
@@ -127,7 +125,7 @@ beginner workflow.
      - Current
      - Inspection visual smoke-test PDBx/mmCIF ``.cif`` file for the
        deterministic plan, including the Pd slab and SAM sulfur atoms at planned
-       three-fold hollow-site anchor positions. In default builds, this file is
+       three-fold hollow-site anchor positions. In CLI builds, this file is
        meant for checking slab geometry and grafting density; it does not include
        full SAM, solvent, or reactant coordinates and is not a parameterized
        Interchange export system. Interchange export leaves this smoke-test file
@@ -141,17 +139,17 @@ beginner workflow.
      - Validated YAML configuration used for the build.
    * - ``solvated_system.cif``
      - Interchange Export
-     - Written by ``--full`` for fully constructed SAM, solvent, and
+      - Written by ``sammd build`` for fully constructed SAM, solvent, and
        reactant coordinates. This is a human-inspectable/OpenMM-loadable
        PDBx/mmCIF ``.cif`` structure file paired with the Interchange export
        artifact.
    * - ``solvated_system_pymol.pdb``
      - Interchange Export
-     - Written by ``--full`` with explicit PDB ``CONECT`` records for PyMOL
+      - Written by ``sammd build`` with explicit PDB ``CONECT`` records for PyMOL
        visualization of DCD trajectories without PyMOL inferring extra bonds.
    * - ``interchange.json``
      - Interchange Export
-     - Written by ``--full`` as the primary portable OpenFF
+      - Written by ``sammd build`` as the primary portable OpenFF
        Interchange export. The JSON path is ``Interchange.model_dump_json`` for
        saving and ``Interchange.model_validate_json`` for reload. SAMMD records
        the concrete ``openff-interchange`` package version when the artifact is
@@ -159,15 +157,14 @@ beginner workflow.
        guaranteed across versions.
    * - ``anchor_metadata.json``
      - Interchange Export
-     - Written by ``--full`` for selected sulfur-metal pair metadata.
+      - Written by ``sammd build`` for selected sulfur-metal pair metadata.
 
 Current limitation
 ------------------
 
-By default, ``sammd build`` writes only ``sam_grafting_density.cif``,
-``build_summary.json``, and ``resolved_config.yaml``. With ``--full``
-in a CUDA-labeled pixi environment, it also writes ``solvated_system.cif``,
+``sammd build`` writes ``sam_grafting_density.cif``, ``build_summary.json``,
+``resolved_config.yaml``, ``solvated_system.cif``,
 ``solvated_system_pymol.pdb``, ``interchange.json``, and
-``anchor_metadata.json``. Public SAMMD APIs should not
+``anchor_metadata.json`` from a CUDA-labeled pixi environment. Public SAMMD APIs should not
 add equilibration, production simulation helpers, or direct GROMACS/LAMMPS/Amber
 command workflows as part of this contract.

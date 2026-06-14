@@ -331,12 +331,11 @@ CONFIG_TEMPLATE = """# =========================================================
 #
 #      sammd validate config.yaml
 #
-# 4. Validate and build the current inspection artifacts:
+# 4. Validate and build the full system artifacts:
 #
 #      sammd build config.yaml --output-dir outputs/my_system --overwrite
 #
-# 5. Inspect sam_grafting_density.cif, build_summary.json, and resolved_config.yaml.
-#    Use --full when you need solvated_system.cif and interchange.json.
+# 5. Inspect sam_grafting_density.cif, solvated_system.cif, and interchange.json.
 #
 # This file defines the molecular system only.
 # It does NOT define equilibration, production MD, thermostats, barostats,
@@ -549,7 +548,7 @@ packing:
 # ============================================================================
 # Parameterization
 # ============================================================================
-# Force-field choices recorded and validated by the current default builder.
+# Force-field choices recorded and validated by the system builder.
 #
 # The small-molecule force field is used for SAM molecules, reactants,
 # solvent molecules, and salts.
@@ -570,12 +569,10 @@ parameterization:
 # ============================================================================
 # Outputs
 # ============================================================================
-# Current files written by the default system builder:
+# Files written by sammd build:
 #   - sam_grafting_density.cif  # Pd slab + sulfur anchors for grafting-density checks
 #   - build_summary.json
 #   - resolved_config.yaml
-#
-# OpenFF Interchange artifact names written by --full:
 #   - interchange.json  # primary portable Interchange export
 #   - solvated_system.cif  # full slab + SAMs + reactants + solvent coordinates
 #   - solvated_system_pymol.pdb  # PyMOL-friendly coordinates with CONECT records

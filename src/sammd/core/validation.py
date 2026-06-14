@@ -75,8 +75,8 @@ def validate_build_plan(plan: Any) -> ValidationReport:
 def validate_output_paths(paths: Any) -> ValidationReport:
     """Validate configured current and reserved output path suffixes.
 
-    Missing optional paths are not failures because future Interchange export
-    artifacts are reserved but not required by the current default builder.
+    This gate validates configured names, not whether build artifacts already
+    exist on disk.
     """
 
     expected_suffixes = {

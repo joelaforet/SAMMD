@@ -63,17 +63,16 @@ Important sections
 
 ``parameterization``
    Records the OpenFF small-molecule force field, charge model, INTERFACE metal
-   force-field file, and nonbonded cutoff. The default builder checks and saves
-   these choices. It does not create a complete OpenMM-ready system unless you
-   run ``sammd build --full`` in a CUDA-labeled pixi environment. The INTERFACE
+   force-field file, and nonbonded cutoff. ``sammd build`` uses these choices to
+   create a complete OpenMM-ready system in a CUDA-labeled pixi environment. The INTERFACE
    metal file gives the base slab LJ parameters. SAMMD records sulfur-metal LJ
    changes in the build summary; you do not configure them here.
 
 ``outputs``
      Names build output files. The ``sam_grafting_density`` key controls the
      slab-and-sulfur visual check file. The ``solvated_system`` key controls the
-     full CIF written by ``--full`` with slab, SAMs, reactants, and
-     solvent. The ``pymol_system`` key controls the PDB written by ``--full``
+     full CIF written by ``sammd build`` with slab, SAMs, reactants, and
+     solvent. The ``pymol_system`` key controls the PDB written by ``sammd build``
      with explicit connectivity for PyMOL. It also names files such as
      ``interchange.json``, ``anchor_metadata.json``, ``build_summary.json``, and
      ``resolved_config.yaml``.

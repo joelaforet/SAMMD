@@ -24,7 +24,7 @@ Bridges2. The default example here uses ``cuda-12-4``:
 
 .. code-block:: bash
 
-   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
+   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite
 
 This writes files such as ``interchange.json``, ``solvated_system.cif``,
 ``solvated_system_pymol.pdb``, and ``anchor_metadata.json``. The

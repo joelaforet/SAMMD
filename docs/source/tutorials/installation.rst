@@ -30,8 +30,8 @@ Restart your shell if the installer asks you to.
 3. Use the dependency-light environment
 ---------------------------------------
 
-The default environment is for YAML files, validation, default builds,
-testing, and docs. It does not need OpenMM, OpenFF, RDKit, PACKMOL, or a GPU.
+The default environment is for YAML files, validation, testing, and docs. It
+does not need OpenMM, OpenFF, RDKit, PACKMOL, or a GPU.
 
 .. code-block:: bash
 
@@ -65,7 +65,7 @@ For a named environment, add ``-e``:
 
 .. code-block:: bash
 
-   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
+   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite
 
 5. Switch environments
 ----------------------

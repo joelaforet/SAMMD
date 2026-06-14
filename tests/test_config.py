@@ -74,10 +74,10 @@ def test_yaml_template_describes_current_build_contract() -> None:
 
     assert "Build and parameterize your molecular system" not in CONFIG_TEMPLATE
     assert "Use the exported OpenMM/OpenFF files" not in CONFIG_TEMPLATE
-    assert "Validate and build the current inspection artifacts" in CONFIG_TEMPLATE
-    assert "Use --full when you need solvated_system.cif" in CONFIG_TEMPLATE
-    assert "Current files written by the default system builder" in CONFIG_TEMPLATE
-    assert "OpenFF Interchange artifact names written by --full" in CONFIG_TEMPLATE
+    assert "Validate and build the full system artifacts" in CONFIG_TEMPLATE
+    assert "Use --full when you need solvated_system.cif" not in CONFIG_TEMPLATE
+    assert "Files written by sammd build" in CONFIG_TEMPLATE
+    assert "OpenFF Interchange artifact names written by --full" not in CONFIG_TEMPLATE
     assert "sam_grafting_density.cif" in CONFIG_TEMPLATE
     assert "build_summary.json" in CONFIG_TEMPLATE
     assert "resolved_config.yaml" in CONFIG_TEMPLATE

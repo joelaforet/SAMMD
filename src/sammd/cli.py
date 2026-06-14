@@ -10,6 +10,7 @@ from typing import Any
 
 import click
 
+from sammd.backends.interchange import backend_build_summary, export_interchange_backend
 from sammd.colors import setup_colored_logging
 from sammd.core.builders import build_system
 from sammd.core.config import CONFIG_TEMPLATE, load_config
@@ -89,24 +90,8 @@ def validate(config: Path) -> None:
     is_flag=True,
     help="Replace existing build artifacts.",
 )
-@click.option(
-    "--full",
-    is_flag=True,
-    help=(
-        "Export OpenFF Interchange files: solvated_system.cif, "
-        "solvated_system_pymol.pdb, interchange.json, "
-        "anchor_metadata.json."
-    ),
-)
-@click.option(
-    "--export-backend",
-    "full",
-    is_flag=True,
-    hidden=True,
-    help="Deprecated alias for --full.",
-)
-def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) -> None:
-    """Build the current plan and optionally write Interchange export files."""
+def build(config: Path, output_dir: Path | None, overwrite: bool) -> None:
+    """Build the current plan and write Interchange export files."""
 
     LOGGER.info("SAMMD Build")
     with _timed("Reading config and constructing deterministic build plan"):
@@ -125,34 +110,27 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
     LOGGER.info("SYSTEM Solution counts: %s", dict(plan.solution.molecule_counts))
 
     try:
-        export_files = None
         with _timed("Writing SAM grafting-density visual check"):
             topology = plan.write_topology_cif(overwrite=overwrite)
         with _timed("Writing resolved configuration"):
             resolved_config = plan.write_resolved_config(overwrite=overwrite)
-        if full:
-            from sammd.backends.interchange import backend_build_summary, export_interchange_backend
-
-            LOGGER.info("OpenFF Interchange Export")
-            export_result = export_interchange_backend(
-                plan,
-                overwrite=overwrite,
-            )
-            export_files = export_result.files
-            with _timed("Writing Interchange export build summary"):
-                build_summary = plan.write_build_summary(overwrite=overwrite)
-                build_summary.write_text(
-                    json.dumps(
-                        backend_build_summary(plan, export_result),
-                        indent=2,
-                        ensure_ascii=False,
-                    )
-                    + "\n",
-                    encoding="utf-8",
+        LOGGER.info("OpenFF Interchange Export")
+        export_result = export_interchange_backend(
+            plan,
+            overwrite=overwrite,
+        )
+        export_files = export_result.files
+        with _timed("Writing Interchange export build summary"):
+            build_summary = plan.write_build_summary(overwrite=overwrite)
+            build_summary.write_text(
+                json.dumps(
+                    backend_build_summary(plan, export_result),
+                    indent=2,
+                    ensure_ascii=False,
                 )
-        else:
-            with _timed("Writing build summary"):
-                build_summary = plan.write_build_summary(overwrite=overwrite)
+                + "\n",
+                encoding="utf-8",
+            )
     except FileExistsError as exc:
         raise click.ClickException(str(exc)) from exc
     except (ImportError, NotImplementedError, RuntimeError, ValueError) as exc:
@@ -162,15 +140,10 @@ def build(config: Path, output_dir: Path | None, overwrite: bool, full: bool) ->
     LOGGER.info("FILE SAM grafting-density CIF: %s", topology)
     LOGGER.info("FILE Build summary: %s", build_summary)
     LOGGER.info("FILE Resolved config: %s", resolved_config)
-    if export_files is not None:
-        LOGGER.info("FILE Wrote solvated system CIF: %s", export_files["solvated_system"])
-        LOGGER.info("FILE PyMOL PDB with CONECT records: %s", export_files["pymol_system"])
-        LOGGER.info("FILE Interchange JSON: %s", export_files["openff_interchange"])
-        LOGGER.info("FILE Anchor metadata: %s", export_files["anchor_metadata"])
-        LOGGER.info(
-            "NEXT Load interchange.json and call Interchange.to_openmm() downstream when needed."
-        )
-    else:
-        LOGGER.info(
-            "NEXT Inspect sam_grafting_density.cif; run --full for OpenFF Interchange files."
-        )
+    LOGGER.info("FILE Wrote solvated system CIF: %s", export_files["solvated_system"])
+    LOGGER.info("FILE PyMOL PDB with CONECT records: %s", export_files["pymol_system"])
+    LOGGER.info("FILE Interchange JSON: %s", export_files["openff_interchange"])
+    LOGGER.info("FILE Anchor metadata: %s", export_files["anchor_metadata"])
+    LOGGER.info(
+        "NEXT Load interchange.json and call Interchange.to_openmm() downstream when needed."
+    )

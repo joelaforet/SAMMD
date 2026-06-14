@@ -2,15 +2,14 @@ Recommended build-to-OpenMM workflow
 ====================================
 
 This tutorial shows the recommended path for students. SAMMD checks the YAML,
-builds the same starting structure each time, and, if requested, writes files
-you can load in OpenMM. SAMMD builds; OpenMM runs.
+builds the same starting structure each time, and writes files you can load in
+OpenMM. SAMMD builds; OpenMM runs.
 
 .. note::
 
-   If you already ran ``pixi shell -e default``, use commands such as
-   ``sammd validate sammd.yaml`` directly. If you are not inside a pixi shell,
-   prefix SAMMD commands with ``pixi run``, for example
-   ``pixi run sammd validate sammd.yaml``.
+   Use the dependency-light ``default`` environment for initialization and
+   validation. Use a CUDA-labeled environment for ``sammd build`` because builds
+   write OpenFF Interchange export files.
 
 1. Create config
 ----------------
@@ -41,25 +40,30 @@ errors before any output files are written.
 3. Build the starting model
 ---------------------------
 
-Build the starting model:
+Build the starting model in a CUDA-labeled pixi environment:
 
 .. code-block:: bash
 
-   pixi run sammd build sammd.yaml --output-dir outputs --overwrite
+   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite
 
-In this version, this command writes exactly three output files:
+This command writes these output files:
 
 * ``sam_grafting_density.cif`` as a PDBx/mmCIF visual smoke test for the Pd
   slab and SAM sulfur anchor positions
 * ``build_summary.json`` for a JSON build report that scripts can read
 * ``resolved_config.yaml`` for the exact validated input used for the build
+* ``interchange.json`` for the primary OpenFF Interchange export
+* ``solvated_system.cif`` for the full slab + SAMs + reactants + solvent
+  PDBx/mmCIF coordinates you can inspect and load in OpenMM
+* ``solvated_system_pymol.pdb`` for PyMOL visualization with explicit ``CONECT``
+  records
+* ``anchor_metadata.json`` for SAM anchor metadata
 
 The result includes the validated configuration and resolved output paths. It
 also includes a centered registered Fcc(111) slab, using Pd(111) by default,
 internal ``fcc_hollow`` binding sites, sulfur atoms marking the planned SAM
-anchors, and approximate solution counts. SAMMD writes full SAM molecule
-coordinates and a parameterized Interchange export only when you run from a
-CUDA-labeled pixi environment with ``--full``.
+anchors, approximate solution counts, full SAM molecule coordinates, and a
+parameterized Interchange export.
 
 4. Inspect outputs
 ------------------
@@ -75,12 +79,8 @@ Use ``outputs/build_summary.json`` to confirm the same build choices in a
 machine-readable form. Use ``outputs/resolved_config.yaml`` when you need the
 exact validated YAML that produced the plan.
 
-You may see those filenames in resolved paths or metadata, but the default
-command does not write ``solvated_system.cif``, ``interchange.json``,
-or ``anchor_metadata.json``.
-
-5. Optional Interchange output files
-------------------------------------
+5. Interchange output files
+---------------------------
 
 Use a CUDA-labeled pixi environment when you want SAMMD to write files for
 OpenFF/OpenMM. Run ``nvidia-smi`` on the machine first, then choose an
@@ -88,11 +88,7 @@ environment whose CUDA version is not newer than the CUDA version shown there.
 For example, use ``cuda-12-4`` for CU Boulder Blanca older-GPU nodes and
 ``cuda-12-6`` for PSC Bridges2. The default example here uses ``cuda-12-4``.
 
-.. code-block:: bash
-
-   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
-
-That command writes these additional files:
+The build command writes these Interchange files:
 
 * ``interchange.json`` for the primary OpenFF Interchange export
 * ``solvated_system.cif`` for the full slab + SAMs + reactants + solvent
@@ -107,9 +103,9 @@ The ``interchange.json`` file is OpenFF Interchange JSON written with
 not guaranteed across OpenFF Interchange versions. Configs that include salt are
 rejected until Interchange export supports salt.
 
-After Interchange export, inspect ``outputs/solvated_system.cif`` if you want to see
-full SAM molecules, solvent, and reactants. ``outputs/sam_grafting_density.cif``
-remains the separate grafting-density smoke test.
+Inspect ``outputs/solvated_system.cif`` if you want to see full SAM molecules,
+solvent, and reactants. ``outputs/sam_grafting_density.cif`` remains the
+separate grafting-density smoke test.
 
 6. Use these files with OpenMM
 ------------------------------
@@ -140,4 +136,4 @@ Notebook version
 ----------------
 
 The related notebook ``notebooks/building_systems_with_sammd.ipynb`` demonstrates the
-default build and inspection steps interactively.
+dependency-light planning and inspection steps interactively.

@@ -29,7 +29,7 @@ Recommended v0.1.0 first-release deliverables:
 - A registered Fcc(111) slab builder, defaulting to Pd(111), and propanethiol SAM placement with tunable grafting density.
 - Mixed SAM support through multiple SAM component definitions with fractions or explicit counts.
 - Centered, double-sided registered Fcc(111) slab geometry with SAMs on both faces and solvent on both sides.
-- Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices. The default build remains dependency-light; `sammd build --full` performs OpenFF Interchange export in a CUDA-labeled pixi environment for supported non-salt configs.
+- Configuration fields and validation that record the selected OpenFF small-molecule force field, charge model, water model, and INTERFACE metal resource choices. `sammd build` performs OpenFF Interchange export in a CUDA-labeled pixi environment for supported non-salt configs.
 - Static CHARMM-INTERFACE-derived Fcc metal Lennard-Jones parameters packaged or identified as OpenFF-compatible OFFXML resource support.
 - Visualization-friendly build artifacts, centered on PDBx/mmCIF topology-inspection output plus machine-readable build summaries.
 - Pytest coverage for configuration validation, parameter conversion, deterministic builders, and import smoke tests.
@@ -94,7 +94,7 @@ Conversion notes:
 
 [OpenFF Interchange construction](https://docs.openforcefield.org/projects/interchange/en/stable/using/construction.html) supports constructing an `Interchange` from a SMIRNOFF `ForceField` and OpenFF `Molecule` or `Topology` objects.
 
-The SAMMD Interchange export pipeline uses OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy is encoded in a SAMMD Interchange plugin collection rather than exposed as a beginner-facing YAML option. The explicit `sammd build --full` path writes `solvated_system.cif`, `interchange.json`, and `anchor_metadata.json` for supported non-salt configs in a CUDA-labeled pixi environment.
+The SAMMD Interchange export pipeline uses OpenFF Toolkit molecule preparation and SMIRNOFF `ForceField` assembly, then OpenFF Interchange construction/export. The strengthened metal-S Lennard-Jones anchor proxy is encoded in a SAMMD Interchange plugin collection rather than exposed as a beginner-facing YAML option. The `sammd build` path writes `solvated_system.cif`, `interchange.json`, and `anchor_metadata.json` for supported non-salt configs in a CUDA-labeled pixi environment.
 
 OpenMM GPU support is tied to the NVIDIA driver and CUDA line available on the
 machine. Students should run `nvidia-smi` on the GPU node or workstation, then
@@ -191,11 +191,11 @@ The current `sammd build` command writes the v0.1.0 first-release artifacts:
 - `build_summary.json`: machine-readable summary of the validated plan and output paths.
 - `resolved_config.yaml`: validated YAML configuration used for the build.
 
-The optional CUDA-environment Interchange export preserves the small public API surface while
+The CUDA-environment Interchange export preserves the small public API surface while
 adding artifact exports for OpenMM handoff:
 
 ```bash
-pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite --full
+pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite
 ```
 
 That command writes `interchange.json`, `solvated_system.cif`, and
@@ -230,14 +230,14 @@ Default post-v0.1.0 Interchange exports plus tutorial-only OpenMM run outputs sh
 - `thermodynamics.csv`: tabular OpenMM state data from a thermodynamic reporter.
 - Optional OpenMM restart/checkpoint artifacts for continuing simulations.
 
-By default, `sammd build` writes `sam_grafting_density.cif`,
-`build_summary.json`, and `resolved_config.yaml`. The default
-`sam_grafting_density.cif` is an inspection
+`sammd build` writes `sam_grafting_density.cif`, `build_summary.json`,
+`resolved_config.yaml`, `solvated_system.cif`, `interchange.json`, and
+`anchor_metadata.json`. The `sam_grafting_density.cif` is an inspection
 visual smoke-test CIF for the deterministic plan, showing the Pd slab and SAM
 sulfur atoms at planned three-fold hollow-site anchors. It is useful for
-checking slab geometry and SAM grafting density before full Interchange export; it
+checking slab geometry and SAM grafting density alongside the full Interchange export; it
 does not include full SAM molecule, solvent, or reactant coordinates.
-With `--full` in a CUDA-labeled pixi environment, SAMMD also writes
+In a CUDA-labeled pixi environment, SAMMD also writes
 `solvated_system.cif`, `interchange.json`, and `anchor_metadata.json`.
 The `interchange.json` artifact is JSON from `Interchange.model_dump_json` with
 reload through `Interchange.model_validate_json` after registering SAMMD's

@@ -88,7 +88,8 @@ def test_build_export_and_openmm_ownership_boundary_is_documented() -> None:
 
     assert "SAMMD builds and exports chemistry, structure, and parameter artifacts" in combined
     assert "OpenMM runs minimization, equilibration, production" in combined
-    assert "sammd build --full" in combined
+    assert "sammd build" in combined
+    assert "sammd build --full" not in combined
     assert "not a student-facing SAMMD run-wrapper API" in combined
 
 
@@ -161,7 +162,7 @@ def test_build_tutorial_documents_default_and_export_outputs() -> None:
     ]
     for export_output in export_outputs:
         assert export_output in combined
-    assert "--full" in combined
+    assert "--full" not in combined
     assert "RUN_INTERCHANGE_EXPORT = False" in notebook
     assert "SAMMD_PIXI_ENV = \"cuda-12-4\"" in notebook
 
