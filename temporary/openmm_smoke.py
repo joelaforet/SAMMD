@@ -1243,8 +1243,10 @@ def actual_solvent_packing_geometry(
     clearance_nm = PACKMOL_TOLERANCE_ANGSTROM / 10.0
     boundary_min_z = min(position[2] for position in boundary_positions_nm)
     boundary_max_z = max(position[2] for position in boundary_positions_nm)
-    z_min = boundary_min_z - padding_per_face_nm
-    z_max = boundary_max_z + padding_per_face_nm
+    fixed_min_z = min(position[2] for position in fixed_solute_positions_nm)
+    fixed_max_z = max(position[2] for position in fixed_solute_positions_nm)
+    z_min = min(boundary_min_z - padding_per_face_nm, fixed_min_z - clearance_nm)
+    z_max = max(boundary_max_z + padding_per_face_nm, fixed_max_z + clearance_nm)
     z_shift_nm = -z_min
     dimensions_nm = (
         plan.box_plan.dimensions_nm[0],

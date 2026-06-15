@@ -452,9 +452,81 @@ def test_reactant_geometry_does_not_define_global_solvent_reservoir() -> None:
 
     assert geometry.solvent_boundary_z_bounds_nm == pytest.approx((1.5, 2.12))
     assert geometry.fixed_solute_z_bounds_nm == pytest.approx((1.5, 3.5))
-    assert geometry.solvent_regions_nm[1][2] == pytest.approx((2.3, 3.62))
+    assert geometry.solvent_regions_nm[1][2] == pytest.approx((2.3, 3.68))
     top_gap_nm = geometry.solvent_regions_nm[1][2][0] - geometry.solvent_boundary_z_bounds_nm[1]
     assert top_gap_nm == pytest.approx(0.18)
+
+
+def test_high_reactant_extends_runtime_box_without_lifting_solvent_region() -> None:
+    """Contain a high fixed reactant while keeping solvent anchored to the SAM."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    from sammd.core.io import AtomRecord
+
+    plan = SimpleNamespace(
+        config=SimpleNamespace(
+            solvent=SimpleNamespace(padding=3.0),
+            packing=SimpleNamespace(packmol=SimpleNamespace(tolerance=1.8)),
+        ),
+        box_plan=SimpleNamespace(dimensions_nm=(2.0, 2.0, 8.0)),
+    )
+    slab_sam_records = (
+        AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (1.0, 1.0, 1.0)),
+        AtomRecord(2, "O", "O", "TGL", 2, "A", "sam:thioglycerol", (1.0, 1.0, 1.62)),
+    )
+    reactant_records = (
+        AtomRecord(3, "C1", "C", "CIN", 3, "B", "reactant:cinnamaldehyde", (1.0, 1.0, 4.5)),
+    )
+
+    geometry = backend._runtime_solvent_geometry(
+        plan,
+        (*slab_sam_records, *reactant_records),
+        solvent_boundary_records=slab_sam_records,
+    )
+
+    assert geometry.solvent_boundary_z_bounds_nm == pytest.approx((1.5, 2.12))
+    assert geometry.fixed_solute_z_bounds_nm == pytest.approx((1.5, 5.0))
+    assert geometry.solvent_regions_nm[1][2][0] == pytest.approx(2.3)
+    assert geometry.dimensions_nm[2] == pytest.approx(5.18)
+    assert geometry.fixed_solute_z_bounds_nm[1] < geometry.dimensions_nm[2]
+
+
+def test_packmol_fixed_solute_coordinates_are_inside_runtime_box() -> None:
+    """Shifted fixed-solute coordinates should fit within Packmol dimensions."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    from sammd.core.io import AtomRecord
+
+    plan = SimpleNamespace(
+        config=SimpleNamespace(
+            solvent=SimpleNamespace(padding=3.0),
+            packing=SimpleNamespace(packmol=SimpleNamespace(tolerance=1.8)),
+        ),
+        box_plan=SimpleNamespace(dimensions_nm=(2.0, 2.0, 8.0)),
+    )
+    boundary_records = (
+        AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (1.0, 1.0, 1.0)),
+        AtomRecord(2, "O", "O", "TGL", 2, "A", "sam:thioglycerol", (1.0, 1.0, 1.62)),
+    )
+    records = (
+        *boundary_records,
+        AtomRecord(3, "C1", "C", "CIN", 3, "B", "reactant", (1.0, 1.0, 4.5)),
+    )
+
+    geometry = backend._runtime_solvent_geometry(
+        plan,
+        records,
+        solvent_boundary_records=boundary_records,
+    )
+    shifted_positions = tuple(
+        backend._shift_position_z(record.coordinates_nm, geometry.z_shift_nm) for record in records
+    )
+
+    backend._ensure_positions_inside_box(
+        shifted_positions,
+        geometry.dimensions_nm,
+        context="test fixed solute",
+    )
 
 
 def _region_volume(region) -> float:

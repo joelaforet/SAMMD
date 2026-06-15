@@ -466,6 +466,11 @@ def build_interchange_backend(
         atom_records[:] = [
             _shift_atom_record_z(record, runtime_geometry.z_shift_nm) for record in atom_records
         ]
+    _ensure_positions_inside_box(
+        tuple(record.coordinates_nm for record in atom_records),
+        runtime_geometry.dimensions_nm,
+        context="fixed solute Packmol",
+    )
 
     runtime_solution = plan_solution_composition(
         plan.config,
@@ -739,8 +744,8 @@ def _runtime_solvent_geometry(
     boundary_max_z = max(record.coordinates_nm[2] for record in boundary_records)
     fixed_min_z = min(record.coordinates_nm[2] for record in fixed_solute_records)
     fixed_max_z = max(record.coordinates_nm[2] for record in fixed_solute_records)
-    final_z_min = boundary_min_z - padding_per_face_nm
-    final_z_max = boundary_max_z + padding_per_face_nm
+    final_z_min = min(boundary_min_z - padding_per_face_nm, fixed_min_z - clearance_nm)
+    final_z_max = max(boundary_max_z + padding_per_face_nm, fixed_max_z + clearance_nm)
     z_shift_nm = -final_z_min
     dimensions_nm = (
         plan.box_plan.dimensions_nm[0],
@@ -775,6 +780,25 @@ def _runtime_solvent_geometry(
         z_shift_nm=z_shift_nm,
         molecule_counts={},
     )
+
+
+def _ensure_positions_inside_box(
+    positions_nm: tuple[Vector3, ...],
+    dimensions_nm: Vector3,
+    *,
+    context: str,
+) -> None:
+    """Validate that coordinates lie inside the zero-origin runtime box."""
+
+    tolerance_nm = 1.0e-9
+    for atom_index, position in enumerate(positions_nm, start=1):
+        for axis, coordinate, dimension in zip("xyz", position, dimensions_nm, strict=True):
+            if coordinate < -tolerance_nm or coordinate > dimension + tolerance_nm:
+                msg = (
+                    f"{context} atom {atom_index} {axis}-coordinate {coordinate:g} nm "
+                    f"lies outside runtime box dimension {dimension:g} nm"
+                )
+                raise ValueError(msg)
 
 
 def _runtime_geometry_with_counts(

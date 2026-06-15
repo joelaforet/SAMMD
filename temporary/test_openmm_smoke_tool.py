@@ -291,6 +291,32 @@ def test_smoke_reactant_does_not_define_global_solvent_reservoir() -> None:
     assert regions[1][2][0] < high_reactant_positions[-1][2] + z_shift + clearance_nm
 
 
+def test_smoke_high_reactant_extends_runtime_box_without_lifting_solvent_region() -> None:
+    """Smoke geometry should contain a high reactant but keep solvent near SAM."""
+
+    smoke = load_smoke_tool()
+    plan = build_system(SAMMDConfig.model_validate({"surface": {"lateral_size": [2.0, 2.0]}}))
+    boundary_positions = actual_solvent_boundary_positions(smoke, plan)
+    high_reactant_positions = (
+        *boundary_positions,
+        (boundary_positions[0][0], boundary_positions[0][1], 6.0),
+    )
+
+    box, z_shift, regions = smoke.actual_solvent_packing_geometry(
+        plan,
+        high_reactant_positions,
+        3.0,
+        solvent_boundary_positions_nm=boundary_positions,
+    )
+    shifted_boundary_top = max(position[2] for position in boundary_positions) + z_shift
+    shifted_reactant_top = high_reactant_positions[-1][2] + z_shift
+    clearance_nm = smoke.PACKMOL_TOLERANCE_ANGSTROM / 10.0
+
+    assert regions[1][2][0] == pytest.approx(shifted_boundary_top + clearance_nm)
+    assert shifted_reactant_top < box[2]
+    assert box[2] == pytest.approx(shifted_reactant_top + clearance_nm)
+
+
 def test_packmol_input_rejects_explicit_full_box_solvent_region() -> None:
     """Smoke Packmol input should not accept old full-box solvent packing."""
 
