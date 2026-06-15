@@ -9,6 +9,18 @@ from pydantic import ValidationError
 from sammd.core.config import CONFIG_TEMPLATE, SAMMDConfig, load_config, load_config_dict
 
 
+def test_project_scope_documents_total_solvent_padding_semantics() -> None:
+    """Prevent docs from regressing to per-face solvent padding wording."""
+
+    text = Path("docs/project-scope.md").read_text(encoding="utf-8")
+
+    assert "3 nm total solvent padding" in text
+    old_wording = (
+        "3 nm solvent padding from the fully extended SAM tips to the box boundary on each side"
+    )
+    assert old_wording not in text
+
+
 def _template_data() -> dict:
     """Return parsed YAML template data."""
 
@@ -114,8 +126,8 @@ def test_yaml_template_describes_neutral_thiols_and_internal_nonbonded_attachmen
     assert "optional advanced override" in normalized
     assert "fully extended SAM" in normalized
     assert "length from sulfur anchor to tail tip" in normalized
-    assert "distance from fully extended SAM tips" in normalized
-    assert "box boundary" in normalized
+    assert "total z reservoir thickness across both exposed SAM faces" in normalized
+    assert "split equally across both faces" in normalized
 
 
 def test_beginner_template_defers_sam_attachment_knobs() -> None:

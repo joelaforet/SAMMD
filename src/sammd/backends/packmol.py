@@ -75,6 +75,15 @@ class PackmolMoleculeTemplate:
             raise ValueError(msg)
 
 
+@dataclass(frozen=True)
+class PackmolSolventComponent:
+    """One solvent component to place in a shared PACKMOL reservoir job."""
+
+    name: str
+    template: PackmolMoleculeTemplate
+    count: int
+
+
 def zero_origin_box_bounds(dimensions_nm: Any) -> BoxBounds:
     """Return ``((0, x), (0, y), (0, z))`` bounds from dimensions in nanometers."""
 
@@ -251,6 +260,108 @@ def pack_fixed_solute_with_solvent(
         packed_positions[index : index + atoms_per_solvent]
         for index in range(solvent_start, solvent_stop, atoms_per_solvent)
     )
+
+
+def pack_fixed_solute_with_solvent_components(
+    *,
+    solute_records: tuple[AtomRecord, ...] | list[AtomRecord],
+    solvent_components: tuple[PackmolSolventComponent, ...] | list[PackmolSolventComponent],
+    dimensions_nm: Any,
+    working_dir: str | Path,
+    solvent_regions_nm: tuple[BoxBounds, ...] | list[BoxBounds] | None = None,
+    tolerance_angstrom: float = 1.8,
+    nloop: int = 200,
+) -> dict[str, tuple[tuple[Vector3, ...], ...]]:
+    """Pack all solvent components against one fixed solute in shared regions.
+
+    The same explicit solvent regions are applied to every component so mixed
+    solvents occupy common reservoirs instead of sequentially shrinking them.
+    """
+
+    raw_components = tuple(solvent_components)
+    for component in raw_components:
+        _validate_solvent_component(component)
+    components = tuple(component for component in raw_components if component.count > 0)
+    if not components:
+        return {}
+    solute_atoms = tuple(solute_records)
+    if not solute_atoms:
+        msg = "fixed-solute packing requires at least one solute atom record"
+        raise ValueError(msg)
+
+    workdir = Path(working_dir)
+    workdir.mkdir(parents=True, exist_ok=True)
+    solute_path = workdir / "fixed_solute.pdb"
+    output_path = workdir / "packmol_output.pdb"
+    input_path = workdir / "packmol_input.inp"
+    stdout_path = workdir / "packmol_stdout.log"
+
+    write_atom_records_pdb(solute_path, solute_atoms)
+    box_bounds_nm = zero_origin_box_bounds(dimensions_nm)
+    regions_nm = tuple(solvent_regions_nm) if solvent_regions_nm is not None else (box_bounds_nm,)
+    solvent_structures: list[PackmolStructure] = []
+    component_atom_counts: dict[str, int] = {}
+    component_region_counts: dict[str, tuple[int, ...]] = {}
+    for component in components:
+        solvent_path = workdir / f"{packmol_file_stem(component.name)}.pdb"
+        write_template_pdb(solvent_path, component.template)
+        component_atom_counts[component.name] = len(component.template.positions_nm)
+        region_counts = split_count_by_region_volume(component.count, regions_nm)
+        component_region_counts[component.name] = region_counts
+        solvent_structures.extend(
+            PackmolStructure(
+                f"{component.name}_{region_index}",
+                solvent_path.name,
+                region_count,
+                inside_box_bounds_nm=region,
+            )
+            for region_index, (region, region_count) in enumerate(
+                zip(regions_nm, region_counts, strict=True),
+                start=1,
+            )
+            if region_count > 0
+        )
+
+    job = PackmolJob(
+        output_path=output_path.name,
+        structures=(
+            PackmolStructure("solute", solute_path.name, 1, fixed=True),
+            *solvent_structures,
+        ),
+        box_bounds_nm=box_bounds_nm,
+        tolerance_angstrom=tolerance_angstrom,
+        nloop=nloop,
+    )
+    input_path.write_text(build_packmol_input(job), encoding="utf-8")
+    result = run_packmol(job, input_path, workdir, stdout_path)
+    if result.returncode != 0 or "Success!" not in result.stdout:
+        msg = f"PACKMOL failed while placing solvent mixture; see {stdout_path}"
+        raise RuntimeError(msg)
+
+    packed_positions = read_pdb_positions_nm(output_path)
+    solvent_atom_count = sum(
+        component.count * component_atom_counts[component.name] for component in components
+    )
+    expected_atom_count = len(solute_atoms) + solvent_atom_count
+    if len(packed_positions) != expected_atom_count:
+        msg = (
+            f"PACKMOL output contains {len(packed_positions)} atoms, expected "
+            f"{expected_atom_count} ({len(solute_atoms)} solute + {solvent_atom_count} solvent)"
+        )
+        raise RuntimeError(msg)
+
+    offset = len(solute_atoms)
+    packed_by_component: dict[str, list[tuple[Vector3, ...]]] = {
+        component.name: [] for component in components
+    }
+    for component in components:
+        atoms_per_solvent = component_atom_counts[component.name]
+        for region_count in component_region_counts[component.name]:
+            for _ in range(region_count):
+                stop = offset + atoms_per_solvent
+                packed_by_component[component.name].append(packed_positions[offset:stop])
+                offset = stop
+    return {name: tuple(positions) for name, positions in packed_by_component.items()}
 
 
 def solvent_regions_around_solute(
@@ -458,6 +569,24 @@ def _validate_structure(structure: PackmolStructure) -> None:
         raise ValueError(msg)
     if structure.inside_box_bounds_nm is not None:
         _validate_bounds(structure.inside_box_bounds_nm)
+
+
+def _validate_solvent_component(component: PackmolSolventComponent) -> None:
+    """Reject invalid solvent component metadata before writing scratch files."""
+
+    if not isinstance(component, PackmolSolventComponent):
+        msg = "solvent components must be PackmolSolventComponent entries"
+        raise TypeError(msg)
+    if not str(component.name).strip():
+        msg = "solvent component name must be non-empty"
+        raise ValueError(msg)
+    if (
+        isinstance(component.count, bool)
+        or not isinstance(component.count, int)
+        or component.count < 0
+    ):
+        msg = f"solvent component {component.name!r} count must be a non-negative integer"
+        raise ValueError(msg)
 
 
 def _region_volume_nm3(region: BoxBounds) -> float:

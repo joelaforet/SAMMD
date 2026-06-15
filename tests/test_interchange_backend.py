@@ -260,6 +260,40 @@ def test_molecule_centers_above_solute_avoid_slab_z_range() -> None:
     assert min(position[2] for molecule in placed for position in molecule) > 5.5
 
 
+def test_runtime_solvent_regions_preserve_planned_count_volume() -> None:
+    """Runtime PACKMOL placement should preserve planned reservoir volumes."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    regions = (
+        ((-1.0, 1.0), (-1.0, 1.0), (-2.0, -1.5)),
+        ((-1.0, 1.0), (-1.0, 1.0), (1.5, 2.0)),
+    )
+    plan = SimpleNamespace(
+        box_plan=SimpleNamespace(
+            bounds_nm=((-1.0, 1.0), (-1.0, 1.0), (-2.0, 2.0)),
+            solvent_packing_regions_nm=regions,
+        )
+    )
+
+    runtime_regions = backend._runtime_solvent_regions(plan)
+
+    assert runtime_regions == (
+        ((0.0, 2.0), (0.0, 2.0), (0.0, 0.5)),
+        ((0.0, 2.0), (0.0, 2.0), (3.5, 4.0)),
+    )
+    assert sum(_region_volume(region) for region in runtime_regions) == pytest.approx(
+        sum(_region_volume(region) for region in regions)
+    )
+
+
+def _region_volume(region) -> float:
+    """Return simple orthorhombic region volume for test assertions."""
+
+    return (region[0][1] - region[0][0]) * (region[1][1] - region[1][0]) * (
+        region[2][1] - region[2][0]
+    )
+
+
 def test_interface_metal_offxml_loads_with_current_openff() -> None:
     """The packaged INTERFACE OFFXML stays compatible with the CUDA env toolkit."""
 

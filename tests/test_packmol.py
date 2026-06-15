@@ -8,9 +8,11 @@ import pytest
 from sammd.backends.packmol import (
     PackmolJob,
     PackmolMoleculeTemplate,
+    PackmolSolventComponent,
     PackmolStructure,
     build_packmol_input,
     pack_fixed_solute_with_solvent,
+    pack_fixed_solute_with_solvent_components,
     pdb_atom_line,
     read_pdb_positions_nm,
     run_packmol,
@@ -561,3 +563,71 @@ def test_fixed_solute_helper_uses_packmol_around_full_box(tmp_path, monkeypatch)
     assert "fixed 0. 0. 0. 0. 0. 0." in input_text
     assert "structure ethanol.pdb" in input_text
     assert "inside box 0 0 0 20 20 20" in input_text
+
+
+def test_mixed_solvent_helper_uses_shared_explicit_regions(tmp_path, monkeypatch) -> None:
+    """Pack mixed solvent in one job with identical reservoir bounds per component."""
+
+    import sammd.backends.packmol as packmol_backend
+
+    captured_jobs = []
+    packed_positions = (
+        (0.0, 0.0, 0.0),
+        (0.1, 0.1, 0.2),
+        (0.2, 0.1, 1.8),
+        (0.3, 0.1, 0.2),
+        (0.4, 0.1, 1.8),
+    )
+
+    def fake_run_packmol(job, input_path, working_dir, stdout_path):
+        captured_jobs.append(job)
+        return SimpleNamespace(returncode=0, stdout="Success!")
+
+    monkeypatch.setattr(packmol_backend, "run_packmol", fake_run_packmol)
+    monkeypatch.setattr(packmol_backend, "read_pdb_positions_nm", lambda path: packed_positions)
+
+    regions = (
+        ((0.0, 2.0), (0.0, 2.0), (0.0, 0.5)),
+        ((0.0, 2.0), (0.0, 2.0), (1.5, 2.0)),
+    )
+    packed = pack_fixed_solute_with_solvent_components(
+        solute_records=(
+            AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (0.0, 0.0, 0.0)),
+        ),
+        solvent_components=(
+            PackmolSolventComponent(
+                "water",
+                PackmolMoleculeTemplate("HOH", ((0.0, 0.0, 0.0),), ("O",), ("O1",)),
+                2,
+            ),
+            PackmolSolventComponent(
+                "ethanol",
+                PackmolMoleculeTemplate("EOH", ((0.0, 0.0, 0.0),), ("C",), ("C1",)),
+                2,
+            ),
+        ),
+        dimensions_nm=(2.0, 2.0, 2.0),
+        working_dir=tmp_path,
+        solvent_regions_nm=regions,
+    )
+
+    assert packed == {
+        "water": (packed_positions[1:2], packed_positions[2:3]),
+        "ethanol": (packed_positions[3:4], packed_positions[4:5]),
+    }
+    assert [structure.name for structure in captured_jobs[0].structures] == [
+        "solute",
+        "water_1",
+        "water_2",
+        "ethanol_1",
+        "ethanol_2",
+    ]
+    assert [structure.inside_box_bounds_nm for structure in captured_jobs[0].structures[1:]] == [
+        regions[0],
+        regions[1],
+        regions[0],
+        regions[1],
+    ]
+    input_text = (tmp_path / "packmol_input.inp").read_text(encoding="utf-8")
+    assert input_text.count("inside box 0 0 0 20 20 5") == 2
+    assert input_text.count("inside box 0 0 15 20 20 20") == 2

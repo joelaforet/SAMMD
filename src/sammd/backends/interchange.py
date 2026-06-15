@@ -26,10 +26,9 @@ from sammd.backends.openff import (
 )
 from sammd.backends.packmol import (
     PackmolMoleculeTemplate,
-    pack_fixed_solute_with_solvent,
+    PackmolSolventComponent,
+    pack_fixed_solute_with_solvent_components,
     packmol_file_stem,
-    solvent_regions_around_solute,
-    zero_origin_box_bounds,
 )
 from sammd.core.io import AtomRecord, safe_write_text
 from sammd.model.sam import SAMPlacement
@@ -393,6 +392,7 @@ def build_interchange_backend(
     solvent_count = sum(solvent.count for solvent in plan.solution.solvent_components)
     stage_start = perf_counter()
     _progress(progress, f"Preparing {solvent_count} solvent molecules")
+    solvent_templates: list[tuple[Any, PreparedMoleculeTemplate]] = []
     for solvent in plan.solution.solvent_components:
         if solvent.smiles is None:
             msg = (
@@ -411,34 +411,41 @@ def build_interchange_backend(
             f"  solvent template ready: {solvent.name}",
             stage_start,
         )
-        centered_solvent = pack_fixed_solute_with_solvent(
-            solute_records=atom_records,
-            solvent_template=PackmolMoleculeTemplate(
-                residue_name=solvent.residue_name or "SOL",
-                positions_nm=template.positions_nm,
-                atom_symbols=template.atom_symbols,
-                atom_names=tuple(
-                    _atom_name(symbol, index)
-                    for index, symbol in enumerate(template.atom_symbols, 1)
+        solvent_templates.append((solvent, template))
+
+    packed_solvent = pack_fixed_solute_with_solvent_components(
+        solute_records=atom_records,
+        solvent_components=tuple(
+            PackmolSolventComponent(
+                name=solvent.name,
+                template=PackmolMoleculeTemplate(
+                    residue_name=solvent.residue_name or "SOL",
+                    positions_nm=template.positions_nm,
+                    atom_symbols=template.atom_symbols,
+                    atom_names=tuple(
+                        _atom_name(symbol, index)
+                        for index, symbol in enumerate(template.atom_symbols, 1)
+                    ),
                 ),
-            ),
-            solvent_name=solvent.name,
-            solvent_count=solvent.count,
-            dimensions_nm=plan.box_plan.dimensions_nm,
-            working_dir=_packmol_working_dir(plan, solvent.name),
-            solvent_regions_nm=solvent_regions_around_solute(
-                atom_records,
-                zero_origin_box_bounds(plan.box_plan.dimensions_nm),
-                plan.config.packing.packmol.tolerance / 10.0,
-            ),
-            tolerance_angstrom=plan.config.packing.packmol.tolerance,
-            nloop=plan.config.packing.packmol.nloop,
-        )
+                count=solvent.count,
+            )
+            for solvent, template in solvent_templates
+        ),
+        dimensions_nm=plan.box_plan.dimensions_nm,
+        working_dir=_packmol_working_dir(plan, "mixed_solvent"),
+        solvent_regions_nm=_runtime_solvent_regions(plan),
+        tolerance_angstrom=plan.config.packing.packmol.tolerance,
+        nloop=plan.config.packing.packmol.nloop,
+    )
+    if solvent_templates:
         stage_start = _timed_progress(
             progress,
-            f"  PACKMOL solvent positions ready: {solvent.name}",
+            "  PACKMOL solvent positions ready",
             stage_start,
         )
+
+    for solvent, template in solvent_templates:
+        centered_solvent = packed_solvent.get(solvent.name, ())
         for solvent_index, transformed in enumerate(centered_solvent, start=1):
             molecule = deepcopy(template.molecule)
             _append_identified_molecule(
@@ -606,6 +613,19 @@ def _packmol_working_dir(plan: Any, solvent_name: str) -> Path:
     if solvated_system is None:
         return Path(tempfile.mkdtemp(prefix="sammd-packmol-"))
     return Path(solvated_system).parent / "packmol" / packmol_file_stem(solvent_name)
+
+
+def _runtime_solvent_regions(plan: Any) -> tuple[Any, ...]:
+    """Return planned solvent regions in the shifted runtime coordinate frame."""
+
+    box_lowers = tuple(axis_bounds[0] for axis_bounds in plan.box_plan.bounds_nm)
+    return tuple(
+        tuple(
+            (axis_bounds[0] - axis_lower, axis_bounds[1] - axis_lower)
+            for axis_bounds, axis_lower in zip(region, box_lowers, strict=True)
+        )
+        for region in plan.box_plan.solvent_packing_regions_nm
+    )
 
 
 def _append_identified_molecule(
