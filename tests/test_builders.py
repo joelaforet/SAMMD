@@ -283,7 +283,7 @@ def test_long_sam_length_uses_openff_conformer_graph_path() -> None:
 def test_short_sam_length_is_not_clamped_to_old_minimum(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Use the actual short conformer estimate without a fixed 0.95 nm floor."""
+    """Use the actual short conformer estimate without a legacy fixed floor."""
 
     monkeypatch.setattr(builders, "_estimate_smiles_contour_length_nm", lambda smiles: 0.62)
 

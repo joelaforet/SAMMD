@@ -281,23 +281,32 @@ def test_metal_residue_name_pads_to_three_characters() -> None:
     assert backend._metal_residue_name("Zn") == "Znx"
 
 
-def test_component_residue_assigner_tracks_mixed_components() -> None:
-    """Mixed component append order should not collapse identity to atom ranges."""
+def test_component_residue_assigner_tracks_semantic_component_chains() -> None:
+    """Components should receive chain IDs from semantic roles, not append order."""
 
     backend = importlib.import_module("sammd.backends.interchange")
     assigner = backend._ComponentResidueAssigner()
 
     first_ptl = assigner.allocate("sam:propanethiol", "PTL")
     first_mce = assigner.allocate("sam:mercaptoethanol", "MCE")
+    first_reactant = assigner.allocate("reactant:cinnamaldehyde", "CIN")
+    first_solvent = assigner.allocate("solvent:ethanol", "EOH")
     second_ptl = assigner.allocate("sam:propanethiol", "PTL")
 
-    assert first_ptl.chain_id == "A"
+    assert first_ptl.chain_id == "C"
     assert first_ptl.residue_id == 1
-    assert first_mce.chain_id == "B"
-    assert first_mce.residue_id == 1
-    assert second_ptl.chain_id == "A"
-    assert second_ptl.residue_id == 2
+    assert first_mce.chain_id == "C"
+    assert first_mce.residue_id == 2
+    assert first_reactant.chain_id == "B"
+    assert first_reactant.residue_id == 1
+    assert first_solvent.chain_id == "D"
+    assert first_solvent.residue_id == 1
+    assert second_ptl.chain_id == "C"
+    assert second_ptl.residue_id == 3
     assert assigner.component_ranges["sam:propanethiol"]["residue_count"] == 2
+    assert assigner.component_ranges["reactant:cinnamaldehyde"]["chain_ids"] == ("B",)
+    assert assigner.component_ranges["sam:mercaptoethanol"]["chain_ids"] == ("C",)
+    assert assigner.component_ranges["solvent:ethanol"]["chain_ids"] == ("D",)
 
 
 def test_openmm_identity_repair_labels_nonmetal_residues() -> None:
@@ -320,6 +329,22 @@ def test_openmm_identity_repair_labels_nonmetal_residues() -> None:
     assert residue.name == "EOH"
     assert residue.id == "12"
     assert residue.chain.id == "A"
+
+
+def test_component_residue_assigner_wraps_solvent_from_semantic_chain() -> None:
+    """Solvent chain wrapping should begin from the solvent role chain."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    assigner = backend._ComponentResidueAssigner()
+
+    last_first_chain = None
+    for _ in range(backend.MAX_RESIDUES_PER_CHAIN):
+        last_first_chain = assigner.allocate("solvent:ethanol", "EOH")
+    first_second_chain = assigner.allocate("solvent:ethanol", "EOH")
+
+    assert last_first_chain == backend._ResidueIdentity("D", 9999, "EOH")
+    assert first_second_chain == backend._ResidueIdentity("E", 1, "EOH")
+    assert assigner.component_ranges["solvent:ethanol"]["chain_ids"] == ("D", "E")
 
 
 def test_molecule_centers_above_solute_avoid_slab_z_range() -> None:
@@ -432,7 +457,7 @@ def test_runtime_solvent_regions_match_packmol_input_after_shift(tmp_path, monke
 
 
 def test_actual_fixed_solute_geometry_defines_solvent_regions_for_short_sam() -> None:
-    """Place solvent next to actual fixed-solute bounds without a 0.95 nm SAM gap."""
+    """Place solvent next to actual fixed-solute bounds without a clamped SAM gap."""
 
     backend = importlib.import_module("sammd.backends.interchange")
     from sammd.core.io import AtomRecord

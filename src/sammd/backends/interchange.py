@@ -45,9 +45,13 @@ from sammd.utils.geometry import (
 )
 
 MAX_RESIDUES_PER_CHAIN = 9999
-# One-character PDB chain IDs are reserved for metal slab atoms as M, so component
-# chains intentionally skip M while keeping deterministic allocation order.
+# Component chains follow PolyzyMD semantic roles rather than construction order
 CHAIN_LETTERS = "ABCDEFGHIJKLNOPQRSTUVWXYZ"
+ROLE_CHAIN_STARTS = {
+    "reactant": "B",
+    "sam": "C",
+    "solvent": "D",
+}
 LOGGER = logging.getLogger(__name__)
 
 
@@ -99,7 +103,7 @@ class _ComponentResidueAssigner:
     """Assign one stable residue identity per chemically meaningful molecule."""
 
     def __init__(self) -> None:
-        self._next_chain_index = 0
+        self._role_states: dict[str, dict[str, object]] = {}
         self._states: dict[str, dict[str, object]] = {}
         self._component_ranges: dict[str, dict[str, object]] = {}
 
@@ -108,45 +112,72 @@ class _ComponentResidueAssigner:
         return {key: dict(value) for key, value in self._component_ranges.items()}
 
     def allocate(self, component_name: str, residue_name: str) -> _ResidueIdentity:
+        role = _component_role(component_name)
+        role_state = self._role_states.get(role)
+        if role_state is None:
+            role_state = {
+                "chain_ids": [ROLE_CHAIN_STARTS[role]],
+                "next_residue_id": 1,
+                "next_chain_index": CHAIN_LETTERS.index(ROLE_CHAIN_STARTS[role]),
+            }
+            self._role_states[role] = role_state
+
         state = self._states.get(component_name)
         if state is None:
-            chain_id = self._next_chain_id()
             state = {
                 "residue_name": residue_name,
-                "chain_ids": [chain_id],
-                "next_residue_id": 1,
                 "residue_count": 0,
+                "chain_ids": [],
             }
             self._states[component_name] = state
 
-        chain_ids = state["chain_ids"]
-        next_residue_id = int(state["next_residue_id"])
+        role_chain_ids = role_state["chain_ids"]
+        next_residue_id = int(role_state["next_residue_id"])
         if next_residue_id > MAX_RESIDUES_PER_CHAIN:
-            chain_ids.append(self._next_chain_id())
+            role_chain_ids.append(self._next_chain_id(role_state))
             next_residue_id = 1
+        chain_id = str(role_chain_ids[-1])
+
+        component_chain_ids = state["chain_ids"]
+        if chain_id not in component_chain_ids:
+            component_chain_ids.append(chain_id)
 
         identity = _ResidueIdentity(
-            chain_id=str(chain_ids[-1]),
+            chain_id=chain_id,
             residue_id=next_residue_id,
             residue_name=residue_name,
         )
-        state["next_residue_id"] = next_residue_id + 1
+        role_state["next_residue_id"] = next_residue_id + 1
         state["residue_count"] = int(state["residue_count"]) + 1
         self._component_ranges[component_name] = {
             "residue_name": residue_name,
             "residue_count": state["residue_count"],
-            "chain_ids": tuple(chain_ids),
+            "chain_ids": tuple(component_chain_ids),
             "max_residues_per_chain": MAX_RESIDUES_PER_CHAIN,
         }
         return identity
 
-    def _next_chain_id(self) -> str:
-        if self._next_chain_index >= len(CHAIN_LETTERS):
+    def _next_chain_id(self, role_state: dict[str, object]) -> str:
+        next_chain_index = int(role_state["next_chain_index"]) + 1
+        if next_chain_index >= len(CHAIN_LETTERS):
             msg = "Interchange export exceeded available one-character chain identifiers"
             raise RuntimeError(msg)
-        chain_id = CHAIN_LETTERS[self._next_chain_index]
-        self._next_chain_index += 1
+        chain_id = CHAIN_LETTERS[next_chain_index]
+        role_state["next_chain_index"] = next_chain_index
         return chain_id
+
+
+def _component_role(component_name: str) -> str:
+    """Return the semantic chain role for a component label."""
+
+    if component_name.startswith("reactant:"):
+        return "reactant"
+    if component_name.startswith("sam:"):
+        return "sam"
+    if component_name.startswith("solvent:"):
+        return "solvent"
+    msg = f"unknown Interchange component role for {component_name!r}"
+    raise ValueError(msg)
 
 
 ProgressCallback = Callable[[str], None]

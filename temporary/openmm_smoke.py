@@ -83,6 +83,12 @@ PACKMOL_TOLERANCE_ANGSTROM = 1.8
 PACKMOL_NLOOP = 200
 MAX_RESIDUES_PER_CHAIN = 9999
 CHAIN_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+SEMANTIC_CHAIN_STARTS = {
+    "metal": "M",
+    "reactant": "B",
+    "sam": "C",
+    "solvent": "D",
+}
 PASS_MAX_TEMPERATURE_K = 600.0
 PASS_MAX_PD_DISPLACEMENT_NM = 0.15
 PASS_MAX_SULFUR_DISPLACEMENT_NM = 0.70
@@ -304,7 +310,6 @@ class ComponentResidueAssigner:
     """Assign PolyzyMD-style wrapping chain/residue identifiers by component."""
 
     def __init__(self) -> None:
-        self._next_chain_index = 0
         self._component_ranges: dict[str, dict[str, object]] = {}
 
     @property
@@ -324,8 +329,9 @@ class ComponentResidueAssigner:
         if residue_count <= 0:
             msg = "residue_count must be positive"
             raise ValueError(msg)
+        role = component_role(component_name)
+        start_chain_index = CHAIN_LETTERS.index(SEMANTIC_CHAIN_STARTS[role])
         chains_needed = math.ceil(residue_count / MAX_RESIDUES_PER_CHAIN)
-        start_chain_index = self._next_chain_index
         stop_chain_index = start_chain_index + chains_needed - 1
         if stop_chain_index >= len(CHAIN_LETTERS):
             msg = "smoke topology exceeded available one-character chain identifiers"
@@ -346,8 +352,22 @@ class ComponentResidueAssigner:
             "last_chain_id": CHAIN_LETTERS[stop_chain_index],
             "max_residues_per_chain": MAX_RESIDUES_PER_CHAIN,
         }
-        self._next_chain_index += chains_needed
         return identities
+
+
+def component_role(component_name: str) -> str:
+    """Return the semantic chain role for smoke-system component names."""
+
+    if component_name == "palladium_slab":
+        return "metal"
+    if component_name == "propanethiolate_sam":
+        return "sam"
+    if component_name == "cinnamaldehyde":
+        return "reactant"
+    if component_name == SOLVENT_NAME:
+        return "solvent"
+    msg = f"unknown smoke component role for {component_name!r}"
+    raise ValueError(msg)
 
 
 def main(argv: list[str] | None = None) -> int:

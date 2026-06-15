@@ -154,24 +154,28 @@ def test_rotation_matrix_maps_source_vector_to_target_vector() -> None:
     assert math.isclose(norm(rotated), 1.0)
 
 
-def test_component_residue_assigner_wraps_after_9999_residues() -> None:
-    """Follow PolyzyMD's one-repeat-unit-per-residue chain wrapping convention."""
+def test_component_residue_assigner_uses_semantic_component_chains() -> None:
+    """Follow PolyzyMD's semantic chain convention for each component role."""
 
     smoke = load_smoke_tool()
     assigner = smoke.ComponentResidueAssigner()
 
-    identities = assigner.allocate("ethanol", "EOH", 10000)
-    next_identity = assigner.allocate("reactant", "CIN", 1)[0]
+    metal_identity = assigner.allocate("palladium_slab", "PD", 1)[0]
+    sam_identity = assigner.allocate("propanethiolate_sam", "PTL", 1)[0]
+    reactant_identity = assigner.allocate("cinnamaldehyde", "CIN", 1)[0]
+    solvent_identities = assigner.allocate("ethanol", "EOH", 10000)
 
-    assert identities[0] == smoke.ResidueIdentity("A", 1, "EOH")
-    assert identities[9998] == smoke.ResidueIdentity("A", 9999, "EOH")
-    assert identities[9999] == smoke.ResidueIdentity("B", 1, "EOH")
-    assert next_identity == smoke.ResidueIdentity("C", 1, "CIN")
+    assert metal_identity == smoke.ResidueIdentity("M", 1, "PD")
+    assert sam_identity == smoke.ResidueIdentity("C", 1, "PTL")
+    assert reactant_identity == smoke.ResidueIdentity("B", 1, "CIN")
+    assert solvent_identities[0] == smoke.ResidueIdentity("D", 1, "EOH")
+    assert solvent_identities[9998] == smoke.ResidueIdentity("D", 9999, "EOH")
+    assert solvent_identities[9999] == smoke.ResidueIdentity("E", 1, "EOH")
     assert assigner.component_ranges["ethanol"] == {
         "residue_name": "EOH",
         "residue_count": 10000,
-        "first_chain_id": "A",
-        "last_chain_id": "B",
+        "first_chain_id": "D",
+        "last_chain_id": "E",
         "max_residues_per_chain": 9999,
     }
 
