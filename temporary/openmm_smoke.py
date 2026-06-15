@@ -1250,8 +1250,10 @@ def actual_solvent_packing_geometry(
     boundary_max_z = max(position[2] for position in boundary_positions_nm)
     fixed_min_z = min(position[2] for position in fixed_solute_positions_nm)
     fixed_max_z = max(position[2] for position in fixed_solute_positions_nm)
-    z_min = min(boundary_min_z - padding_per_face_nm, fixed_min_z - clearance_nm)
-    z_max = max(boundary_max_z + padding_per_face_nm, fixed_max_z + clearance_nm)
+    solvent_z_min = boundary_min_z - padding_per_face_nm
+    solvent_z_max = boundary_max_z + padding_per_face_nm
+    z_min = min(solvent_z_min, fixed_min_z - clearance_nm)
+    z_max = max(solvent_z_max, fixed_max_z + clearance_nm)
     z_shift_nm = -z_min
     dimensions_nm = (
         plan.box_plan.dimensions_nm[0],
@@ -1261,11 +1263,15 @@ def actual_solvent_packing_geometry(
     shifted_min_z = boundary_min_z + z_shift_nm
     shifted_max_z = boundary_max_z + z_shift_nm
     regions = (
-        ((0.0, dimensions_nm[0]), (0.0, dimensions_nm[1]), (0.0, shifted_min_z - clearance_nm)),
         (
             (0.0, dimensions_nm[0]),
             (0.0, dimensions_nm[1]),
-            (shifted_max_z + clearance_nm, dimensions_nm[2]),
+            (solvent_z_min + z_shift_nm, shifted_min_z - clearance_nm),
+        ),
+        (
+            (0.0, dimensions_nm[0]),
+            (0.0, dimensions_nm[1]),
+            (shifted_max_z + clearance_nm, solvent_z_max + z_shift_nm),
         ),
     )
     solvent_regions = tuple(

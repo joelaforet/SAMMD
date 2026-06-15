@@ -33,9 +33,9 @@ def packmol_structure_blocks(text: str) -> list[str]:
 
 
 def load_smoke_tool():
-    """Load the sibling temporary/openmm_smoke.py module."""
+    """Load the temporary/openmm_smoke.py module from the repository root."""
 
-    path = Path(__file__).resolve().with_name("openmm_smoke.py")
+    path = Path(__file__).resolve().parents[1] / "temporary" / "openmm_smoke.py"
     spec = importlib.util.spec_from_file_location("sammd_openmm_smoke_tool", path)
     assert spec is not None
     assert spec.loader is not None
@@ -203,7 +203,7 @@ def test_packmol_input_packs_solvent_around_actual_fixed_solute() -> None:
     plan = build_system(config)
     fixed_positions = actual_fixed_solute_positions(smoke, plan)
     boundary_positions = actual_solvent_boundary_positions(smoke, plan)
-    box, _, regions = smoke.actual_solvent_packing_geometry(
+    box, z_shift, regions = smoke.actual_solvent_packing_geometry(
         plan,
         fixed_positions,
         3.0,
@@ -212,10 +212,12 @@ def test_packmol_input_packs_solvent_around_actual_fixed_solute() -> None:
 
     assert regions[0][0] == pytest.approx((0.0, box[0]))
     assert regions[0][1] == pytest.approx((0.0, box[1]))
-    assert regions[0][2][0] == pytest.approx(0.0)
+    shifted_boundary_bottom = min(position[2] for position in boundary_positions) + z_shift
+    shifted_boundary_top = max(position[2] for position in boundary_positions) + z_shift
+    assert regions[0][2][0] == pytest.approx(shifted_boundary_bottom - 1.5)
     assert regions[1][0] == pytest.approx((0.0, box[0]))
     assert regions[1][1] == pytest.approx((0.0, box[1]))
-    assert regions[1][2][1] == pytest.approx(box[2])
+    assert regions[1][2][1] == pytest.approx(shifted_boundary_top + 1.5)
     text = smoke.build_packmol_input(
         solute_path=Path("fixed_pd_sam.pdb"),
         solvent_path=Path("ethanol.pdb"),
@@ -313,6 +315,7 @@ def test_smoke_high_reactant_extends_runtime_box_without_lifting_solvent_region(
     clearance_nm = smoke.PACKMOL_TOLERANCE_ANGSTROM / 10.0
 
     assert regions[1][2][0] == pytest.approx(shifted_boundary_top + clearance_nm)
+    assert regions[1][2][1] == pytest.approx(shifted_boundary_top + 1.5)
     assert shifted_reactant_top < box[2]
     assert box[2] == pytest.approx(shifted_reactant_top + clearance_nm)
 

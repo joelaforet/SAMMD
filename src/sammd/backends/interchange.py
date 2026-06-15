@@ -744,8 +744,10 @@ def _runtime_solvent_geometry(
     boundary_max_z = max(record.coordinates_nm[2] for record in boundary_records)
     fixed_min_z = min(record.coordinates_nm[2] for record in fixed_solute_records)
     fixed_max_z = max(record.coordinates_nm[2] for record in fixed_solute_records)
-    final_z_min = min(boundary_min_z - padding_per_face_nm, fixed_min_z - clearance_nm)
-    final_z_max = max(boundary_max_z + padding_per_face_nm, fixed_max_z + clearance_nm)
+    solvent_z_min = boundary_min_z - padding_per_face_nm
+    solvent_z_max = boundary_max_z + padding_per_face_nm
+    final_z_min = min(solvent_z_min, fixed_min_z - clearance_nm)
+    final_z_max = max(solvent_z_max, fixed_max_z + clearance_nm)
     z_shift_nm = -final_z_min
     dimensions_nm = (
         plan.box_plan.dimensions_nm[0],
@@ -757,12 +759,12 @@ def _runtime_solvent_geometry(
     bottom_region = (
         (0.0, dimensions_nm[0]),
         (0.0, dimensions_nm[1]),
-        (0.0, boundary_bounds[0] - clearance_nm),
+        (solvent_z_min + z_shift_nm, boundary_bounds[0] - clearance_nm),
     )
     top_region = (
         (0.0, dimensions_nm[0]),
         (0.0, dimensions_nm[1]),
-        (boundary_bounds[1] + clearance_nm, dimensions_nm[2]),
+        (boundary_bounds[1] + clearance_nm, solvent_z_max + z_shift_nm),
     )
     solvent_regions_nm = tuple(
         region for region in (bottom_region, top_region) if region[2][1] > region[2][0]

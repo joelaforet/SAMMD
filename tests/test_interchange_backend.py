@@ -13,6 +13,7 @@ import pytest
 
 from sammd.core.builders import build_system
 from sammd.core.config import SAMMDConfig, load_config_dict
+from sammd.core.io import AtomRecord
 from sammd.model.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
 
 
@@ -163,6 +164,40 @@ def test_interchange_export_rejects_salts_before_optional_imports(tmp_path: Path
 
     with pytest.raises(NotImplementedError, match="does not yet support salts"):
         backend.build_interchange_backend(plan)
+
+
+def test_runtime_solvent_region_stays_at_boundary_padding_when_reactant_expands_box() -> None:
+    """Reactant containment should not enlarge solvent counting reservoirs."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    plan = SimpleNamespace(
+        config=SimpleNamespace(
+            solvent=SimpleNamespace(padding=3.0),
+            packing=SimpleNamespace(packmol=SimpleNamespace(tolerance=1.8)),
+        ),
+        box_plan=SimpleNamespace(dimensions_nm=(2.0, 3.0, 4.0)),
+    )
+    boundary_records = (
+        AtomRecord(1, "Pd", "Pd", "PD", 1, "M", "metal", (0.0, 0.0, 0.0)),
+        AtomRecord(2, "S", "S", "SAM", 1, "A", "sam", (0.0, 0.0, 1.0)),
+    )
+    fixed_records = (
+        *boundary_records,
+        AtomRecord(3, "C", "C", "RCT", 1, "B", "reactant", (0.0, 0.0, 6.0)),
+    )
+
+    geometry = backend._runtime_solvent_geometry(
+        plan,
+        fixed_records,
+        solvent_boundary_records=boundary_records,
+    )
+
+    shifted_boundary_top = 1.0 + geometry.z_shift_nm
+    shifted_reactant_top = 6.0 + geometry.z_shift_nm
+    assert geometry.dimensions_nm[2] == pytest.approx(shifted_reactant_top + 0.18)
+    assert geometry.solvent_regions_nm[1][2][0] == pytest.approx(shifted_boundary_top + 0.18)
+    assert geometry.solvent_regions_nm[1][2][1] == pytest.approx(shifted_boundary_top + 1.5)
+    assert geometry.solvent_regions_nm[1][2][1] < geometry.dimensions_nm[2]
 
 
 def test_pdbx_writer_terminates_final_loop_for_pymol(tmp_path: Path, monkeypatch) -> None:
@@ -452,7 +487,7 @@ def test_reactant_geometry_does_not_define_global_solvent_reservoir() -> None:
 
     assert geometry.solvent_boundary_z_bounds_nm == pytest.approx((1.5, 2.12))
     assert geometry.fixed_solute_z_bounds_nm == pytest.approx((1.5, 3.5))
-    assert geometry.solvent_regions_nm[1][2] == pytest.approx((2.3, 3.68))
+    assert geometry.solvent_regions_nm[1][2] == pytest.approx((2.3, 3.62))
     top_gap_nm = geometry.solvent_regions_nm[1][2][0] - geometry.solvent_boundary_z_bounds_nm[1]
     assert top_gap_nm == pytest.approx(0.18)
 
@@ -487,6 +522,7 @@ def test_high_reactant_extends_runtime_box_without_lifting_solvent_region() -> N
     assert geometry.solvent_boundary_z_bounds_nm == pytest.approx((1.5, 2.12))
     assert geometry.fixed_solute_z_bounds_nm == pytest.approx((1.5, 5.0))
     assert geometry.solvent_regions_nm[1][2][0] == pytest.approx(2.3)
+    assert geometry.solvent_regions_nm[1][2][1] == pytest.approx(3.62)
     assert geometry.dimensions_nm[2] == pytest.approx(5.18)
     assert geometry.fixed_solute_z_bounds_nm[1] < geometry.dimensions_nm[2]
 

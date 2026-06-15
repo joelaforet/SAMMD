@@ -118,7 +118,10 @@ def build(config: Path, output_dir: Path | None, overwrite: bool) -> None:
     LOGGER.info("SYSTEM Surface: %s(%s)", plan.slab.metal, plan.slab.facet)
     LOGGER.info("SYSTEM Binding sites: %s", len(plan.binding_sites))
     LOGGER.info("SYSTEM SAM molecules: %s", len(plan.sam_placements.placements))
-    LOGGER.info("SYSTEM Solution counts: %s", dict(plan.solution.molecule_counts))
+    LOGGER.info(
+        "SYSTEM Preliminary planned solution counts: %s",
+        dict(plan.solution.molecule_counts),
+    )
 
     try:
         with _timed("Writing SAM grafting-density visual check"):
@@ -130,6 +133,12 @@ def build(config: Path, output_dir: Path | None, overwrite: bool) -> None:
             plan,
             overwrite=overwrite,
         )
+        runtime_geometry = export_result.runtime_solvent_geometry
+        if runtime_geometry is not None:
+            LOGGER.info(
+                "SYSTEM Final runtime solution counts: %s",
+                runtime_geometry.molecule_counts,
+            )
         export_files = export_result.files
         with _timed("Writing Interchange export build summary"):
             build_summary = plan.write_build_summary(overwrite=overwrite)

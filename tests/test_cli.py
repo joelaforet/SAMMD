@@ -24,7 +24,10 @@ def _patch_interchange_export(monkeypatch) -> None:
         }
         for path in files.values():
             path.write_text("mock export\n", encoding="utf-8")
-        return SimpleNamespace(files=files)
+        return SimpleNamespace(
+            files=files,
+            runtime_solvent_geometry=SimpleNamespace(molecule_counts={"ethanol": 7}),
+        )
 
     monkeypatch.setattr("sammd.cli.export_interchange_backend", fake_export_interchange_backend)
     monkeypatch.setattr(
@@ -197,6 +200,9 @@ def test_build_cli_writes_full_system_artifacts(monkeypatch) -> None:
         assert "OK" in result.output
         assert "Dependency-free validation gates passed" in result.output
         assert "Surface: Pd(111)" in result.output
+        assert "Preliminary planned solution counts" in result.output
+        assert "Final runtime solution counts" in result.output
+        assert "SYSTEM Solution counts" not in result.output
         assert "SAM grafting-density CIF" in result.output
         assert "Build summary" in result.output
         assert "Resolved config" in result.output
