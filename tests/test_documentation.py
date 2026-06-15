@@ -227,4 +227,3 @@ def test_building_systems_notebook_workflow_smoke(tmp_path: Path) -> None:
     assert plan.output_paths.sam_grafting_density == output_dir / "sam_grafting_density.cif"
     assert plan.output_paths.build_summary == output_dir / "build_summary.json"
     assert plan.output_paths.resolved_config == output_dir / "resolved_config.yaml"
-    assert not plan.full_construction_available

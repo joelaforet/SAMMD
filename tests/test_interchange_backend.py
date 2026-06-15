@@ -68,13 +68,11 @@ def test_interchange_build_summary_marks_completed_exports(tmp_path: Path) -> No
 
     summary = backend.backend_build_summary(plan, result)
 
-    assert summary["full_construction_available"] is True
     assert summary["artifacts"]["openff_interchange"]["available"] is True
     assert summary["artifacts"]["openff_interchange"]["constructed"] is True
     assert summary["artifacts"]["openff_interchange"]["status"] == "current"
     assert summary["artifacts"]["pymol_system"]["status"] == "current"
     assert "openmm_system" not in summary["artifacts"]
-    assert summary["engine_exports"]["openmm"]["available"] is False
     assert summary["backend_export"]["openff_interchange_version"] == "0.5.3"
     assert summary["backend_export"]["sulfur_metal_pair_count"] == 1
     override = summary["backend_export"]["metal_sulfur_override"]

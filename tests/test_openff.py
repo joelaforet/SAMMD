@@ -135,14 +135,13 @@ def test_parameterization_plan_from_config_records_choices_and_targets() -> None
 def test_parameterization_plan_from_build_plan_records_counts_and_stays_inspectable(
     tmp_path,
 ) -> None:
-    """Summarize build-plan molecule counts while leaving construction disabled."""
+    """Summarize build-plan molecule counts from the validated build plan."""
 
     openff_adapter = importlib.import_module("sammd.backends.openff")
     build_plan = build_system(SAMMDConfig(), output_dir=tmp_path)
 
     plan = openff_adapter.parameterization_plan_from_build_plan(build_plan)
 
-    assert not build_plan.full_construction_available
     assert plan.output_targets["openff_interchange"] == str(tmp_path / "interchange.json")
     assert "openmm_system" not in plan.output_targets
     assert plan.component_counts["sam_placements"] == len(build_plan.sam_placements.placements)

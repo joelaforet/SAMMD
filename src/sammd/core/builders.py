@@ -1,9 +1,11 @@
-"""Public build-plan composition for deterministic SAMMD workflows."""
+"""Create SAMMD build plans from validated configuration."""
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from heapq import heappop, heappush
+from math import dist
 from pathlib import Path
 from typing import Any
 
@@ -26,34 +28,6 @@ from sammd.model.surfaces import BindingSite, SurfaceSlab, generate_binding_site
 DEFAULT_SOLVENT_PADDING_NM = 3.0
 DEFAULT_SAM_EXTENDED_LENGTH_NM = 0.95
 SLAB_CUTOFF_BUFFER_NM = 0.5
-OPENMM_CONSTRUCTION_IMPLEMENTED = False
-
-ENGINE_EXPORT_PLAN: dict[str, dict[str, object]] = {
-    "openmm": {
-        "status": "reserved",
-        "available": False,
-        "handoff": "Use Interchange.to_openmm() downstream when needed",
-        "teaching_scope": "student OpenMM Python API path",
-    },
-    "gromacs": {
-        "status": "reserved",
-        "available": False,
-        "handoff": "future downstream export from Interchange",
-        "teaching_scope": "not taught in beginner workflow",
-    },
-    "lammps": {
-        "status": "reserved",
-        "available": False,
-        "handoff": "future downstream export from Interchange",
-        "teaching_scope": "not taught in beginner workflow",
-    },
-    "amber": {
-        "status": "reserved",
-        "available": False,
-        "handoff": "future downstream export from Interchange",
-        "teaching_scope": "not taught in beginner workflow",
-    },
-}
 
 
 @dataclass(frozen=True)
@@ -64,7 +38,7 @@ class SAMLengthEstimate:
     residue_name: str
     smiles: str
     configured_length_nm: float | None
-    heuristic_length_nm: float
+    estimated_length_nm: float | None
     length_nm: float
     source: str
 
@@ -85,7 +59,7 @@ class BoxPlan:
 
 @dataclass(frozen=True)
 class SAMMDBuildPlan:
-    """Dependency-light system build artifact assembled from deterministic planners."""
+    """Validated system plan with slab, SAM, solution, box, and output paths."""
 
     config: SAMMDConfig
     slab: SurfaceSlab
@@ -94,24 +68,6 @@ class SAMMDBuildPlan:
     solution: SolutionPlan
     output_paths: OutputPaths
     box_plan: BoxPlan
-    openmm_construction_implemented: bool = OPENMM_CONSTRUCTION_IMPLEMENTED
-
-    @property
-    def full_construction_available(self) -> bool:
-        """Return whether full Interchange export construction is available."""
-
-        return self.openmm_construction_implemented
-
-    def require_full_construction(self) -> None:
-        """Raise a clear error for workflows that need OpenFF/OpenMM objects."""
-
-        if self.openmm_construction_implemented:
-            return
-        msg = (
-            "Full OpenFF/OpenMM construction is not implemented yet; this object is a "
-            "deterministic inspection build plan."
-        )
-        raise NotImplementedError(msg)
 
     def write_topology_cif(
         self, path: str | Path | None = None, *, overwrite: bool = False
@@ -203,7 +159,7 @@ class SAMMDBuildPlan:
                         "residue_name": estimate.residue_name,
                         "smiles": estimate.smiles,
                         "configured_length_nm": estimate.configured_length_nm,
-                        "heuristic_length_nm": estimate.heuristic_length_nm,
+                        "estimated_length_nm": estimate.estimated_length_nm,
                         "length_nm": estimate.length_nm,
                         "source": estimate.source,
                     }
@@ -233,8 +189,6 @@ class SAMMDBuildPlan:
                 ),
                 "anchor_metadata": self._artifact_summary("anchor_metadata", "reserved"),
             },
-            "engine_exports": ENGINE_EXPORT_PLAN,
-            "full_construction_available": self.full_construction_available,
         }
 
     def _artifact_summary(self, key: str, status: str) -> dict[str, object]:
@@ -438,55 +392,99 @@ def _derive_box_plan(config: SAMMDConfig, slab: SurfaceSlab) -> BoxPlan:
 
 
 def _estimate_sam_length(component: Any) -> SAMLengthEstimate:
-    """Estimate fully extended SAM length without chemistry toolkit dependencies."""
+    """Estimate fully extended SAM length from configuration or OpenFF geometry."""
 
-    heuristic_length_nm = _estimate_smiles_extended_length_nm(component.smiles)
     configured_length_nm = component.extended_length_nm
     if configured_length_nm is not None:
         length_nm = configured_length_nm
         source = "configured"
-    elif heuristic_length_nm > DEFAULT_SAM_EXTENDED_LENGTH_NM:
-        length_nm = heuristic_length_nm
-        source = "smiles_heuristic"
+        estimated_length_nm = None
     else:
-        length_nm = DEFAULT_SAM_EXTENDED_LENGTH_NM
-        source = "minimum_default"
+        try:
+            estimated_length_nm = _estimate_smiles_contour_length_nm(component.smiles)
+        except Exception as exc:
+            msg = (
+                f"SAM length estimation failed for component {component.name!r}; "
+                "set extended_length_nm for this SAM component to override automatic "
+                "OpenFF/RDKit conformer-based estimation."
+            )
+            raise ValueError(msg) from exc
+        length_nm = max(DEFAULT_SAM_EXTENDED_LENGTH_NM, estimated_length_nm)
+        source = (
+            "openff_conformer"
+            if estimated_length_nm > DEFAULT_SAM_EXTENDED_LENGTH_NM
+            else "minimum_default"
+        )
     return SAMLengthEstimate(
         component_name=component.name,
         residue_name=component.residue_name,
         smiles=component.smiles,
         configured_length_nm=configured_length_nm,
-        heuristic_length_nm=heuristic_length_nm,
+        estimated_length_nm=estimated_length_nm,
         length_nm=length_nm,
         source=source,
     )
 
 
-def _estimate_smiles_extended_length_nm(smiles: str) -> float:
-    """Return a conservative heavy-atom path estimate from a simple SMILES scan."""
+def _estimate_smiles_contour_length_nm(smiles: str) -> float:
+    """Return the heavy-atom graph contour length from one OpenFF conformer."""
 
-    heavy_atoms = 0
-    index = 0
-    organic_subset = {"B", "C", "N", "O", "P", "S", "F", "I"}
-    aromatic_subset = {"b", "c", "n", "o", "p", "s"}
-    while index < len(smiles):
-        char = smiles[index]
-        if char == "[":
-            end = smiles.find("]", index + 1)
-            token = smiles[index + 1 : end if end != -1 else len(smiles)]
-            if token and not token.startswith("H"):
-                heavy_atoms += 1
-            index = len(smiles) if end == -1 else end + 1
-            continue
-        if char in organic_subset or char in aromatic_subset:
-            if index + 1 < len(smiles) and smiles[index : index + 2] in {"Cl", "Br"}:
-                index += 2
-            else:
-                index += 1
-            heavy_atoms += 1
-            continue
-        index += 1
-    if heavy_atoms <= 1:
+    from openff.toolkit import Molecule
+
+    molecule = Molecule.from_smiles(smiles, allow_undefined_stereo=True)
+    molecule.generate_conformers(n_conformers=1)
+    conformer = molecule.conformers[0]
+    heavy_atom_indices = tuple(
+        index
+        for index, atom in enumerate(molecule.atoms)
+        if atom.atomic_number != 1
+    )
+    if len(heavy_atom_indices) <= 1:
         return 0.0
-    # Approximate an all-trans heavy-atom chain; branching/rings make this conservative.
-    return 0.15 + 0.154 * (heavy_atoms - 1)
+
+    adjacency = {index: [] for index in heavy_atom_indices}
+    for bond in molecule.bonds:
+        atom1_index = bond.atom1_index
+        atom2_index = bond.atom2_index
+        if atom1_index not in adjacency or atom2_index not in adjacency:
+            continue
+        length_nm = dist(
+            _conformer_position_nm(conformer, atom1_index),
+            _conformer_position_nm(conformer, atom2_index),
+        )
+        adjacency[atom1_index].append((atom2_index, length_nm))
+        adjacency[atom2_index].append((atom1_index, length_nm))
+
+    sulfur_indices = tuple(
+        index
+        for index in heavy_atom_indices
+        if molecule.atom(index).atomic_number == 16
+    )
+    starts = sulfur_indices or heavy_atom_indices
+    return max(_farthest_graph_distance_nm(adjacency, start) for start in starts)
+
+
+def _conformer_position_nm(conformer: Any, atom_index: int) -> tuple[float, float, float]:
+    """Return one conformer position in nanometers."""
+
+    return tuple(conformer[atom_index][axis].m_as("nanometer") for axis in range(3))
+
+
+def _farthest_graph_distance_nm(
+    adjacency: dict[int, list[tuple[int, float]]],
+    start: int,
+) -> float:
+    """Return the farthest weighted graph distance from one atom index."""
+
+    distances = {start: 0.0}
+    queue = [(0.0, start)]
+    while queue:
+        distance_nm, atom_index = heappop(queue)
+        if distance_nm > distances[atom_index]:
+            continue
+        for neighbor_index, bond_length_nm in adjacency[atom_index]:
+            neighbor_distance_nm = distance_nm + bond_length_nm
+            if neighbor_distance_nm < distances.get(neighbor_index, float("inf")):
+                distances[neighbor_index] = neighbor_distance_nm
+                heappush(queue, (neighbor_distance_nm, neighbor_index))
+    return max(distances.values())

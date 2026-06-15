@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import sammd.core.builders as builders
 from sammd.core.builders import (
     DEFAULT_SAM_EXTENDED_LENGTH_NM,
     DEFAULT_SOLVENT_PADDING_NM,
@@ -61,7 +62,6 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
     assert plan.output_paths.pymol_system == tmp_path / "solvated_system_pymol.pdb"
     assert plan.output_paths.openff_interchange == tmp_path / "interchange.json"
     assert plan.output_paths.anchor_metadata == tmp_path / "anchor_metadata.json"
-    assert not plan.full_construction_available
     artifacts = plan.build_summary()["artifacts"]
     assert artifacts["sam_grafting_density"] == {
         "path": str(tmp_path / "sam_grafting_density.cif"),
@@ -91,21 +91,6 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
             "Pre-1.0 OpenFF Interchange JSON compatibility is not guaranteed across versions."
         ),
     }
-    engine_exports = plan.build_summary()["engine_exports"]
-    assert set(engine_exports) == {"openmm", "gromacs", "lammps", "amber"}
-    assert engine_exports["openmm"] == {
-        "status": "reserved",
-        "available": False,
-        "handoff": "Use Interchange.to_openmm() downstream when needed",
-        "teaching_scope": "student OpenMM Python API path",
-    }
-    for engine in ["gromacs", "lammps", "amber"]:
-        assert engine_exports[engine] == {
-            "status": "reserved",
-            "available": False,
-            "handoff": "future downstream export from Interchange",
-            "teaching_scope": "not taught in beginner workflow",
-        }
     interaction = plan.build_summary()["sam"]["metal_sulfur_interaction"]
     assert interaction["mode"] == METAL_SULFUR_INTERACTION_MODE
     assert interaction["site_kind"] == "fcc_hollow"
@@ -113,8 +98,6 @@ def test_default_build_plan_contains_schema_artifacts(tmp_path) -> None:
     assert interaction["sigma_nm"] == METAL_SULFUR_SIGMA_NM
     assert interaction["epsilon_kcal_mol"] == METAL_SULFUR_EPSILON_KCAL_MOL
     assert interaction["epsilon_kj_mol"] == METAL_SULFUR_EPSILON_KJ_MOL
-    with pytest.raises(NotImplementedError, match="OpenFF/OpenMM construction is not implemented"):
-        plan.require_full_construction()
 
 
 def test_build_system_accepts_registered_non_pd_surface(tmp_path) -> None:
@@ -169,6 +152,7 @@ def test_default_box_plan_uses_sam_tip_padding_and_centered_slab() -> None:
     )
     assert plan.box_plan.sam_extended_length_nm == DEFAULT_SAM_EXTENDED_LENGTH_NM
     assert plan.box_plan.sam_length_estimates[0].source == "minimum_default"
+    assert plan.box_plan.sam_length_estimates[0].estimated_length_nm is not None
 
 
 def test_default_solvation_counts_are_deterministic() -> None:
@@ -187,7 +171,7 @@ def test_default_solvation_counts_are_deterministic() -> None:
 
 
 def test_configured_sam_length_override_changes_box_and_solution_counts() -> None:
-    """Use optional configured SAM length before the dependency-free heuristic."""
+    """Use optional configured SAM length before automatic estimation."""
 
     default_plan = build_system(SAMMDConfig())
     longer_plan = build_system(
@@ -208,12 +192,55 @@ def test_configured_sam_length_override_changes_box_and_solution_counts() -> Non
 
     assert longer_plan.box_plan.sam_extended_length_nm == 1.75
     assert longer_plan.box_plan.sam_length_estimates[0].source == "configured"
+    assert longer_plan.box_plan.sam_length_estimates[0].estimated_length_nm is None
     assert longer_plan.box_plan.dimensions_nm[2] > default_plan.box_plan.dimensions_nm[2]
     assert longer_plan.solution.box_volume_nm3 == pytest.approx(longer_plan.box_plan.volume_nm3)
     assert (
         longer_plan.solution.solvent_components[0].count
         > default_plan.solution.solvent_components[0].count
     )
+
+
+def test_long_sam_length_uses_openff_conformer_graph_path() -> None:
+    """Use bonded heavy-atom contour length when it exceeds the minimum default."""
+
+    plan = build_system(
+        SAMMDConfig(
+            sam={
+                "components": [
+                    {
+                        "name": "dodecanethiol",
+                        "residue_name": "DDT",
+                        "smiles": "CCCCCCCCCCCCS",
+                        "fraction": 1.0,
+                    }
+                ]
+            }
+        )
+    )
+    estimate = plan.box_plan.sam_length_estimates[0]
+
+    assert estimate.source == "openff_conformer"
+    assert estimate.estimated_length_nm is not None
+    assert estimate.estimated_length_nm > DEFAULT_SAM_EXTENDED_LENGTH_NM
+    assert estimate.length_nm == pytest.approx(estimate.estimated_length_nm)
+
+
+def test_sam_length_estimation_failure_suggests_configured_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explain how users can bypass toolkit/conformer failures."""
+
+    def fail_estimation(smiles: str) -> float:
+        raise RuntimeError(f"cannot estimate {smiles}")
+
+    monkeypatch.setattr(builders, "_estimate_smiles_contour_length_nm", fail_estimation)
+
+    with pytest.raises(
+        ValueError,
+        match=r"SAM length estimation failed for component 'propanethiol'.*extended_length_nm",
+    ):
+        build_system(SAMMDConfig())
 
 
 def test_build_plan_writes_topology_cif_and_refuses_overwrite(tmp_path) -> None:
@@ -269,6 +296,7 @@ def test_build_plan_writes_topology_cif_and_refuses_overwrite(tmp_path) -> None:
     }
     assert summary["box"]["volume_nm3"] == pytest.approx(plan.box_plan.volume_nm3)
     assert summary["box"]["slab_center_nm"] == [0.0, 0.0, 0.0]
+    assert "estimated_length_nm" in summary["box"]["sam_length_estimates"][0]
     assert summary["solution"]["count_planning_volume_nm3"] == pytest.approx(
         plan.box_plan.volume_nm3
     )

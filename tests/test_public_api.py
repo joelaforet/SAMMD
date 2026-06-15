@@ -46,7 +46,7 @@ def test_public_api_contract_excludes_simulation_wrappers() -> None:
 
 
 def test_build_system_returns_dependency_light_plan() -> None:
-    """Keep docs workflow importable while Interchange construction is deferred."""
+    """Return a validated plan without exposing simulation wrapper APIs."""
 
     from sammd import build_system
     from sammd.core.config import SAMMDConfig
@@ -55,5 +55,3 @@ def test_build_system_returns_dependency_light_plan() -> None:
     plan = build_system(config)
 
     assert plan.config is config
-    assert not plan.full_construction_available
-    assert plan.openmm_construction_implemented is False

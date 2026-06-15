@@ -29,7 +29,7 @@ def _patch_interchange_export(monkeypatch) -> None:
     monkeypatch.setattr("sammd.cli.export_interchange_backend", fake_export_interchange_backend)
     monkeypatch.setattr(
         "sammd.cli.backend_build_summary",
-        lambda plan, export_result: {"full_construction_available": True},
+        lambda plan, export_result: {"backend_export": {"mode": "mock"}},
     )
 
 

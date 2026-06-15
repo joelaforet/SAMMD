@@ -230,10 +230,7 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
             artifact["constructed"] = True
             artifact["openff_interchange_package_version"] = result.openff_interchange_version
         artifacts[key] = artifact
-    engine_exports = dict(summary["engine_exports"])
     summary["artifacts"] = artifacts
-    summary["engine_exports"] = engine_exports
-    summary["full_construction_available"] = True
     summary["backend_export"] = {
         "mode": "openff_interchange_with_plugin_pair_overrides",
         "openff_toolkit_version": result.openff_toolkit_version,
