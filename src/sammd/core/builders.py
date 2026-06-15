@@ -273,7 +273,7 @@ def build_system(
     Returns
     -------
     SAMMDBuildPlan
-        Dependency-light artifact containing slab, SAM, solution, and output plans.
+        Validated artifact containing slab, SAM, solution, and output plans.
     """
 
     loaded_config = _load_build_config(config)

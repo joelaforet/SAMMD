@@ -45,7 +45,7 @@ def test_public_api_contract_excludes_simulation_wrappers() -> None:
         assert not hasattr(sammd, public_name)
 
 
-def test_build_system_returns_dependency_light_plan() -> None:
+def test_build_system_returns_validated_plan() -> None:
     """Return a validated plan without exposing simulation wrapper APIs."""
 
     from sammd import build_system
