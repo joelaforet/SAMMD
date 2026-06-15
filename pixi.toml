@@ -33,6 +33,16 @@ openff-toolkit = "*"
 openff-interchange = "*"
 packmol = "*"
 
+[feature.analysis.dependencies]
+numpy = "*"
+pandas = "*"
+scipy = "*"
+matplotlib = "*"
+seaborn = "*"
+pymbar = "*"
+mdanalysis = "*"
+mdtraj = "*"
+
 [feature.cuda-12-4.dependencies]
 # CUDA 12.4 driver line, e.g. CU Boulder Blanca older-GPU nodes.
 openmm = "=8.1.2"
@@ -62,9 +72,10 @@ default = ["dev", "interchange"]
 dev = ["dev", "interchange"]
 docs = ["dev", "docs", "interchange"]
 interchange = ["dev", "interchange"]
-cuda-12-4 = ["dev", "interchange", "cuda-12-4"]
-cuda-12-6 = ["dev", "interchange", "cuda-12-6"]
-cuda-13-0 = ["dev", "interchange", "cuda-13-0"]
+analysis = ["dev", "interchange", "analysis"]
+cuda-12-4 = ["dev", "interchange", "analysis", "cuda-12-4"]
+cuda-12-6 = ["dev", "interchange", "analysis", "cuda-12-6"]
+cuda-13-0 = ["dev", "interchange", "analysis", "cuda-13-0"]
 
 [tasks]
 test = "python -m pytest --cov=sammd --cov-report=term-missing"
