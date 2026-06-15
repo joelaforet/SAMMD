@@ -747,7 +747,7 @@ def resolve_solvent_count(
     solution = plan_solution_composition(plan.config, planning_volume_nm3)
     for component in solution.solvent_components:
         if component.name == solvent_name:
-            return max(1, component.count)
+            return component.count
     raise ValueError(f"solvent component {solvent_name!r} was not planned")
 
 
@@ -1129,6 +1129,11 @@ def build_openmm_smoke_system(
             shift_position_z(position, z_shift_nm) for position in sulfur_references
         ]
     set_periodic_box(modules, topology, system, box_dimensions_nm)
+    ensure_positions_inside_box(
+        tuple(positions_nm),
+        box_dimensions_nm,
+        context="fixed solute Packmol",
+    )
     resolved_solvent_count = resolve_solvent_count(
         str(solvent_count),
         plan,
@@ -1284,6 +1289,25 @@ def shift_position_z(position: Vector3, shift_nm: float) -> Vector3:
     """Return a position shifted along z."""
 
     return (position[0], position[1], position[2] + shift_nm)
+
+
+def ensure_positions_inside_box(
+    positions_nm: tuple[Vector3, ...],
+    dimensions_nm: Vector3,
+    *,
+    context: str,
+) -> None:
+    """Validate that coordinates lie inside the zero-origin runtime box."""
+
+    tolerance_nm = 1.0e-9
+    for atom_index, position in enumerate(positions_nm, start=1):
+        for axis, coordinate, dimension in zip("xyz", position, dimensions_nm, strict=True):
+            if coordinate < -tolerance_nm or coordinate > dimension + tolerance_nm:
+                msg = (
+                    f"{context} atom {atom_index} {axis}-coordinate {coordinate:g} nm "
+                    f"lies outside runtime box dimension {dimension:g} nm"
+                )
+                raise ValueError(msg)
 
 
 def set_periodic_box(modules: Any, topology: Any, system: Any, dimensions_nm: Vector3) -> None:
