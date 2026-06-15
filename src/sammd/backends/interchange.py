@@ -28,6 +28,8 @@ from sammd.backends.packmol import (
     PackmolMoleculeTemplate,
     pack_fixed_solute_with_solvent,
     packmol_file_stem,
+    solvent_regions_around_solute,
+    zero_origin_box_bounds,
 )
 from sammd.core.io import AtomRecord, safe_write_text
 from sammd.model.sam import SAMPlacement
@@ -46,8 +48,6 @@ MAX_RESIDUES_PER_CHAIN = 9999
 # One-character PDB chain IDs are reserved for metal slab atoms as M, so component
 # chains intentionally skip M while keeping deterministic allocation order.
 CHAIN_LETTERS = "ABCDEFGHIJKLNOPQRSTUVWXYZ"
-PACKMOL_TOLERANCE_ANGSTROM = 1.8
-PACKMOL_NLOOP = 200
 LOGGER = logging.getLogger(__name__)
 
 
@@ -426,8 +426,13 @@ def build_interchange_backend(
             solvent_count=solvent.count,
             dimensions_nm=plan.box_plan.dimensions_nm,
             working_dir=_packmol_working_dir(plan, solvent.name),
-            tolerance_angstrom=PACKMOL_TOLERANCE_ANGSTROM,
-            nloop=PACKMOL_NLOOP,
+            solvent_regions_nm=solvent_regions_around_solute(
+                atom_records,
+                zero_origin_box_bounds(plan.box_plan.dimensions_nm),
+                plan.config.packing.packmol.tolerance / 10.0,
+            ),
+            tolerance_angstrom=plan.config.packing.packmol.tolerance,
+            nloop=plan.config.packing.packmol.nloop,
         )
         stage_start = _timed_progress(
             progress,

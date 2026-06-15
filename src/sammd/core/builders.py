@@ -52,6 +52,12 @@ class BoxPlan:
     bounds_nm: tuple[tuple[float, float], tuple[float, float], tuple[float, float]]
     volume_nm3: float
     solvent_padding_nm: float
+    solvent_padding_per_face_nm: float
+    solvent_packing_regions_nm: tuple[
+        tuple[tuple[float, float], tuple[float, float], tuple[float, float]], ...
+    ]
+    solvent_count_planning_volume_nm3: float
+    solvent_packing_warnings: tuple[str, ...]
     sam_extended_length_nm: float
     slab_center_nm: tuple[float, float, float]
     sam_length_estimates: tuple[SAMLengthEstimate, ...]
@@ -151,6 +157,15 @@ class SAMMDBuildPlan:
                 "bounds_nm": [list(bounds) for bounds in self.box_plan.bounds_nm],
                 "volume_nm3": self.box_plan.volume_nm3,
                 "solvent_padding_nm": self.box_plan.solvent_padding_nm,
+                "solvent_padding_per_face_nm": self.box_plan.solvent_padding_per_face_nm,
+                "solvent_packing_regions_nm": [
+                    [list(axis_bounds) for axis_bounds in region]
+                    for region in self.box_plan.solvent_packing_regions_nm
+                ],
+                "solvent_count_planning_volume_nm3": (
+                    self.box_plan.solvent_count_planning_volume_nm3
+                ),
+                "solvent_packing_warnings": list(self.box_plan.solvent_packing_warnings),
                 "sam_extended_length_nm": self.box_plan.sam_extended_length_nm,
                 "slab_center_nm": list(self.box_plan.slab_center_nm),
                 "sam_length_estimates": [
@@ -296,7 +311,10 @@ def build_system(
         box_plan.lateral_size_nm[0] * box_plan.lateral_size_nm[1],
         seed=active_seed,
     )
-    solution = plan_solution_composition(loaded_config, box_plan.volume_nm3)
+    solution = plan_solution_composition(
+        loaded_config,
+        box_plan.solvent_count_planning_volume_nm3,
+    )
     output_paths = plan_output_paths(
         loaded_config,
         loaded_config.outputs.directory if output_dir is None else output_dir,
@@ -365,12 +383,15 @@ def _derive_box_plan(config: SAMMDConfig, slab: SurfaceSlab) -> BoxPlan:
     """Derive the single deterministic box used for counts and metadata."""
 
     padding_nm = getattr(config.solvent, "padding", DEFAULT_SOLVENT_PADDING_NM)
+    padding_per_face_nm = padding_nm / 2.0
     sam_length_estimates = tuple(
         _estimate_sam_length(component) for component in config.sam.components
     )
     sam_extended_length_nm = max(estimate.length_nm for estimate in sam_length_estimates)
-    z_min = slab.bottom_z_nm - sam_extended_length_nm - padding_nm
-    z_max = slab.top_z_nm + sam_extended_length_nm + padding_nm
+    bottom_solute_z_nm = slab.bottom_z_nm - sam_extended_length_nm
+    top_solute_z_nm = slab.top_z_nm + sam_extended_length_nm
+    z_min = bottom_solute_z_nm - padding_per_face_nm
+    z_max = top_solute_z_nm + padding_per_face_nm
     box_z_nm = z_max - z_min
     dimensions_nm = (slab.lateral_size_nm[0], slab.lateral_size_nm[1], box_z_nm)
     bounds_nm = (
@@ -379,16 +400,57 @@ def _derive_box_plan(config: SAMMDConfig, slab: SurfaceSlab) -> BoxPlan:
         (z_min, z_max),
     )
     volume_nm3 = dimensions_nm[0] * dimensions_nm[1] * dimensions_nm[2]
+    solvent_packing_regions_nm = (
+        (bounds_nm[0], bounds_nm[1], (z_min, bottom_solute_z_nm)),
+        (bounds_nm[0], bounds_nm[1], (top_solute_z_nm, z_max)),
+    )
+    solvent_count_planning_volume_nm3 = sum(
+        _region_volume_nm3(region) for region in solvent_packing_regions_nm
+    )
+    solvent_packing_warnings = _solvent_region_warnings(solvent_packing_regions_nm)
     return BoxPlan(
         lateral_size_nm=slab.lateral_size_nm,
         dimensions_nm=dimensions_nm,
         bounds_nm=bounds_nm,
         volume_nm3=volume_nm3,
         solvent_padding_nm=padding_nm,
+        solvent_padding_per_face_nm=padding_per_face_nm,
+        solvent_packing_regions_nm=solvent_packing_regions_nm,
+        solvent_count_planning_volume_nm3=solvent_count_planning_volume_nm3,
+        solvent_packing_warnings=solvent_packing_warnings,
         sam_extended_length_nm=sam_extended_length_nm,
         slab_center_nm=(0.0, 0.0, 0.0),
         sam_length_estimates=sam_length_estimates,
     )
+
+
+def _region_volume_nm3(
+    region: tuple[tuple[float, float], tuple[float, float], tuple[float, float]],
+) -> float:
+    """Return the volume of one orthorhombic packing region."""
+
+    return (
+        (region[0][1] - region[0][0])
+        * (region[1][1] - region[1][0])
+        * (region[2][1] - region[2][0])
+    )
+
+
+def _solvent_region_warnings(
+    regions_nm: tuple[tuple[tuple[float, float], tuple[float, float], tuple[float, float]], ...],
+) -> tuple[str, ...]:
+    """Return warnings for solvent regions with poor z thickness."""
+
+    warnings: list[str] = []
+    for index, region in enumerate(regions_nm, start=1):
+        thickness_nm = region[2][1] - region[2][0]
+        if thickness_nm <= 0.0:
+            warnings.append(f"solvent packing region {index} has non-positive z thickness")
+        elif thickness_nm < 0.2:
+            warnings.append(
+                f"solvent packing region {index} is very thin ({thickness_nm:.3g} nm)"
+            )
+    return tuple(warnings)
 
 
 def _estimate_sam_length(component: Any) -> SAMLengthEstimate:

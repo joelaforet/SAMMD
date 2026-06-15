@@ -195,13 +195,13 @@ def _validate_sam_count(plan: Any) -> ValidationGateResult:
 
 def _validate_solution_volume(plan: Any) -> ValidationGateResult:
     actual = plan.solution.box_volume_nm3
-    expected = plan.box_plan.volume_nm3
+    expected = plan.box_plan.solvent_count_planning_volume_nm3
     return _gate(
-        "solution_volume_matches_box",
+        "solution_volume_matches_solvent_regions",
         _approx_equal(actual, expected),
-        "solution count volume matches box-plan volume",
-        "solution count volume must match box-plan volume",
-        {"solution_volume_nm3": actual, "box_volume_nm3": expected},
+        "solution count volume matches solvent packing regions",
+        "solution count volume must match solvent packing region volume",
+        {"solution_volume_nm3": actual, "solvent_region_volume_nm3": expected},
     )
 
 

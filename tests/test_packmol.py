@@ -14,6 +14,8 @@ from sammd.backends.packmol import (
     pdb_atom_line,
     read_pdb_positions_nm,
     run_packmol,
+    solvent_regions_around_solute,
+    split_count_by_region_volume,
     write_packmol_input,
     zero_origin_box_bounds,
 )
@@ -106,12 +108,68 @@ def test_zero_origin_bounds_accept_plain_dimensions_and_box_plan() -> None:
         bounds_nm=((-0.5, 0.5), (-1.0, 1.0), (-1.5, 1.5)),
         volume_nm3=6.0,
         solvent_padding_nm=1.0,
+        solvent_padding_per_face_nm=0.5,
+        solvent_packing_regions_nm=(((0.0, 1.0), (0.0, 2.0), (0.0, 0.5)),),
+        solvent_count_planning_volume_nm3=1.0,
+        solvent_packing_warnings=(),
         sam_extended_length_nm=0.5,
         slab_center_nm=(0.0, 0.0, 0.0),
         sam_length_estimates=(),
     )
 
     assert zero_origin_box_bounds(box_plan) == ((0.0, 1.0), (0.0, 2.0), (0.0, 3.0))
+
+
+def test_packmol_input_renders_two_explicit_solvent_regions() -> None:
+    """Render separate solvent blocks when structures define inside-box bounds."""
+
+    job = PackmolJob(
+        output_path="packed.pdb",
+        structures=(
+            PackmolStructure("solute", "solute.pdb", 1, fixed=True),
+            PackmolStructure(
+                "water_bottom",
+                "water.pdb",
+                10,
+                inside_box_bounds_nm=((0.0, 2.0), (0.0, 2.0), (0.0, 1.5)),
+            ),
+            PackmolStructure(
+                "water_top",
+                "water.pdb",
+                10,
+                inside_box_bounds_nm=((0.0, 2.0), (0.0, 2.0), (3.5, 5.0)),
+            ),
+        ),
+        box_bounds_nm=((0.0, 2.0), (0.0, 2.0), (0.0, 5.0)),
+    )
+
+    text = build_packmol_input(job)
+
+    assert text.count("structure water.pdb") == 2
+    assert "inside box 0 0 0 20 20 15" in text
+    assert "inside box 0 0 35 20 20 50" in text
+    assert "inside box 0 0 0 20 20 50" not in text
+
+
+def test_actual_solute_extents_define_bottom_and_top_solvent_regions() -> None:
+    """Use generated atom coordinates instead of full-box solvent packing."""
+
+    records = (
+        AtomRecord(1, "C", "C", "SAM", 1, "A", "sam", (0.0, 0.0, 1.7)),
+        AtomRecord(2, "C", "C", "SAM", 1, "A", "sam", (0.0, 0.0, 3.4)),
+    )
+
+    regions = solvent_regions_around_solute(
+        records,
+        ((0.0, 2.0), (0.0, 2.0), (0.0, 5.0)),
+        clearance_nm=0.18,
+    )
+
+    assert regions[0][2] == pytest.approx((0.0, 1.52))
+    assert regions[1][2] == pytest.approx((3.58, 5.0))
+    assert regions[0][:2] == ((0.0, 2.0), (0.0, 2.0))
+    assert regions[1][:2] == ((0.0, 2.0), (0.0, 2.0))
+    assert split_count_by_region_volume(10, regions) == (5, 5)
 
 
 @pytest.mark.parametrize(

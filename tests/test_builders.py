@@ -132,16 +132,17 @@ def test_box_plan_uses_adjusted_commensurate_lateral_dimensions() -> None:
 
 
 def test_default_box_plan_uses_sam_tip_padding_and_centered_slab() -> None:
-    """Compute z bounds from centered slab faces, SAM length, and solvent padding."""
+    """Compute z bounds from SAM length and split total solvent padding."""
 
     plan = build_system(SAMMDConfig())
+    expected_padding_per_face = DEFAULT_SOLVENT_PADDING_NM / 2.0
     expected_z_min = (
         plan.slab.bottom_z_nm
         - DEFAULT_SAM_EXTENDED_LENGTH_NM
-        - DEFAULT_SOLVENT_PADDING_NM
+        - expected_padding_per_face
     )
     expected_z_max = (
-        plan.slab.top_z_nm + DEFAULT_SAM_EXTENDED_LENGTH_NM + DEFAULT_SOLVENT_PADDING_NM
+        plan.slab.top_z_nm + DEFAULT_SAM_EXTENDED_LENGTH_NM + expected_padding_per_face
     )
     expected_z = expected_z_max - expected_z_min
 
@@ -151,21 +152,41 @@ def test_default_box_plan_uses_sam_tip_padding_and_centered_slab() -> None:
         (plan.slab.lateral_size_nm[0], plan.slab.lateral_size_nm[1], expected_z)
     )
     assert plan.box_plan.sam_extended_length_nm == DEFAULT_SAM_EXTENDED_LENGTH_NM
+    assert plan.box_plan.solvent_padding_nm == DEFAULT_SOLVENT_PADDING_NM
+    assert plan.box_plan.solvent_padding_per_face_nm == expected_padding_per_face
+    assert plan.box_plan.solvent_packing_regions_nm[0][2] == pytest.approx(
+        (expected_z_min, plan.slab.bottom_z_nm - DEFAULT_SAM_EXTENDED_LENGTH_NM)
+    )
+    assert plan.box_plan.solvent_packing_regions_nm[1][2] == pytest.approx(
+        (plan.slab.top_z_nm + DEFAULT_SAM_EXTENDED_LENGTH_NM, expected_z_max)
+    )
     assert plan.box_plan.sam_length_estimates[0].source == "minimum_default"
     assert plan.box_plan.sam_length_estimates[0].estimated_length_nm is not None
 
 
+def test_padding_three_nanometers_gives_one_point_five_per_face() -> None:
+    """Interpret solvent padding as a total reservoir split across exposed faces."""
+
+    plan = build_system(SAMMDConfig(solvent={"padding": 3.0}))
+
+    assert plan.box_plan.solvent_padding_nm == 3.0
+    assert plan.box_plan.solvent_padding_per_face_nm == 1.5
+
+
 def test_default_solvation_counts_are_deterministic() -> None:
-    """Convert the default unified box volume into stable molecule counts."""
+    """Convert the solvent packing volume into stable molecule counts."""
 
     plan = build_system(SAMMDConfig())
-    count_planning_volume_nm3 = plan.box_plan.volume_nm3
+    count_planning_volume_nm3 = plan.box_plan.solvent_count_planning_volume_nm3
     expected_ethanol = round_half_up(
         0.789 * count_planning_volume_nm3 * 1.0e-24 * 1000.0 / 46.06844 * 6.02214076e23
     )
 
     assert plan.box_plan.solvent_padding_nm == DEFAULT_SOLVENT_PADDING_NM
-    assert plan.solution.box_volume_nm3 == pytest.approx(plan.box_plan.volume_nm3)
+    assert plan.solution.box_volume_nm3 == pytest.approx(
+        plan.box_plan.solvent_count_planning_volume_nm3
+    )
+    assert plan.solution.box_volume_nm3 < plan.box_plan.volume_nm3
     assert plan.solution.solvent_components[0].count == expected_ethanol
     assert plan.solution.reactants[0].count == 1
 
@@ -194,10 +215,11 @@ def test_configured_sam_length_override_changes_box_and_solution_counts() -> Non
     assert longer_plan.box_plan.sam_length_estimates[0].source == "configured"
     assert longer_plan.box_plan.sam_length_estimates[0].estimated_length_nm is None
     assert longer_plan.box_plan.dimensions_nm[2] > default_plan.box_plan.dimensions_nm[2]
-    assert longer_plan.solution.box_volume_nm3 == pytest.approx(longer_plan.box_plan.volume_nm3)
-    assert (
-        longer_plan.solution.solvent_components[0].count
-        > default_plan.solution.solvent_components[0].count
+    assert longer_plan.solution.box_volume_nm3 == pytest.approx(
+        longer_plan.box_plan.solvent_count_planning_volume_nm3
+    )
+    assert longer_plan.solution.solvent_components[0].count == (
+        default_plan.solution.solvent_components[0].count
     )
 
 
@@ -298,7 +320,7 @@ def test_build_plan_writes_topology_cif_and_refuses_overwrite(tmp_path) -> None:
     assert summary["box"]["slab_center_nm"] == [0.0, 0.0, 0.0]
     assert "estimated_length_nm" in summary["box"]["sam_length_estimates"][0]
     assert summary["solution"]["count_planning_volume_nm3"] == pytest.approx(
-        plan.box_plan.volume_nm3
+        plan.box_plan.solvent_count_planning_volume_nm3
     )
     assert summary["solution"]["molecule_counts"]["cinnamaldehyde"] == 1
     with pytest.raises(FileExistsError, match="refusing to overwrite"):

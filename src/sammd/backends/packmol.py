@@ -28,6 +28,7 @@ class PackmolStructure:
     fixed: bool = False
     atom_count: int | None = None
     output_group: str | None = None
+    inside_box_bounds_nm: BoxBounds | None = None
 
 
 @dataclass(frozen=True)
@@ -99,17 +100,6 @@ def build_packmol_input(job: PackmolJob) -> str:
         lines.append("movebadrandom")
     lines.append("")
 
-    bounds_angstrom = tuple(
-        (lower * 10.0, upper * 10.0) for lower, upper in job.box_bounds_nm
-    )
-    box_tokens = (
-        bounds_angstrom[0][0],
-        bounds_angstrom[1][0],
-        bounds_angstrom[2][0],
-        bounds_angstrom[0][1],
-        bounds_angstrom[1][1],
-        bounds_angstrom[2][1],
-    )
     for structure in job.structures:
         lines.extend(
             [
@@ -120,6 +110,16 @@ def build_packmol_input(job: PackmolJob) -> str:
         if structure.fixed:
             lines.append("  fixed 0. 0. 0. 0. 0. 0.")
         else:
+            bounds_nm = structure.inside_box_bounds_nm or job.box_bounds_nm
+            bounds_angstrom = tuple((lower * 10.0, upper * 10.0) for lower, upper in bounds_nm)
+            box_tokens = (
+                bounds_angstrom[0][0],
+                bounds_angstrom[1][0],
+                bounds_angstrom[2][0],
+                bounds_angstrom[0][1],
+                bounds_angstrom[1][1],
+                bounds_angstrom[2][1],
+            )
             lines.append("  inside box " + " ".join(_format_float(value) for value in box_tokens))
         lines.extend(["end structure", ""])
     return "\n".join(lines).rstrip() + "\n"
@@ -178,10 +178,11 @@ def pack_fixed_solute_with_solvent(
     solvent_count: int,
     dimensions_nm: Any,
     working_dir: str | Path,
+    solvent_regions_nm: tuple[BoxBounds, ...] | list[BoxBounds] | None = None,
     tolerance_angstrom: float = 1.8,
     nloop: int = 200,
 ) -> tuple[tuple[Vector3, ...], ...]:
-    """Pack solvent throughout a box around one fixed solute and return solvent positions."""
+    """Pack solvent in explicit regions around one fixed solute and return positions."""
 
     if solvent_count <= 0:
         return ()
@@ -200,13 +201,29 @@ def pack_fixed_solute_with_solvent(
 
     write_atom_records_pdb(solute_path, solute_atoms)
     write_template_pdb(solvent_path, solvent_template)
+    box_bounds_nm = zero_origin_box_bounds(dimensions_nm)
+    regions_nm = tuple(solvent_regions_nm) if solvent_regions_nm is not None else (box_bounds_nm,)
+    solvent_counts = split_count_by_region_volume(solvent_count, regions_nm)
+    solvent_structures = tuple(
+        PackmolStructure(
+            f"{solvent_name}_{region_index}",
+            solvent_path.name,
+            region_count,
+            inside_box_bounds_nm=region,
+        )
+        for region_index, (region, region_count) in enumerate(
+            zip(regions_nm, solvent_counts, strict=True),
+            start=1,
+        )
+        if region_count > 0
+    )
     job = PackmolJob(
         output_path=output_path.name,
         structures=(
             PackmolStructure("solute", solute_path.name, 1, fixed=True),
-            PackmolStructure(solvent_name, solvent_path.name, solvent_count),
+            *solvent_structures,
         ),
-        box_bounds_nm=zero_origin_box_bounds(dimensions_nm),
+        box_bounds_nm=box_bounds_nm,
         tolerance_angstrom=tolerance_angstrom,
         nloop=nloop,
     )
@@ -234,6 +251,64 @@ def pack_fixed_solute_with_solvent(
         packed_positions[index : index + atoms_per_solvent]
         for index in range(solvent_start, solvent_stop, atoms_per_solvent)
     )
+
+
+def solvent_regions_around_solute(
+    solute_records: tuple[AtomRecord, ...] | list[AtomRecord],
+    box_bounds_nm: BoxBounds,
+    clearance_nm: float,
+) -> tuple[BoxBounds, ...]:
+    """Return bottom and top solvent regions outside actual solute z extents."""
+
+    _validate_bounds(box_bounds_nm)
+    _validate_positive_finite_number(clearance_nm, "clearance_nm")
+    solute_atoms = tuple(solute_records)
+    if not solute_atoms:
+        msg = "solvent region planning requires at least one solute atom record"
+        raise ValueError(msg)
+    solute_z_values = tuple(record.coordinates_nm[2] for record in solute_atoms)
+    bottom_region = (
+        box_bounds_nm[0],
+        box_bounds_nm[1],
+        (box_bounds_nm[2][0], min(solute_z_values) - clearance_nm),
+    )
+    top_region = (
+        box_bounds_nm[0],
+        box_bounds_nm[1],
+        (max(solute_z_values) + clearance_nm, box_bounds_nm[2][1]),
+    )
+    return tuple(region for region in (bottom_region, top_region) if region[2][1] > region[2][0])
+
+
+def split_count_by_region_volume(count: int, regions_nm: tuple[BoxBounds, ...]) -> tuple[int, ...]:
+    """Split a molecule count across regions proportional to region volume."""
+
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        msg = "count must be a non-negative integer"
+        raise ValueError(msg)
+    if not regions_nm:
+        msg = "at least one solvent packing region is required"
+        raise ValueError(msg)
+    volumes = tuple(_region_volume_nm3(region) for region in regions_nm)
+    total_volume = sum(volumes)
+    if total_volume <= 0.0:
+        msg = "solvent packing regions must have positive total volume"
+        raise ValueError(msg)
+    raw_counts = tuple(count * volume / total_volume for volume in volumes)
+    floor_counts = [int(raw_count) for raw_count in raw_counts]
+    remaining = count - sum(floor_counts)
+    remainders = sorted(
+        (
+            (raw_count - floor_count, index)
+            for index, (raw_count, floor_count) in enumerate(
+                zip(raw_counts, floor_counts, strict=True)
+            )
+        ),
+        reverse=True,
+    )
+    for _, index in remainders[:remaining]:
+        floor_counts[index] += 1
+    return tuple(floor_counts)
 
 
 def read_pdb_positions_nm(path: str | Path) -> tuple[Vector3, ...]:
@@ -381,6 +456,17 @@ def _validate_structure(structure: PackmolStructure) -> None:
     if not isinstance(structure.fixed, bool):
         msg = f"structure '{structure.name}' fixed must be a boolean"
         raise ValueError(msg)
+    if structure.inside_box_bounds_nm is not None:
+        _validate_bounds(structure.inside_box_bounds_nm)
+
+
+def _region_volume_nm3(region: BoxBounds) -> float:
+    _validate_bounds(region)
+    return (
+        (region[0][1] - region[0][0])
+        * (region[1][1] - region[1][0])
+        * (region[2][1] - region[2][0])
+    )
 
 
 def _validate_bounds(bounds_nm: Any) -> None:
