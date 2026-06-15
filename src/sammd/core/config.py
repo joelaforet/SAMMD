@@ -448,15 +448,18 @@ reactants:
 # ============================================================================
 # Solvent
 # ============================================================================
-# Solvent is packed above and around the slab/SAM/reactant system.
+# Solvent is packed only into explicit reservoirs above and below the
+# slab/SAM/reactant system, not throughout the full simulation box.
 #
-# padding is the requested z distance from fully extended SAM tips to the box
-# boundary. The same planned box volume is used for solvent/reactant/salt counts.
+# padding is the total z reservoir thickness across both exposed SAM faces.
+# SAMMD splits this equally, so padding: 3.0 gives 1.5 nm per face. Counts are
+# planned from the two solvent reservoirs only. Short NPT equilibration is
+# expected to shrink or relax the initially underpacked box.
 #
 # residue_name must be a 3-character PDB residue code.
 #
 solvent:
-  padding: 3.0  # nm, distance from fully extended SAM tips to box boundary
+  padding: 3.0  # nm total solvent thickness, split equally across both faces
 
   components:
     - name: ethanol
@@ -469,7 +472,7 @@ solvent:
 # Example water solvent:
 #
 # solvent:
-#   padding: 3.0  # nm, distance from fully extended SAM tips to box boundary
+#   padding: 3.0  # nm total solvent thickness, split equally across both faces
 #   components:
 #     - name: water
 #       residue_name: HOH

@@ -48,12 +48,16 @@ Important sections
    estimates the length from the SMILES string and uses at least 0.95 nm.
 
 ``solvent``
-   Defines ``padding``, the distance in ``z`` from the estimated SAM tips to
-   the box edge. It also defines solvent mole fractions, normalized only over
-   the solvent components. SAMMD uses the planned box volume to count solvent,
-   reactant, and salt molecules, and then to place them with PACKMOL. Each
-   component needs a three-character ``residue_name``. Non-water solvents need
-   density and molar mass unless SAMMD has a supported built-in value.
+   Defines ``padding``, the total solvent reservoir thickness in ``z`` across
+   both exposed SAM faces. SAMMD splits this value equally, so ``padding: 3.0``
+   creates about 1.5 nm of initial solvent above the SAM and 1.5 nm below it.
+   Solvent is packed into those explicit reservoir regions, not throughout the
+   slab/SAM region, and solvent counts are planned from the combined reservoir
+   volume. This can intentionally underpack the initial cell; use a short NPT
+   equilibration to let the box shrink or relax. Solvent mole fractions are
+   normalized only over solvent components. Each component needs a
+   three-character ``residue_name``. Non-water solvents need density and molar
+   mass unless SAMMD has a supported built-in value.
 
 ``salts`` and ``reactants``
    Define optional ions and reactants. Reactants use exactly one of ``count`` or
@@ -90,8 +94,8 @@ Resolved defaults to notice
 * The surface defaults to a ``[2.0, 2.0]`` nm Pd(111) size in ``x`` and ``y``.
 * SAMMD chooses the slab thickness automatically.
 * The SAM defaults to neutral propanethiol ``CCCS`` at ``0.25 nm^2 / molecule``.
-* The solvent defaults to ethanol ``CCO`` with 3.0 nm padding above the
-  estimated SAM tips.
+* The solvent defaults to ethanol ``CCO`` with 3.0 nm total padding, split as
+  1.5 nm per exposed SAM face.
 * The default reactant is one cinnamaldehyde molecule.
 * The default seed is 2026, so placement planning is reproducible.
 
