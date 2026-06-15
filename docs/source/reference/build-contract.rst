@@ -18,10 +18,13 @@ The supported first-release command-line surface is:
 
    * - Command
      - Contract
-   * - ``sammd init [-o PATH] [--force]``
-     - Create a project directory containing ``sammd.yaml`` with a commented
-       starter YAML configuration. Existing paths are protected unless
-       ``--force`` is supplied.
+   * - ``sammd init [-o DIR] [--force]``
+     - Create an output directory and write ``DIR/sammd.yaml`` with a commented
+       starter YAML configuration. Existing directories are allowed if they do
+       not already contain ``sammd.yaml``. Existing ``DIR/sammd.yaml`` is
+       protected unless ``--force`` is supplied; ``--force`` overwrites only
+       ``DIR/sammd.yaml`` and preserves unrelated files in the directory.
+       Non-directory output paths and YAML file paths are rejected.
    * - ``sammd validate CONFIG``
      - Load and validate a YAML configuration without writing build artifacts.
    * - ``sammd build CONFIG --output-dir DIR --overwrite``
