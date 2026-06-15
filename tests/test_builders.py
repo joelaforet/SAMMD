@@ -22,6 +22,7 @@ from sammd.model.metal_sulfur import (
     METAL_SULFUR_PAIRS_PER_ANCHOR,
     METAL_SULFUR_SIGMA_NM,
 )
+from sammd.model.sam import DEFAULT_SULFUR_HEIGHT_NM
 from sammd.model.solvation import round_half_up
 from sammd.model.surfaces import plan_fcc111_slab
 
@@ -138,11 +139,15 @@ def test_default_box_plan_uses_sam_tip_padding_and_centered_slab() -> None:
     expected_padding_per_face = DEFAULT_SOLVENT_PADDING_NM / 2.0
     expected_z_min = (
         plan.slab.bottom_z_nm
+        - DEFAULT_SULFUR_HEIGHT_NM
         - DEFAULT_SAM_EXTENDED_LENGTH_NM
         - expected_padding_per_face
     )
     expected_z_max = (
-        plan.slab.top_z_nm + DEFAULT_SAM_EXTENDED_LENGTH_NM + expected_padding_per_face
+        plan.slab.top_z_nm
+        + DEFAULT_SULFUR_HEIGHT_NM
+        + DEFAULT_SAM_EXTENDED_LENGTH_NM
+        + expected_padding_per_face
     )
     expected_z = expected_z_max - expected_z_min
 
@@ -155,13 +160,41 @@ def test_default_box_plan_uses_sam_tip_padding_and_centered_slab() -> None:
     assert plan.box_plan.solvent_padding_nm == DEFAULT_SOLVENT_PADDING_NM
     assert plan.box_plan.solvent_padding_per_face_nm == expected_padding_per_face
     assert plan.box_plan.solvent_packing_regions_nm[0][2] == pytest.approx(
-        (expected_z_min, plan.slab.bottom_z_nm - DEFAULT_SAM_EXTENDED_LENGTH_NM)
+        (
+            expected_z_min,
+            plan.slab.bottom_z_nm - DEFAULT_SULFUR_HEIGHT_NM - DEFAULT_SAM_EXTENDED_LENGTH_NM,
+        )
     )
     assert plan.box_plan.solvent_packing_regions_nm[1][2] == pytest.approx(
-        (plan.slab.top_z_nm + DEFAULT_SAM_EXTENDED_LENGTH_NM, expected_z_max)
+        (
+            plan.slab.top_z_nm + DEFAULT_SULFUR_HEIGHT_NM + DEFAULT_SAM_EXTENDED_LENGTH_NM,
+            expected_z_max,
+        )
     )
     assert plan.box_plan.sam_length_estimates[0].source == "minimum_default"
     assert plan.box_plan.sam_length_estimates[0].estimated_length_nm is not None
+
+
+def test_solvent_regions_exclude_sam_anchor_envelope() -> None:
+    """Keep planned solvent reservoirs outside the sulfur-anchored SAM envelope."""
+
+    plan = build_system(SAMMDConfig())
+    bottom_region, top_region = plan.box_plan.solvent_packing_regions_nm
+    bottom_anchor_z = min(
+        placement.anchor_pose.sulfur_position_nm[2]
+        for placement in plan.sam_placements.placements
+        if placement.side == "bottom"
+    )
+    top_anchor_z = max(
+        placement.anchor_pose.sulfur_position_nm[2]
+        for placement in plan.sam_placements.placements
+        if placement.side == "top"
+    )
+
+    assert bottom_region[2][1] == pytest.approx(
+        bottom_anchor_z - plan.box_plan.sam_extended_length_nm
+    )
+    assert top_region[2][0] == pytest.approx(top_anchor_z + plan.box_plan.sam_extended_length_nm)
 
 
 def test_padding_three_nanometers_gives_one_point_five_per_face() -> None:

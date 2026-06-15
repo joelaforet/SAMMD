@@ -451,7 +451,7 @@ reactants:
 # Solvent is packed only into explicit reservoirs above and below the
 # slab/SAM/reactant system, not throughout the full simulation box.
 #
-# padding is the total z reservoir thickness across both exposed SAM faces.
+# Padding is the total z reservoir thickness across both exposed SAM faces.
 # SAMMD splits this equally, so padding: 3.0 gives 1.5 nm per face. Counts are
 # planned from the two solvent reservoirs only. Short NPT equilibration is
 # expected to shrink or relax the initially underpacked box.

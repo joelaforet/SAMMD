@@ -150,10 +150,12 @@ def test_packmol_input_packs_solvent_around_fixed_solute() -> None:
     regions = smoke.runtime_solvent_packing_regions(plan)
 
     assert box == plan.box_plan.dimensions_nm
-    assert regions == (
-        ((0.0, box[0]), (0.0, box[1]), (0.0, 1.5)),
-        ((0.0, box[0]), (0.0, box[1]), (box[2] - 1.5, box[2])),
-    )
+    assert regions[0][0] == pytest.approx((0.0, box[0]))
+    assert regions[0][1] == pytest.approx((0.0, box[1]))
+    assert regions[0][2] == pytest.approx((0.0, 1.5))
+    assert regions[1][0] == pytest.approx((0.0, box[0]))
+    assert regions[1][1] == pytest.approx((0.0, box[1]))
+    assert regions[1][2] == pytest.approx((box[2] - 1.5, box[2]))
     text = smoke.build_packmol_input(
         solute_path=Path("fixed_pd_sam.pdb"),
         solvent_path=Path("ethanol.pdb"),
@@ -169,11 +171,36 @@ def test_packmol_input_packs_solvent_around_fixed_solute() -> None:
     assert "  number 13" in solvent_blocks[0]
     assert "  number 12" in solvent_blocks[1]
     assert "  inside box 0 0 0 22.0052 23.8213 15" in solvent_blocks[0]
-    assert "  inside box 0 0 49.7212 22.0052 23.8213 64.7212" in solvent_blocks[1]
+    assert "  inside box 0 0 53.3212 22.0052 23.8213 68.3212" in solvent_blocks[1]
     assert "structure fixed_pd_sam.pdb" in text
     assert "fixed 0. 0. 0. 0. 0. 0." in text
-    assert "  inside box 0 0 0 22.0052 23.8213 64.7212" not in text
+    assert "  inside box 0 0 0 22.0052 23.8213 68.3212" not in text
     assert "nloop 200" in text
+
+
+def test_runtime_solvent_regions_exclude_shifted_fixed_solute_envelope() -> None:
+    """Shifted smoke solvent regions should stay outside planned fixed-solute extents."""
+
+    smoke = load_smoke_tool()
+    plan = build_system(SAMMDConfig.model_validate({"surface": {"lateral_size": [2.0, 2.0]}}))
+    box = smoke.derive_box_dimensions(plan, 3.0)
+    shift_z = box[2] / 2.0
+    regions = smoke.runtime_solvent_packing_regions(plan)
+    bottom_anchor_z = min(
+        placement.anchor_pose.sulfur_position_nm[2]
+        for placement in plan.sam_placements.placements
+        if placement.side == "bottom"
+    )
+    top_anchor_z = max(
+        placement.anchor_pose.sulfur_position_nm[2]
+        for placement in plan.sam_placements.placements
+        if placement.side == "top"
+    )
+    bottom_solute_limit_z = bottom_anchor_z - plan.box_plan.sam_extended_length_nm + shift_z
+    top_solute_limit_z = top_anchor_z + plan.box_plan.sam_extended_length_nm + shift_z
+
+    assert regions[0][2][1] == pytest.approx(bottom_solute_limit_z)
+    assert regions[1][2][0] == pytest.approx(top_solute_limit_z)
 
 
 def test_packmol_input_rejects_explicit_full_box_solvent_region() -> None:

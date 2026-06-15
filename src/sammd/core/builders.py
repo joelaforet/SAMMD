@@ -21,7 +21,7 @@ from sammd.core.io import (
     write_mmcif,
 )
 from sammd.model.metal_sulfur import default_metal_sulfur_interaction
-from sammd.model.sam import SAMPlacementPlan, plan_sam_placements
+from sammd.model.sam import DEFAULT_SULFUR_HEIGHT_NM, SAMPlacementPlan, plan_sam_placements
 from sammd.model.solvation import SolutionPlan, plan_solution_composition
 from sammd.model.surfaces import BindingSite, SurfaceSlab, generate_binding_sites, plan_fcc111_slab
 
@@ -388,8 +388,8 @@ def _derive_box_plan(config: SAMMDConfig, slab: SurfaceSlab) -> BoxPlan:
         _estimate_sam_length(component) for component in config.sam.components
     )
     sam_extended_length_nm = max(estimate.length_nm for estimate in sam_length_estimates)
-    bottom_solute_z_nm = slab.bottom_z_nm - sam_extended_length_nm
-    top_solute_z_nm = slab.top_z_nm + sam_extended_length_nm
+    bottom_solute_z_nm = slab.bottom_z_nm - DEFAULT_SULFUR_HEIGHT_NM - sam_extended_length_nm
+    top_solute_z_nm = slab.top_z_nm + DEFAULT_SULFUR_HEIGHT_NM + sam_extended_length_nm
     z_min = bottom_solute_z_nm - padding_per_face_nm
     z_max = top_solute_z_nm + padding_per_face_nm
     box_z_nm = z_max - z_min
