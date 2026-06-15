@@ -23,6 +23,7 @@ from sammd.backends.forcefields import get_fcc_metal_parameters
 from sammd.backends.packmol import (
     PackmolJob,
     PackmolStructure,
+    _require_explicit_solvent_regions,
     read_pdb_positions_nm,
     split_count_by_region_volume,
     zero_origin_box_bounds,
@@ -1318,10 +1319,8 @@ def build_packmol_input(
 ) -> str:
     """Build Packmol input text for the smoke solvent placement."""
 
-    regions_nm = tuple(solvent_regions_nm)
-    if not regions_nm:
-        msg = "smoke Packmol solvent placement requires explicit solvent regions"
-        raise ValueError(msg)
+    box_bounds_nm = zero_origin_box_bounds(box_dimensions_nm)
+    regions_nm = _require_explicit_solvent_regions(solvent_regions_nm, box_bounds_nm)
     region_counts = split_count_by_region_volume(solvent_count, regions_nm)
     region_labels = (
         ("bottom", "top")
@@ -1349,7 +1348,7 @@ def build_packmol_input(
             PackmolStructure("solute", solute_path.name, 1, fixed=True),
             *solvent_structures,
         ),
-        box_bounds_nm=zero_origin_box_bounds(box_dimensions_nm),
+        box_bounds_nm=box_bounds_nm,
         tolerance_angstrom=PACKMOL_TOLERANCE_ANGSTROM,
         nloop=PACKMOL_NLOOP,
     )

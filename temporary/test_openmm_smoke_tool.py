@@ -176,6 +176,23 @@ def test_packmol_input_packs_solvent_around_fixed_solute() -> None:
     assert "nloop 200" in text
 
 
+def test_packmol_input_rejects_explicit_full_box_solvent_region() -> None:
+    """Smoke Packmol input should not accept old full-box solvent packing."""
+
+    smoke = load_smoke_tool()
+    box = (2.0, 2.0, 2.0)
+
+    with pytest.raises(ValueError, match="must not reproduce full-box solvent packing"):
+        smoke.build_packmol_input(
+            solute_path=Path("fixed_pd_sam.pdb"),
+            solvent_path=Path("ethanol.pdb"),
+            output_path=Path("packmol_output.pdb"),
+            solvent_count=25,
+            box_dimensions_nm=box,
+            solvent_regions_nm=(smoke.zero_origin_box_bounds(box),),
+        )
+
+
 def test_committed_packmol_artifacts_do_not_use_single_full_box_solvent() -> None:
     """Committed smoke artifacts should not contradict planned solvent regions."""
 

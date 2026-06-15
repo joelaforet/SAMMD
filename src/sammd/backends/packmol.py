@@ -201,7 +201,7 @@ def pack_fixed_solute_with_solvent(
         raise ValueError(msg)
 
     box_bounds_nm = zero_origin_box_bounds(dimensions_nm)
-    regions_nm = _require_explicit_solvent_regions(solvent_regions_nm)
+    regions_nm = _require_explicit_solvent_regions(solvent_regions_nm, box_bounds_nm)
 
     workdir = Path(working_dir)
     workdir.mkdir(parents=True, exist_ok=True)
@@ -291,7 +291,7 @@ def pack_fixed_solute_with_solvent_components(
         raise ValueError(msg)
 
     box_bounds_nm = zero_origin_box_bounds(dimensions_nm)
-    regions_nm = _require_explicit_solvent_regions(solvent_regions_nm)
+    regions_nm = _require_explicit_solvent_regions(solvent_regions_nm, box_bounds_nm)
 
     workdir = Path(working_dir)
     workdir.mkdir(parents=True, exist_ok=True)
@@ -446,8 +446,13 @@ def split_count_by_region_volume(
     return tuple(floor_counts)
 
 
+FULL_BOX_REGION_REL_TOL = 1.0e-9
+FULL_BOX_REGION_ABS_TOL_NM3 = 1.0e-12
+
+
 def _require_explicit_solvent_regions(
     solvent_regions_nm: tuple[BoxBounds, ...] | list[BoxBounds] | None,
+    box_bounds_nm: BoxBounds,
 ) -> tuple[BoxBounds, ...]:
     """Return validated explicit regions for high-level SAMMD solvent packing.
 
@@ -455,6 +460,8 @@ def _require_explicit_solvent_regions(
     ----------
     solvent_regions_nm
         Explicit solvent packing regions in nanometers.
+    box_bounds_nm
+        Runtime full-box bounds used to reject old full-box solvent packing.
 
     Returns
     -------
@@ -462,6 +469,7 @@ def _require_explicit_solvent_regions(
         Validated immutable region bounds.
     """
 
+    _validate_bounds(box_bounds_nm)
     if solvent_regions_nm is None:
         msg = "explicit solvent_regions_nm are required for SAMMD solvent packing"
         raise ValueError(msg)
@@ -471,7 +479,29 @@ def _require_explicit_solvent_regions(
         raise ValueError(msg)
     for region in regions_nm:
         _validate_bounds(region)
+        _validate_region_inside_box(region, box_bounds_nm)
+    if _regions_fill_box(regions_nm, box_bounds_nm):
+        msg = "explicit solvent_regions_nm must not reproduce full-box solvent packing"
+        raise ValueError(msg)
     return regions_nm
+
+
+def _validate_region_inside_box(region: BoxBounds, box_bounds_nm: BoxBounds) -> None:
+    """Reject solvent regions outside the runtime Packmol box."""
+
+    for axis, region_axis, box_axis in zip(("x", "y", "z"), region, box_bounds_nm, strict=True):
+        if region_axis[0] < box_axis[0] or region_axis[1] > box_axis[1]:
+            msg = f"solvent region {axis}-axis bounds must lie within runtime box bounds"
+            raise ValueError(msg)
+
+
+def _regions_fill_box(regions_nm: tuple[BoxBounds, ...], box_bounds_nm: BoxBounds) -> bool:
+    """Return whether regions preserve old full-box solvent semantics."""
+
+    box_volume = _region_volume_nm3(box_bounds_nm)
+    region_volume = sum(_region_volume_nm3(region) for region in regions_nm)
+    tolerance = max(FULL_BOX_REGION_ABS_TOL_NM3, box_volume * FULL_BOX_REGION_REL_TOL)
+    return abs(region_volume - box_volume) <= tolerance
 
 
 def read_pdb_positions_nm(path: str | Path) -> tuple[Vector3, ...]:
