@@ -16,6 +16,22 @@ from sammd.core.config import SAMMDConfig
 from sammd.utils.geometry import norm
 
 
+def packmol_structure_blocks(text: str) -> list[str]:
+    """Return rendered Packmol structure blocks from input text."""
+
+    blocks = []
+    current = []
+    for line in text.splitlines():
+        if line.startswith("structure "):
+            current = [line]
+        elif current:
+            current.append(line)
+            if line == "end structure":
+                blocks.append("\n".join(current))
+                current = []
+    return blocks
+
+
 def load_smoke_tool():
     """Load the sibling temporary/openmm_smoke.py module."""
 
@@ -125,30 +141,58 @@ def test_default_run_schedule_records_300_frames_with_2fs_timestep() -> None:
 
 
 def test_packmol_input_packs_solvent_around_fixed_solute() -> None:
-    """Packmol input should pack solvent around a fixed solute instead of using a lattice."""
+    """Packmol input should pack solvent in the planned shifted regions."""
 
     smoke = load_smoke_tool()
-    config = SAMMDConfig.model_validate(
-        {"surface": {"lateral_size": [2.0, 2.0]}}
-    )
+    config = SAMMDConfig.model_validate({"surface": {"lateral_size": [2.0, 2.0]}})
     plan = build_system(config)
     box = smoke.derive_box_dimensions(plan, 3.0)
+    regions = smoke.runtime_solvent_packing_regions(plan)
 
     assert box == plan.box_plan.dimensions_nm
+    assert regions == (
+        ((0.0, box[0]), (0.0, box[1]), (0.0, 1.5)),
+        ((0.0, box[0]), (0.0, box[1]), (box[2] - 1.5, box[2])),
+    )
     text = smoke.build_packmol_input(
         solute_path=Path("fixed_pd_sam.pdb"),
         solvent_path=Path("ethanol.pdb"),
         output_path=Path("packmol_output.pdb"),
         solvent_count=25,
         box_dimensions_nm=box,
+        solvent_regions_nm=regions,
     )
+    blocks = packmol_structure_blocks(text)
+    solvent_blocks = [block for block in blocks if block.startswith("structure ethanol.pdb")]
 
-    assert "structure ethanol.pdb" in text
-    assert "  number 25" in text
+    assert len(solvent_blocks) == 2
+    assert "  number 13" in solvent_blocks[0]
+    assert "  number 12" in solvent_blocks[1]
+    assert "  inside box 0 0 0 22.0052 23.8213 15" in solvent_blocks[0]
+    assert "  inside box 0 0 49.7212 22.0052 23.8213 64.7212" in solvent_blocks[1]
     assert "structure fixed_pd_sam.pdb" in text
     assert "fixed 0. 0. 0. 0. 0. 0." in text
-    assert "inside box 0 0 0" in text
+    assert "  inside box 0 0 0 22.0052 23.8213 64.7212" not in text
     assert "nloop 200" in text
+
+
+def test_committed_packmol_artifacts_do_not_use_single_full_box_solvent() -> None:
+    """Committed smoke artifacts should not contradict planned solvent regions."""
+
+    repo_root = Path(__file__).resolve().parents[1]
+    artifact_paths = sorted(repo_root.glob("outputs/**/packmol_input.inp"))
+
+    if not artifact_paths:
+        pytest.skip("no generated Packmol artifacts are present in this checkout")
+    for artifact_path in artifact_paths:
+        text = artifact_path.read_text(encoding="utf-8")
+        blocks = packmol_structure_blocks(text)
+        solvent_blocks = [
+            block
+            for block in blocks
+            if "fixed 0. 0. 0. 0. 0. 0." not in block and "inside box" in block
+        ]
+        assert len(solvent_blocks) != 1, artifact_path
 
 
 def test_validate_args_rejects_invalid_solvent_count() -> None:

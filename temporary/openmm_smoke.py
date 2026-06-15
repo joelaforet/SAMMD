@@ -24,6 +24,7 @@ from sammd.backends.packmol import (
     PackmolJob,
     PackmolStructure,
     read_pdb_positions_nm,
+    split_count_by_region_volume,
     zero_origin_box_bounds,
 )
 from sammd.backends.packmol import (
@@ -86,6 +87,7 @@ PASS_MAX_PD_DISPLACEMENT_NM = 0.15
 PASS_MAX_SULFUR_DISPLACEMENT_NM = 0.70
 
 Vector3 = tuple[float, float, float]
+BoxBounds = tuple[tuple[float, float], tuple[float, float], tuple[float, float]]
 
 
 @dataclass(frozen=True)
@@ -1111,6 +1113,7 @@ def build_openmm_smoke_system(
         solvent_template=solvent_template,
         solvent_count=solvent_count,
         box_dimensions_nm=box_dimensions_nm,
+        solvent_regions_nm=runtime_solvent_packing_regions(plan),
         working_dir=packmol_working_dir,
     )
     solvent_identities = residue_assigner.allocate(
@@ -1180,6 +1183,19 @@ def derive_box_dimensions(plan: Any, solvent_padding_nm: float) -> Vector3:
     return plan.box_plan.dimensions_nm
 
 
+def runtime_solvent_packing_regions(plan: Any) -> tuple[BoxBounds, ...]:
+    """Return planned solvent regions shifted into the zero-origin runtime box."""
+
+    box_lowers = tuple(axis_bounds[0] for axis_bounds in plan.box_plan.bounds_nm)
+    return tuple(
+        tuple(
+            (axis_bounds[0] - axis_lower, axis_bounds[1] - axis_lower)
+            for axis_bounds, axis_lower in zip(region, box_lowers, strict=True)
+        )
+        for region in plan.box_plan.solvent_packing_regions_nm
+    )
+
+
 def set_periodic_box(modules: Any, topology: Any, system: Any, dimensions_nm: Vector3) -> None:
     """Apply orthorhombic periodic box vectors to topology and system."""
 
@@ -1244,6 +1260,7 @@ def pack_solution_with_packmol(
     solvent_template: MoleculeTemplate,
     solvent_count: int,
     box_dimensions_nm: Vector3,
+    solvent_regions_nm: tuple[BoxBounds, ...],
     working_dir: Path,
 ) -> PackmolSolutionPositions:
     """Use Packmol to place solvent molecules around Pd+SAM+reactant solute."""
@@ -1264,6 +1281,7 @@ def pack_solution_with_packmol(
         output_path=output_path,
         solvent_count=solvent_count,
         box_dimensions_nm=box_dimensions_nm,
+        solvent_regions_nm=solvent_regions_nm,
     )
     input_path.write_text(input_text, encoding="utf-8")
     run_packmol(input_path, working_dir, stdout_path)
@@ -1296,14 +1314,40 @@ def build_packmol_input(
     output_path: Path,
     solvent_count: int,
     box_dimensions_nm: Vector3,
+    solvent_regions_nm: tuple[BoxBounds, ...],
 ) -> str:
     """Build Packmol input text for the smoke solvent placement."""
 
+    regions_nm = tuple(solvent_regions_nm)
+    if not regions_nm:
+        msg = "smoke Packmol solvent placement requires explicit solvent regions"
+        raise ValueError(msg)
+    region_counts = split_count_by_region_volume(solvent_count, regions_nm)
+    region_labels = (
+        ("bottom", "top")
+        if len(regions_nm) == 2
+        else tuple(f"region_{index}" for index in range(1, len(regions_nm) + 1))
+    )
+    solvent_structures = tuple(
+        PackmolStructure(
+            f"{SOLVENT_NAME}_{region_label}",
+            solvent_path.name,
+            region_count,
+            inside_box_bounds_nm=region,
+        )
+        for region_label, region, region_count in zip(
+            region_labels,
+            regions_nm,
+            region_counts,
+            strict=True,
+        )
+        if region_count > 0
+    )
     job = PackmolJob(
         output_path=output_path.name,
         structures=(
             PackmolStructure("solute", solute_path.name, 1, fixed=True),
-            PackmolStructure(SOLVENT_NAME, solvent_path.name, solvent_count),
+            *solvent_structures,
         ),
         box_bounds_nm=zero_origin_box_bounds(box_dimensions_nm),
         tolerance_angstrom=PACKMOL_TOLERANCE_ANGSTROM,
@@ -1317,10 +1361,7 @@ def run_packmol(input_path: Path, working_dir: Path, stdout_path: Path) -> None:
 
     job = PackmolJob(
         output_path="packmol_output.pdb",
-        structures=(
-            PackmolStructure("solute", "fixed_solute.pdb", 1, fixed=True),
-            PackmolStructure(SOLVENT_NAME, f"{SOLVENT_NAME}.pdb", 1),
-        ),
+        structures=(PackmolStructure("solute", "fixed_solute.pdb", 1, fixed=True),),
         box_bounds_nm=zero_origin_box_bounds((1.0, 1.0, 1.0)),
     )
     result = execute_packmol(job, input_path, working_dir, stdout_path)
