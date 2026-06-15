@@ -45,7 +45,7 @@ Important sections
    SMILES string, and either fractions that sum to 1.0 or explicit counts.
    Advanced users may set ``extended_length_nm`` to change the estimated fully
    extended SAM length used to size the box. If you do not set it, SAMMD
-   estimates the length from the SMILES string and uses at least 0.95 nm.
+   estimates the length from an OpenFF conformer derived from the SMILES string.
 
 ``solvent``
    Defines ``padding``, the total solvent reservoir thickness in ``z`` across

@@ -75,3 +75,74 @@ def test_smoke_fixed_solute_containment_rejects_outside_box() -> None:
             (1.0, 1.0, 1.0),
             context="test fixed solute",
         )
+
+
+def test_smoke_solvent_clearance_uses_configured_packmol_tolerance() -> None:
+    """Use non-default Packmol tolerance when sizing runtime solvent clearance."""
+
+    smoke = load_smoke_module()
+    plan = SimpleNamespace(
+        config=SimpleNamespace(
+            packing=SimpleNamespace(packmol=SimpleNamespace(tolerance=2.5)),
+        ),
+        box_plan=SimpleNamespace(dimensions_nm=(2.0, 2.0, 1.0)),
+    )
+
+    box, z_shift, regions = smoke.actual_solvent_packing_geometry(
+        plan,
+        ((0.5, 0.5, 0.0), (0.5, 0.5, 1.0)),
+        2.0,
+    )
+
+    assert box == pytest.approx((2.0, 2.0, 3.0))
+    assert z_shift == pytest.approx(1.0)
+    assert regions[0][2] == pytest.approx((0.0, 0.75))
+    assert regions[1][2] == pytest.approx((2.25, 3.0))
+
+
+def test_smoke_zero_solvent_count_skips_packmol_after_containment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Return no solvent positions for zero counts without writing Packmol files."""
+
+    smoke = load_smoke_module()
+
+    def fail_if_packmol_runs(*args: object, **kwargs: object) -> None:
+        """Fail if zero-count placement reaches Packmol execution."""
+
+        raise AssertionError("Packmol should not run for zero solvent count")
+
+    monkeypatch.setattr(smoke, "run_packmol", fail_if_packmol_runs)
+
+    solution = smoke.pack_solution_with_packmol(
+        topology=SimpleNamespace(),
+        solute_positions_nm=((0.5, 0.5, 0.5),),
+        solvent_template=SimpleNamespace(),
+        solvent_count=0,
+        box_dimensions_nm=(1.0, 1.0, 1.0),
+        solvent_regions_nm=(),
+        working_dir=tmp_path / "packmol",
+    )
+
+    assert solution.solvent_positions_nm == ()
+    assert not (tmp_path / "packmol").exists()
+
+
+def test_smoke_zero_solvent_count_still_validates_fixed_solute_containment(
+    tmp_path: Path,
+) -> None:
+    """Reject invalid fixed solute coordinates before zero-count short-circuiting."""
+
+    smoke = load_smoke_module()
+
+    with pytest.raises(ValueError, match="fixed solute Packmol atom 1"):
+        smoke.pack_solution_with_packmol(
+            topology=SimpleNamespace(),
+            solute_positions_nm=((1.5, 0.5, 0.5),),
+            solvent_template=SimpleNamespace(),
+            solvent_count=0,
+            box_dimensions_nm=(1.0, 1.0, 1.0),
+            solvent_regions_nm=(),
+            working_dir=tmp_path / "packmol",
+        )

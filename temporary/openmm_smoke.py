@@ -1245,7 +1245,7 @@ def actual_solvent_packing_geometry(
     if not boundary_positions_nm:
         raise ValueError("actual solvent packing geometry requires boundary positions")
     padding_per_face_nm = solvent_padding_nm / 2.0
-    clearance_nm = PACKMOL_TOLERANCE_ANGSTROM / 10.0
+    clearance_nm = plan.config.packing.packmol.tolerance / 10.0
     boundary_min_z = min(position[2] for position in boundary_positions_nm)
     boundary_max_z = max(position[2] for position in boundary_positions_nm)
     fixed_min_z = min(position[2] for position in fixed_solute_positions_nm)
@@ -1378,6 +1378,14 @@ def pack_solution_with_packmol(
     working_dir: Path,
 ) -> PackmolSolutionPositions:
     """Use Packmol to place solvent molecules around Pd+SAM+reactant solute."""
+
+    ensure_positions_inside_box(
+        solute_positions_nm,
+        box_dimensions_nm,
+        context="fixed solute Packmol",
+    )
+    if solvent_count == 0:
+        return PackmolSolutionPositions(solvent_positions_nm=())
 
     working_dir.mkdir(parents=True, exist_ok=True)
     solute_path = working_dir / "fixed_solute.pdb"
