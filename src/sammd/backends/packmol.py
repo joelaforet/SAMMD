@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 from collections.abc import Sized
 from dataclasses import dataclass, field
+from itertools import pairwise
 from math import isfinite
 from pathlib import Path
 from typing import Any
@@ -447,6 +448,7 @@ def split_count_by_region_volume(
 
 
 FULL_BOX_REGION_REL_TOL = 1.0e-9
+FULL_BOX_REGION_ABS_TOL_NM = 1.0e-12
 FULL_BOX_REGION_ABS_TOL_NM3 = 1.0e-12
 
 
@@ -499,12 +501,53 @@ def _validate_region_inside_box(region: BoxBounds, box_bounds_nm: BoxBounds) -> 
 
 
 def _regions_fill_box(regions_nm: tuple[BoxBounds, ...], box_bounds_nm: BoxBounds) -> bool:
-    """Return whether regions preserve old full-box solvent semantics."""
+    """Return whether the union of orthorhombic regions covers the runtime box."""
 
-    box_volume = _region_volume_nm3(box_bounds_nm)
-    region_volume = sum(_region_volume_nm3(region) for region in regions_nm)
-    tolerance = max(FULL_BOX_REGION_ABS_TOL_NM3, box_volume * FULL_BOX_REGION_REL_TOL)
-    return abs(region_volume - box_volume) <= tolerance
+    axis_boundaries = tuple(
+        _sorted_unique_axis_boundaries(
+            (box_bounds_nm[axis_index], *(region[axis_index] for region in regions_nm)),
+            box_bounds_nm[axis_index],
+        )
+        for axis_index in range(3)
+    )
+    for x_lower, x_upper in pairwise(axis_boundaries[0]):
+        for y_lower, y_upper in pairwise(axis_boundaries[1]):
+            for z_lower, z_upper in pairwise(axis_boundaries[2]):
+                cell = ((x_lower, x_upper), (y_lower, y_upper), (z_lower, z_upper))
+                if _region_volume_nm3(cell) <= FULL_BOX_REGION_ABS_TOL_NM3:
+                    continue
+                if not any(_region_covers_cell(region, cell) for region in regions_nm):
+                    return False
+    return True
+
+
+def _sorted_unique_axis_boundaries(
+    bounds_by_region: tuple[tuple[float, float], ...],
+    box_axis: tuple[float, float],
+) -> tuple[float, ...]:
+    """Return sorted axis partition boundaries with near-duplicates merged."""
+
+    tolerance = _axis_match_tolerance_nm(*box_axis)
+    boundaries = sorted(boundary for bounds in bounds_by_region for boundary in bounds)
+    unique_boundaries: list[float] = []
+    for boundary in boundaries:
+        if abs(boundary - box_axis[0]) <= tolerance:
+            boundary = box_axis[0]
+        elif abs(boundary - box_axis[1]) <= tolerance:
+            boundary = box_axis[1]
+        if not unique_boundaries or abs(boundary - unique_boundaries[-1]) > tolerance:
+            unique_boundaries.append(boundary)
+    return tuple(unique_boundaries)
+
+
+def _region_covers_cell(region: BoxBounds, cell: BoxBounds) -> bool:
+    """Return whether one orthorhombic region covers a partition cell."""
+
+    return all(
+        region_axis[0] <= cell_axis[0] + _axis_match_tolerance_nm(*cell_axis)
+        and region_axis[1] >= cell_axis[1] - _axis_match_tolerance_nm(*cell_axis)
+        for region_axis, cell_axis in zip(region, cell, strict=True)
+    )
 
 
 def _region_matches_box(region: BoxBounds, box_bounds_nm: BoxBounds) -> bool:
@@ -524,7 +567,7 @@ def _region_matches_box(region: BoxBounds, box_bounds_nm: BoxBounds) -> bool:
 def _axis_match_tolerance_nm(lower_nm: float, upper_nm: float) -> float:
     """Return an absolute tolerance for comparing one box axis in nanometers."""
 
-    return max(FULL_BOX_REGION_ABS_TOL_NM3, abs(upper_nm - lower_nm) * FULL_BOX_REGION_REL_TOL)
+    return max(FULL_BOX_REGION_ABS_TOL_NM, abs(upper_nm - lower_nm) * FULL_BOX_REGION_REL_TOL)
 
 
 def read_pdb_positions_nm(path: str | Path) -> tuple[Vector3, ...]:
