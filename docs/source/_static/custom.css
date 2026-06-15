@@ -217,6 +217,53 @@ pre {
   padding: 0.85rem 1rem;
 }
 
+.highlight-python .highlight,
+.highlight-python .highlight pre {
+  color: var(--sammd-text);
+}
+
+.highlight-python .highlight .n,
+.highlight-python .highlight .nn,
+.highlight-python .highlight .nd,
+.highlight-python .highlight .nf,
+.highlight-python .highlight .o,
+.highlight-python .highlight .p {
+  color: #2f2a24;
+}
+
+.highlight-python .highlight .k,
+.highlight-python .highlight .kc,
+.highlight-python .highlight .kn,
+.highlight-python .highlight .ow {
+  color: #486800;
+  font-weight: 700;
+}
+
+.highlight-python .highlight .nb,
+.highlight-python .highlight .bp {
+  color: #624600;
+}
+
+.highlight-python .highlight .s,
+.highlight-python .highlight .s1,
+.highlight-python .highlight .s2,
+.highlight-python .highlight .sa,
+.highlight-python .highlight .se {
+  color: #9a4a17;
+}
+
+.highlight-python .highlight .m,
+.highlight-python .highlight .mi,
+.highlight-python .highlight .mf {
+  color: #0b5f72;
+}
+
+.highlight-python .highlight .c,
+.highlight-python .highlight .c1 {
+  color: #5e5549;
+  font-style: italic;
+}
+
 code.literal,
 .content code:not(.xref) {
   background: #efe4d3;
