@@ -74,6 +74,7 @@ class BackendExportResult:
 class RuntimeSolventGeometry:
     """Actual fixed-solute geometry used for runtime solvent packing."""
 
+    solvent_boundary_z_bounds_nm: tuple[float, float]
     fixed_solute_z_bounds_nm: tuple[float, float]
     solvent_regions_nm: tuple[
         tuple[tuple[float, float], tuple[float, float], tuple[float, float]], ...
@@ -277,6 +278,9 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
                     * geometry.dimensions_nm[1]
                     * geometry.dimensions_nm[2]
                 ),
+                "actual_solvent_boundary_z_bounds_nm": list(
+                    geometry.solvent_boundary_z_bounds_nm
+                ),
                 "actual_fixed_solute_z_bounds_nm": list(geometry.fixed_solute_z_bounds_nm),
                 "solvent_packing_regions_nm": [
                     [list(axis_bounds) for axis_bounds in region]
@@ -411,6 +415,8 @@ def build_interchange_backend(
                 stage_start,
             )
 
+    solvent_boundary_records = tuple(atom_records)
+
     reactant_count = sum(reactant.count for reactant in plan.solution.reactants)
     stage_start = perf_counter()
     _progress(progress, f"Preparing {reactant_count} reactants")
@@ -448,7 +454,11 @@ def build_interchange_backend(
             )
     _timed_progress(progress, "  reactants placed", stage_start)
 
-    runtime_geometry = _runtime_solvent_geometry(plan, tuple(atom_records))
+    runtime_geometry = _runtime_solvent_geometry(
+        plan,
+        tuple(atom_records),
+        solvent_boundary_records=solvent_boundary_records,
+    )
     if runtime_geometry.z_shift_nm != 0.0:
         positions_nm[:] = [
             _shift_position_z(position, runtime_geometry.z_shift_nm) for position in positions_nm
@@ -710,41 +720,51 @@ def _runtime_solvent_regions(plan: Any) -> tuple[Any, ...]:
 def _runtime_solvent_geometry(
     plan: Any,
     fixed_solute_records: tuple[AtomRecord, ...],
+    *,
+    solvent_boundary_records: tuple[AtomRecord, ...] | None = None,
 ) -> RuntimeSolventGeometry:
-    """Derive runtime solvent regions from actual fixed-solute z extents."""
+    """Derive runtime solvent regions from slab/SAM z extents."""
 
     if not fixed_solute_records:
         msg = "runtime solvent geometry requires fixed-solute atom records"
         raise ValueError(msg)
+    boundary_records = solvent_boundary_records or fixed_solute_records
+    if not boundary_records:
+        msg = "runtime solvent geometry requires solvent-boundary atom records"
+        raise ValueError(msg)
     padding_nm = float(getattr(plan.config.solvent, "padding", 3.0))
     padding_per_face_nm = padding_nm / 2.0
     clearance_nm = float(plan.config.packing.packmol.tolerance) / 10.0
+    boundary_min_z = min(record.coordinates_nm[2] for record in boundary_records)
+    boundary_max_z = max(record.coordinates_nm[2] for record in boundary_records)
     fixed_min_z = min(record.coordinates_nm[2] for record in fixed_solute_records)
     fixed_max_z = max(record.coordinates_nm[2] for record in fixed_solute_records)
-    final_z_min = fixed_min_z - padding_per_face_nm
-    final_z_max = fixed_max_z + padding_per_face_nm
+    final_z_min = boundary_min_z - padding_per_face_nm
+    final_z_max = boundary_max_z + padding_per_face_nm
     z_shift_nm = -final_z_min
     dimensions_nm = (
         plan.box_plan.dimensions_nm[0],
         plan.box_plan.dimensions_nm[1],
         final_z_max - final_z_min,
     )
+    boundary_bounds = (boundary_min_z + z_shift_nm, boundary_max_z + z_shift_nm)
     fixed_bounds = (fixed_min_z + z_shift_nm, fixed_max_z + z_shift_nm)
     bottom_region = (
         (0.0, dimensions_nm[0]),
         (0.0, dimensions_nm[1]),
-        (0.0, fixed_bounds[0] - clearance_nm),
+        (0.0, boundary_bounds[0] - clearance_nm),
     )
     top_region = (
         (0.0, dimensions_nm[0]),
         (0.0, dimensions_nm[1]),
-        (fixed_bounds[1] + clearance_nm, dimensions_nm[2]),
+        (boundary_bounds[1] + clearance_nm, dimensions_nm[2]),
     )
     solvent_regions_nm = tuple(
         region for region in (bottom_region, top_region) if region[2][1] > region[2][0]
     )
     count_volume_nm3 = sum(_region_volume_nm3(region) for region in solvent_regions_nm)
     return RuntimeSolventGeometry(
+        solvent_boundary_z_bounds_nm=boundary_bounds,
         fixed_solute_z_bounds_nm=fixed_bounds,
         solvent_regions_nm=solvent_regions_nm,
         solvent_count_planning_volume_nm3=count_volume_nm3,
@@ -774,6 +794,7 @@ def _runtime_geometry_with_counts(
         molecule_counts[salt.anion] = molecule_counts.get(salt.anion, 0) + salt.anion_count
 
     return RuntimeSolventGeometry(
+        solvent_boundary_z_bounds_nm=geometry.solvent_boundary_z_bounds_nm,
         fixed_solute_z_bounds_nm=geometry.fixed_solute_z_bounds_nm,
         solvent_regions_nm=geometry.solvent_regions_nm,
         solvent_count_planning_volume_nm3=geometry.solvent_count_planning_volume_nm3,

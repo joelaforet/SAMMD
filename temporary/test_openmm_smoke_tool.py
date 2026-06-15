@@ -48,16 +48,9 @@ def load_smoke_tool():
 def actual_fixed_solute_positions(smoke, plan) -> tuple[tuple[float, float, float], ...]:
     """Construct fixed-solute positions after slab, SAM, and reactant placement."""
 
+    positions = list(actual_solvent_boundary_positions(smoke, plan))
     box = smoke.derive_box_dimensions(plan, 3.0)
     shift_nm = tuple(dimension / 2.0 for dimension in box)
-    positions = [smoke.add_vectors(position, shift_nm) for position in plan.slab.positions_nm]
-    positions.extend(
-        smoke.add_vectors(
-            smoke.add_vectors(placement.position_nm, smoke.scale_vector(placement.normal, 0.18)),
-            shift_nm,
-        )
-        for placement in plan.sam_placements.placements
-    )
     reactant_template = smoke.MoleculeTemplate(
         name="reactant",
         smiles="C=CC=O",
@@ -80,6 +73,22 @@ def actual_fixed_solute_positions(smoke, plan) -> tuple[tuple[float, float, floa
         box,
     ):
         positions.extend(molecule_positions)
+    return tuple(positions)
+
+
+def actual_solvent_boundary_positions(smoke, plan) -> tuple[tuple[float, float, float], ...]:
+    """Construct slab and SAM positions that define planar solvent boundaries."""
+
+    box = smoke.derive_box_dimensions(plan, 3.0)
+    shift_nm = tuple(dimension / 2.0 for dimension in box)
+    positions = [smoke.add_vectors(position, shift_nm) for position in plan.slab.positions_nm]
+    positions.extend(
+        smoke.add_vectors(
+            smoke.add_vectors(placement.position_nm, smoke.scale_vector(placement.normal, 0.18)),
+            shift_nm,
+        )
+        for placement in plan.sam_placements.placements
+    )
     return tuple(positions)
 
 
@@ -121,6 +130,7 @@ def test_auto_solvent_count_uses_actual_solvent_region_volume() -> None:
         plan,
         actual_fixed_solute_positions(smoke, plan),
         solvent_padding_nm=3.0,
+        solvent_boundary_positions_nm=actual_solvent_boundary_positions(smoke, plan),
     )
     actual_volume = smoke.solvent_packing_volume_nm3(regions)
 
@@ -192,7 +202,13 @@ def test_packmol_input_packs_solvent_around_actual_fixed_solute() -> None:
     config = SAMMDConfig.model_validate({"surface": {"lateral_size": [2.0, 2.0]}})
     plan = build_system(config)
     fixed_positions = actual_fixed_solute_positions(smoke, plan)
-    box, _, regions = smoke.actual_solvent_packing_geometry(plan, fixed_positions, 3.0)
+    boundary_positions = actual_solvent_boundary_positions(smoke, plan)
+    box, _, regions = smoke.actual_solvent_packing_geometry(
+        plan,
+        fixed_positions,
+        3.0,
+        solvent_boundary_positions_nm=boundary_positions,
+    )
 
     assert regions[0][0] == pytest.approx((0.0, box[0]))
     assert regions[0][1] == pytest.approx((0.0, box[1]))
@@ -212,8 +228,8 @@ def test_packmol_input_packs_solvent_around_actual_fixed_solute() -> None:
     solvent_blocks = [block for block in blocks if block.startswith("structure ethanol.pdb")]
 
     assert len(solvent_blocks) == 2
-    assert "  number 12" in solvent_blocks[0]
-    assert "  number 13" in solvent_blocks[1]
+    assert "  number 13" in solvent_blocks[0]
+    assert "  number 12" in solvent_blocks[1]
     bottom_region_stop_angstrom = regions[0][2][1] * 10.0
     assert (
         f"  inside box 0 0 0 22.0052 23.8213 {bottom_region_stop_angstrom:g}"
@@ -231,18 +247,48 @@ def test_packmol_input_packs_solvent_around_actual_fixed_solute() -> None:
 
 
 def test_actual_solvent_regions_exclude_generated_fixed_solute_envelope() -> None:
-    """Smoke solvent regions should stay outside actual fixed-solute extents."""
+    """Smoke solvent regions should stay outside actual slab/SAM extents."""
 
     smoke = load_smoke_tool()
     plan = build_system(SAMMDConfig.model_validate({"surface": {"lateral_size": [2.0, 2.0]}}))
     fixed_positions = actual_fixed_solute_positions(smoke, plan)
-    _, z_shift, regions = smoke.actual_solvent_packing_geometry(plan, fixed_positions, 3.0)
-    shifted_min_z = min(position[2] for position in fixed_positions) + z_shift
-    shifted_max_z = max(position[2] for position in fixed_positions) + z_shift
+    boundary_positions = actual_solvent_boundary_positions(smoke, plan)
+    _, z_shift, regions = smoke.actual_solvent_packing_geometry(
+        plan,
+        fixed_positions,
+        3.0,
+        solvent_boundary_positions_nm=boundary_positions,
+    )
+    shifted_min_z = min(position[2] for position in boundary_positions) + z_shift
+    shifted_max_z = max(position[2] for position in boundary_positions) + z_shift
     clearance_nm = smoke.PACKMOL_TOLERANCE_ANGSTROM / 10.0
 
     assert regions[0][2][1] == pytest.approx(shifted_min_z - clearance_nm)
     assert regions[1][2][0] == pytest.approx(shifted_max_z + clearance_nm)
+
+
+def test_smoke_reactant_does_not_define_global_solvent_reservoir() -> None:
+    """A high reactant should remain fixed without lifting the whole top reservoir."""
+
+    smoke = load_smoke_tool()
+    plan = build_system(SAMMDConfig.model_validate({"surface": {"lateral_size": [2.0, 2.0]}}))
+    boundary_positions = actual_solvent_boundary_positions(smoke, plan)
+    high_reactant_positions = (
+        *boundary_positions,
+        (boundary_positions[0][0], boundary_positions[0][1], 6.0),
+    )
+
+    _, z_shift, regions = smoke.actual_solvent_packing_geometry(
+        plan,
+        high_reactant_positions,
+        3.0,
+        solvent_boundary_positions_nm=boundary_positions,
+    )
+    shifted_boundary_top = max(position[2] for position in boundary_positions) + z_shift
+    clearance_nm = smoke.PACKMOL_TOLERANCE_ANGSTROM / 10.0
+
+    assert regions[1][2][0] == pytest.approx(shifted_boundary_top + clearance_nm)
+    assert regions[1][2][0] < high_reactant_positions[-1][2] + z_shift + clearance_nm
 
 
 def test_packmol_input_rejects_explicit_full_box_solvent_region() -> None:

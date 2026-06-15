@@ -1088,6 +1088,7 @@ def build_openmm_smoke_system(
         sulfur_height_nm,
         sam_identities,
     )
+    solvent_boundary_positions_nm = tuple(positions_nm)
     reactant_identities = residue_assigner.allocate(
         "cinnamaldehyde",
         "CIN",
@@ -1120,6 +1121,7 @@ def build_openmm_smoke_system(
         plan,
         tuple(positions_nm),
         solvent_padding_nm,
+        solvent_boundary_positions_nm=solvent_boundary_positions_nm,
     )
     if z_shift_nm != 0.0:
         positions_nm[:] = [shift_position_z(position, z_shift_nm) for position in positions_nm]
@@ -1227,25 +1229,30 @@ def actual_solvent_packing_geometry(
     plan: Any,
     fixed_solute_positions_nm: tuple[Vector3, ...],
     solvent_padding_nm: float,
+    *,
+    solvent_boundary_positions_nm: tuple[Vector3, ...] | None = None,
 ) -> tuple[Vector3, float, tuple[BoxBounds, ...]]:
-    """Return box dimensions and solvent regions from actual fixed-solute geometry."""
+    """Return box dimensions and solvent regions from actual slab/SAM geometry."""
 
     if not fixed_solute_positions_nm:
         raise ValueError("actual solvent packing geometry requires fixed-solute positions")
+    boundary_positions_nm = solvent_boundary_positions_nm or fixed_solute_positions_nm
+    if not boundary_positions_nm:
+        raise ValueError("actual solvent packing geometry requires boundary positions")
     padding_per_face_nm = solvent_padding_nm / 2.0
     clearance_nm = PACKMOL_TOLERANCE_ANGSTROM / 10.0
-    fixed_min_z = min(position[2] for position in fixed_solute_positions_nm)
-    fixed_max_z = max(position[2] for position in fixed_solute_positions_nm)
-    z_min = fixed_min_z - padding_per_face_nm
-    z_max = fixed_max_z + padding_per_face_nm
+    boundary_min_z = min(position[2] for position in boundary_positions_nm)
+    boundary_max_z = max(position[2] for position in boundary_positions_nm)
+    z_min = boundary_min_z - padding_per_face_nm
+    z_max = boundary_max_z + padding_per_face_nm
     z_shift_nm = -z_min
     dimensions_nm = (
         plan.box_plan.dimensions_nm[0],
         plan.box_plan.dimensions_nm[1],
         z_max - z_min,
     )
-    shifted_min_z = fixed_min_z + z_shift_nm
-    shifted_max_z = fixed_max_z + z_shift_nm
+    shifted_min_z = boundary_min_z + z_shift_nm
+    shifted_max_z = boundary_max_z + z_shift_nm
     regions = (
         ((0.0, dimensions_nm[0]), (0.0, dimensions_nm[1]), (0.0, shifted_min_z - clearance_nm)),
         (

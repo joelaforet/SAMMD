@@ -90,6 +90,7 @@ def test_interchange_export_preserves_runtime_geometry_for_summary(
     backend = importlib.import_module("sammd.backends.interchange")
     plan = build_system(SAMMDConfig(), output_dir=tmp_path)
     geometry = backend.RuntimeSolventGeometry(
+        solvent_boundary_z_bounds_nm=(1.0, 2.5),
         fixed_solute_z_bounds_nm=(1.0, 3.0),
         solvent_regions_nm=(((0.0, 2.0), (0.0, 2.0), (0.0, 0.8)),),
         solvent_count_planning_volume_nm3=3.2,
@@ -124,6 +125,8 @@ def test_interchange_export_preserves_runtime_geometry_for_summary(
 
     assert exported.runtime_solvent_geometry == geometry
     assert summary["box"]["dimensions_nm"] == [2.0, 2.0, 4.0]
+    assert summary["box"]["actual_solvent_boundary_z_bounds_nm"] == [1.0, 2.5]
+    assert summary["box"]["actual_fixed_solute_z_bounds_nm"] == [1.0, 3.0]
     assert summary["box"]["solvent_packing_regions_nm"] == [
         [[0.0, 2.0], [0.0, 2.0], [0.0, 0.8]]
     ]
@@ -413,10 +416,45 @@ def test_actual_fixed_solute_geometry_defines_solvent_regions_for_short_sam() ->
 
     geometry = backend._runtime_solvent_geometry(plan, records)
 
+    assert geometry.solvent_boundary_z_bounds_nm == pytest.approx((1.5, 2.12))
     assert geometry.fixed_solute_z_bounds_nm == pytest.approx((1.5, 2.12))
     assert geometry.solvent_regions_nm[0][2] == pytest.approx((0.0, 1.32))
     assert geometry.solvent_regions_nm[1][2] == pytest.approx((2.3, 3.62))
     assert geometry.solvent_count_planning_volume_nm3 == pytest.approx(10.56)
+
+
+def test_reactant_geometry_does_not_define_global_solvent_reservoir() -> None:
+    """Keep global solvent regions next to the SAM while reactants stay fixed."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    from sammd.core.io import AtomRecord
+
+    plan = SimpleNamespace(
+        config=SimpleNamespace(
+            solvent=SimpleNamespace(padding=3.0),
+            packing=SimpleNamespace(packmol=SimpleNamespace(tolerance=1.8)),
+        ),
+        box_plan=SimpleNamespace(dimensions_nm=(2.0, 2.0, 8.0)),
+    )
+    slab_sam_records = (
+        AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (1.0, 1.0, 1.0)),
+        AtomRecord(2, "O", "O", "TGL", 2, "A", "sam:thioglycerol", (1.0, 1.0, 1.62)),
+    )
+    reactant_records = (
+        AtomRecord(3, "C1", "C", "CIN", 3, "B", "reactant:cinnamaldehyde", (1.0, 1.0, 3.0)),
+    )
+
+    geometry = backend._runtime_solvent_geometry(
+        plan,
+        (*slab_sam_records, *reactant_records),
+        solvent_boundary_records=slab_sam_records,
+    )
+
+    assert geometry.solvent_boundary_z_bounds_nm == pytest.approx((1.5, 2.12))
+    assert geometry.fixed_solute_z_bounds_nm == pytest.approx((1.5, 3.5))
+    assert geometry.solvent_regions_nm[1][2] == pytest.approx((2.3, 3.62))
+    top_gap_nm = geometry.solvent_regions_nm[1][2][0] - geometry.solvent_boundary_z_bounds_nm[1]
+    assert top_gap_nm == pytest.approx(0.18)
 
 
 def _region_volume(region) -> float:

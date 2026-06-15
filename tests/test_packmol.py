@@ -773,10 +773,11 @@ def test_mixed_solvent_helper_uses_shared_explicit_regions(tmp_path, monkeypatch
     captured_jobs = []
     packed_positions = (
         (0.0, 0.0, 0.0),
-        (0.1, 0.1, 0.2),
-        (0.2, 0.1, 1.8),
-        (0.3, 0.1, 0.2),
-        (0.4, 0.1, 1.8),
+        (0.1, 0.1, 1.2),
+        (0.2, 0.1, 0.2),
+        (0.3, 0.1, 1.8),
+        (0.4, 0.1, 0.2),
+        (0.5, 0.1, 1.8),
     )
 
     def fake_run_packmol(job, input_path, working_dir, stdout_path):
@@ -793,6 +794,7 @@ def test_mixed_solvent_helper_uses_shared_explicit_regions(tmp_path, monkeypatch
     packed = pack_fixed_solute_with_solvent_components(
         solute_records=(
             AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (0.0, 0.0, 0.0)),
+            AtomRecord(2, "C1", "C", "CIN", 2, "B", "reactant:cinnamaldehyde", (0.1, 0.1, 1.2)),
         ),
         solvent_components=(
             PackmolSolventComponent(
@@ -812,8 +814,8 @@ def test_mixed_solvent_helper_uses_shared_explicit_regions(tmp_path, monkeypatch
     )
 
     assert packed == {
-        "water": (packed_positions[1:2], packed_positions[2:3]),
-        "ethanol": (packed_positions[3:4], packed_positions[4:5]),
+        "water": (packed_positions[2:3], packed_positions[3:4]),
+        "ethanol": (packed_positions[4:5], packed_positions[5:6]),
     }
     assert [structure.name for structure in captured_jobs[0].structures] == [
         "solute",
@@ -829,8 +831,11 @@ def test_mixed_solvent_helper_uses_shared_explicit_regions(tmp_path, monkeypatch
         regions[1],
     ]
     input_text = (tmp_path / "packmol_input.inp").read_text(encoding="utf-8")
+    fixed_solute_text = (tmp_path / "fixed_solute.pdb").read_text(encoding="utf-8")
     assert input_text.count("inside box 0 0 0 20 20 5") == 2
     assert input_text.count("inside box 0 0 15 20 20 20") == 2
+    assert "CIN" in fixed_solute_text
+    assert "reactant:cinnamaldehyde" not in fixed_solute_text
 
 
 def test_mixed_solvent_low_counts_are_split_across_equal_regions(tmp_path, monkeypatch) -> None:
