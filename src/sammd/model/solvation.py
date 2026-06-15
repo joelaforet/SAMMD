@@ -262,8 +262,12 @@ def _prepare_solvent_component(component: Any) -> dict[str, Any]:
     if mole_fraction < 0:
         msg = f"solvent component '{name}' mole_fraction must be non-negative"
         raise ValueError(msg)
-    density_g_ml = _resolve_float(component, "density", name, "density_g_ml")
-    molar_mass_g_mol = _resolve_float(component, "molar_mass", name, "molar_mass_g_mol")
+    density_g_ml = _resolve_solvent_float_property(
+        component, "density", name, "density_g_ml"
+    )
+    molar_mass_g_mol = _resolve_solvent_float_property(
+        component, "molar_mass", name, "molar_mass_g_mol"
+    )
     is_water = name.lower() == "water"
     if is_water:
         density_g_ml = density_g_ml or DEFAULT_WATER_DENSITY_G_ML
@@ -391,8 +395,10 @@ def _validate_count_planning_volume(box_volume_nm3: float) -> None:
         raise ValueError(msg)
 
 
-def _resolve_float(component: Any, attr: str, name: str, property_name: str) -> float | None:
-    """Resolve an optional numeric property from input or known component metadata."""
+def _resolve_solvent_float_property(
+    component: Any, attr: str, name: str, property_name: str
+) -> float | None:
+    """Resolve an optional solvent property from input or known solvent metadata."""
 
     value = _get_optional(component, attr)
     if value is not None:
