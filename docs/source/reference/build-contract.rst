@@ -23,12 +23,12 @@ The supported first-release command-line surface is:
        unless ``--force`` is supplied.
    * - ``sammd validate CONFIG``
      - Load and validate a YAML configuration without writing build artifacts.
-    * - ``sammd build CONFIG --output-dir DIR --overwrite``
-      - In a CUDA-labeled pixi environment, build the current deterministic plan
-        and write inspection, OpenFF Interchange, and OpenMM handoff artifacts
-        into ``DIR``. Existing artifacts are protected unless ``--overwrite`` is
-        supplied. Salt-containing configs are rejected until salt export is
-        implemented.
+   * - ``sammd build CONFIG --output-dir DIR --overwrite``
+     - In a CUDA-labeled pixi environment, build the current deterministic plan
+       and write inspection, OpenFF Interchange, and OpenMM handoff artifacts
+       into ``DIR``. Existing artifacts are protected unless ``--overwrite`` is
+       supplied. Salt-containing configs are rejected until salt export is
+       implemented.
 
 The ``build`` command does not run minimization, equilibration, production MD,
 trajectory writing, or reporter setup.
@@ -139,17 +139,17 @@ beginner workflow.
      - Validated YAML configuration used for the build.
    * - ``solvated_system.cif``
      - Interchange Export
-      - Written by ``sammd build`` for fully constructed SAM, solvent, and
+     - Written by ``sammd build`` for fully constructed SAM, solvent, and
        reactant coordinates. This is a human-inspectable/OpenMM-loadable
        PDBx/mmCIF ``.cif`` structure file paired with the Interchange export
        artifact.
    * - ``solvated_system_pymol.pdb``
      - Interchange Export
-      - Written by ``sammd build`` with explicit PDB ``CONECT`` records for PyMOL
+     - Written by ``sammd build`` with explicit PDB ``CONECT`` records for PyMOL
        visualization of DCD trajectories without PyMOL inferring extra bonds.
    * - ``interchange.json``
      - Interchange Export
-      - Written by ``sammd build`` as the primary portable OpenFF
+     - Written by ``sammd build`` as the primary portable OpenFF
        Interchange export. The JSON path is ``Interchange.model_dump_json`` for
        saving and ``Interchange.model_validate_json`` for reload. SAMMD records
        the concrete ``openff-interchange`` package version when the artifact is
@@ -157,7 +157,7 @@ beginner workflow.
        guaranteed across versions.
    * - ``anchor_metadata.json``
      - Interchange Export
-      - Written by ``sammd build`` for selected sulfur-metal pair metadata.
+     - Written by ``sammd build`` for selected sulfur-metal pair metadata.
 
 Current limitation
 ------------------
