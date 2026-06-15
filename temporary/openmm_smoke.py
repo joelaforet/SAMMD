@@ -252,6 +252,9 @@ class SmokeBuild:
     anchor_pairs: tuple[tuple[int, int], ...]
     anchor_scaling: Any
     solvent_count: int
+    solvent_name: str
+    solvent_residue_name: str
+    solvent_smiles: str
     reactant_count: int
     sam_count: int
     platform_dimensions_nm: Vector3
@@ -391,10 +394,7 @@ def component_role(component_name: str) -> str:
         return "sam"
     if component_name == "cinnamaldehyde":
         return "reactant"
-    if component_name == SOLVENT_NAME:
-        return "solvent"
-    msg = f"unknown smoke component role for {component_name!r}"
-    raise ValueError(msg)
+    return "solvent"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -798,6 +798,29 @@ def resolve_solvent_count(
     raise ValueError(f"solvent component {solvent_name!r} was not planned")
 
 
+def resolved_solvent_metadata(
+    config: SAMMDConfig,
+    solvent_template: MoleculeTemplate,
+) -> dict[str, str]:
+    """Return configured solvent metadata matching the resolved template."""
+
+    template_smiles = getattr(solvent_template, "smiles", SOLVENT_SMILES)
+    solvent_config = getattr(config, "solvent", None)
+    solvent_components = getattr(solvent_config, "components", ())
+    for component in solvent_components:
+        if component.name == solvent_template.name:
+            return {
+                "name": component.name,
+                "residue_name": component.residue_name,
+                "smiles": component.smiles or template_smiles,
+            }
+    return {
+        "name": solvent_template.name,
+        "residue_name": SOLVENT_RESIDUE_NAME,
+        "smiles": template_smiles,
+    }
+
+
 def resolve_reactant_count(reactant_count: int | None, plan: Any, reactant_name: str) -> int:
     """Resolve explicit or concentration-derived reactant count."""
 
@@ -1079,6 +1102,7 @@ def build_openmm_smoke_system(
     anchor_pairs: list[tuple[int, int]] = []
     residue_assigner = ComponentResidueAssigner()
     chain_cache: dict[str, Any] = {}
+    solvent_metadata = resolved_solvent_metadata(plan.config, solvent_template)
 
     box_dimensions_nm = derive_box_dimensions(plan, solvent_padding_nm)
     shift_nm = tuple(dimension / 2.0 for dimension in box_dimensions_nm)
@@ -1183,6 +1207,7 @@ def build_openmm_smoke_system(
         solvent_template.name,
         runtime_solvent_geometry.solvent_count_planning_volume_nm3,
     )
+    validate_runtime_solvent_regions_for_count(runtime_solvent_geometry, resolved_solvent_count)
     runtime_solvent_geometry = replace_runtime_solvent_molecule_counts(
         runtime_solvent_geometry,
         {solvent_template.name: resolved_solvent_count},
@@ -1199,10 +1224,11 @@ def build_openmm_smoke_system(
             solvent_regions_nm=solvent_regions_nm,
             working_dir=packmol_working_dir,
             tolerance_angstrom=plan.config.packing.packmol.tolerance,
+            solvent_residue_name=solvent_metadata["residue_name"],
         )
         solvent_identities = residue_assigner.allocate(
-            SOLVENT_NAME,
-            SOLVENT_RESIDUE_NAME,
+            solvent_metadata["name"],
+            solvent_metadata["residue_name"],
             resolved_solvent_count,
         )
         placed_solvent = add_solvent_molecules(
@@ -1250,6 +1276,9 @@ def build_openmm_smoke_system(
         anchor_pairs=tuple(anchor_pairs),
         anchor_scaling=anchor_scaling,
         solvent_count=placed_solvent,
+        solvent_name=solvent_metadata["name"],
+        solvent_residue_name=solvent_metadata["residue_name"],
+        solvent_smiles=solvent_metadata["smiles"],
         reactant_count=reactant_count,
         sam_count=len(plan.sam_placements.placements),
         platform_dimensions_nm=box_dimensions_nm,
@@ -1331,6 +1360,8 @@ def build_runtime_solvent_geometry(
     )
     shifted_min_z = boundary_min_z + z_shift_nm
     shifted_max_z = boundary_max_z + z_shift_nm
+    shifted_fixed_min_z = fixed_min_z + z_shift_nm
+    shifted_fixed_max_z = fixed_max_z + z_shift_nm
     regions = (
         (
             (0.0, dimensions_nm[0]),
@@ -1346,8 +1377,8 @@ def build_runtime_solvent_geometry(
     solvent_regions = tuple(region for region in regions if region[2][1] > region[2][0])
     count_volume_nm3 = solvent_packing_volume_nm3(solvent_regions)
     return RuntimeSolventGeometry(
-        solvent_boundary_z_bounds_nm=(boundary_min_z, boundary_max_z),
-        fixed_solute_z_bounds_nm=(fixed_min_z, fixed_max_z),
+        solvent_boundary_z_bounds_nm=(shifted_min_z, shifted_max_z),
+        fixed_solute_z_bounds_nm=(shifted_fixed_min_z, shifted_fixed_max_z),
         solvent_regions_nm=solvent_regions,
         solvent_count_planning_volume_nm3=count_volume_nm3,
         solvent_padding_nm=solvent_padding_nm,
@@ -1357,6 +1388,32 @@ def build_runtime_solvent_geometry(
         z_shift_nm=z_shift_nm,
         molecule_counts={},
     )
+
+
+def validate_runtime_solvent_regions_for_count(
+    geometry: RuntimeSolventGeometry,
+    solvent_count: int,
+) -> None:
+    """Reject nonzero solvent requests when clearance removes usable reservoirs."""
+
+    if solvent_count <= 0:
+        return
+    usable_thickness_nm = geometry.solvent_padding_per_face_nm - geometry.solvent_clearance_nm
+    if usable_thickness_nm <= 0.0:
+        msg = (
+            "nonzero solvent requests require solvent padding per face to exceed Packmol "
+            f"clearance; got {geometry.solvent_padding_per_face_nm:g} nm padding per face "
+            f"and {geometry.solvent_clearance_nm:g} nm clearance"
+        )
+        raise ValueError(msg)
+    if len(geometry.solvent_regions_nm) != 2:
+        msg = "nonzero solvent requests require positive bottom and top solvent region thicknesses"
+        raise ValueError(msg)
+    for label, region in zip(("bottom", "top"), geometry.solvent_regions_nm, strict=True):
+        region_thickness_nm = region[2][1] - region[2][0]
+        if region_thickness_nm <= 0.0:
+            msg = f"nonzero solvent requests require positive {label} solvent region thickness"
+            raise ValueError(msg)
 
 
 def replace_runtime_solvent_molecule_counts(
@@ -1482,6 +1539,7 @@ def pack_solution_with_packmol(
     solvent_regions_nm: tuple[BoxBounds, ...],
     working_dir: Path,
     tolerance_angstrom: float = PACKMOL_TOLERANCE_ANGSTROM,
+    solvent_residue_name: str = SOLVENT_RESIDUE_NAME,
 ) -> PackmolSolutionPositions:
     """Use Packmol to place solvent molecules around Pd+SAM+reactant solute."""
 
@@ -1495,13 +1553,13 @@ def pack_solution_with_packmol(
 
     working_dir.mkdir(parents=True, exist_ok=True)
     solute_path = working_dir / "fixed_solute.pdb"
-    solvent_path = working_dir / f"{SOLVENT_NAME}.pdb"
+    solvent_path = working_dir / f"{solvent_template.name}.pdb"
     output_path = working_dir / "packmol_output.pdb"
     input_path = working_dir / "packmol_input.inp"
     stdout_path = working_dir / "packmol_stdout.log"
 
     write_topology_pdb(solute_path, topology, solute_positions_nm)
-    write_molecule_template_pdb(solvent_path, solvent_template, residue_name=SOLVENT_RESIDUE_NAME)
+    write_molecule_template_pdb(solvent_path, solvent_template, residue_name=solvent_residue_name)
 
     input_text = build_packmol_input(
         solute_path=solute_path,
@@ -1558,7 +1616,7 @@ def build_packmol_input(
     )
     solvent_structures = tuple(
         PackmolStructure(
-            f"{SOLVENT_NAME}_{region_label}",
+            f"{solvent_path.stem}_{region_label}",
             solvent_path.name,
             region_count,
             inside_box_bounds_nm=region,
@@ -2276,6 +2334,16 @@ def indexed_reference_displacements(
     )
 
 
+def smoke_build_solvent_metadata(smoke_build: SmokeBuild) -> dict[str, str]:
+    """Return solvent metadata recorded on the smoke build."""
+
+    return {
+        "name": getattr(smoke_build, "solvent_name", SOLVENT_NAME),
+        "residue_name": getattr(smoke_build, "solvent_residue_name", SOLVENT_RESIDUE_NAME),
+        "smiles": getattr(smoke_build, "solvent_smiles", SOLVENT_SMILES),
+    }
+
+
 def smoke_summary(
     *,
     plan: Any,
@@ -2324,6 +2392,7 @@ def smoke_summary(
             sulfur_is_stable,
         )
     )
+    solvent_metadata = smoke_build_solvent_metadata(smoke_build)
 
     return {
         "system": {
@@ -2332,9 +2401,9 @@ def smoke_summary(
             "sam_molecules": smoke_build.sam_count,
             "sam_molecules_per_face": plan.sam_placements.selected_sites_per_side,
             "solvent": {
-                "name": SOLVENT_NAME,
-                "residue_name": SOLVENT_RESIDUE_NAME,
-                "smiles": SOLVENT_SMILES,
+                "name": solvent_metadata["name"],
+                "residue_name": solvent_metadata["residue_name"],
+                "smiles": solvent_metadata["smiles"],
                 "molecules": smoke_build.solvent_count,
             },
             "reactant_molecules": smoke_build.reactant_count,
@@ -2438,6 +2507,7 @@ def write_build_config(
 ) -> None:
     """Write the validated config plus smoke-only runtime arguments."""
 
+    solvent_metadata = smoke_build_solvent_metadata(smoke_build)
     payload = {
         "sammd_config": config.model_dump(mode="json"),
         "smoke_overrides": {
@@ -2445,9 +2515,9 @@ def write_build_config(
             "build_seed": args.seed,
             "velocity_seed": args.seed,
             "canonical_validation_seed": DEFAULT_SEED,
-            "solvent_name": SOLVENT_NAME,
-            "solvent_residue_name": SOLVENT_RESIDUE_NAME,
-            "solvent_smiles": SOLVENT_SMILES,
+            "solvent_name": solvent_metadata["name"],
+            "solvent_residue_name": solvent_metadata["residue_name"],
+            "solvent_smiles": solvent_metadata["smiles"],
             "solvent_count": smoke_build.solvent_count,
             "runtime_solvent_geometry": runtime_solvent_geometry_summary(
                 smoke_build.runtime_solvent_geometry

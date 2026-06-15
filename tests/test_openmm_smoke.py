@@ -303,6 +303,52 @@ def test_smoke_solvent_clearance_uses_configured_packmol_tolerance() -> None:
     assert regions[1][2] == pytest.approx((2.25, 3.0))
 
 
+def test_smoke_runtime_solvent_bounds_are_shifted() -> None:
+    """Report z-bounds in the same runtime frame as Packmol regions."""
+
+    smoke = load_smoke_module()
+    plan = SimpleNamespace(
+        config=SimpleNamespace(
+            packing=SimpleNamespace(packmol=SimpleNamespace(tolerance=1.0)),
+        ),
+        box_plan=SimpleNamespace(dimensions_nm=(2.0, 2.0, 1.0)),
+    )
+
+    geometry = smoke.build_runtime_solvent_geometry(
+        plan,
+        ((0.5, 0.5, -1.0), (0.5, 0.5, 1.0)),
+        2.0,
+        solvent_boundary_positions_nm=((0.5, 0.5, -0.5), (0.5, 0.5, 0.5)),
+    )
+
+    assert geometry.z_shift_nm == pytest.approx(1.5)
+    assert geometry.solvent_boundary_z_bounds_nm == pytest.approx((1.0, 2.0))
+    assert geometry.fixed_solute_z_bounds_nm == pytest.approx((0.5, 2.5))
+
+
+def test_smoke_nonzero_solvent_rejects_clearance_removed_regions() -> None:
+    """Do not silently accept empty solvent reservoirs for requested solvent."""
+
+    smoke = load_smoke_module()
+    geometry = smoke.RuntimeSolventGeometry(
+        solvent_boundary_z_bounds_nm=(1.0, 2.0),
+        fixed_solute_z_bounds_nm=(0.5, 2.5),
+        solvent_regions_nm=(),
+        solvent_count_planning_volume_nm3=0.0,
+        solvent_padding_nm=0.2,
+        solvent_padding_per_face_nm=0.1,
+        solvent_clearance_nm=0.2,
+        dimensions_nm=(2.0, 2.0, 3.0),
+        z_shift_nm=1.5,
+        molecule_counts={},
+    )
+
+    with pytest.raises(ValueError, match="padding per face to exceed Packmol clearance"):
+        smoke.validate_runtime_solvent_regions_for_count(geometry, 1)
+
+    smoke.validate_runtime_solvent_regions_for_count(geometry, 0)
+
+
 def test_smoke_zero_solvent_count_skips_packmol_after_containment(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

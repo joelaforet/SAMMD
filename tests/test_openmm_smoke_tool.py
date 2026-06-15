@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 from sammd.core.builders import build_system
 from sammd.core.config import SAMMDConfig
@@ -463,6 +464,9 @@ def test_smoke_summary_records_seed_provenance() -> None:
         pd_indices=(0,),
         sam_count=1,
         solvent_count=1,
+        solvent_name="methanol",
+        solvent_residue_name="MOH",
+        solvent_smiles="CO",
         reactant_count=1,
         system=fake_system,
         platform_dimensions_nm=(2.0, 2.0, 6.0),
@@ -529,6 +533,12 @@ def test_smoke_summary_records_seed_provenance() -> None:
     assert summary["run"]["build_seed"] == 1234
     assert summary["run"]["velocity_seed"] == 1234
     assert summary["run"]["canonical_validation_seed"] == smoke.DEFAULT_SEED
+    assert summary["system"]["solvent"] == {
+        "name": "methanol",
+        "residue_name": "MOH",
+        "smiles": "CO",
+        "molecules": 1,
+    }
 
 
 def test_smoke_summary_records_runtime_solvent_geometry_metadata() -> None:
@@ -551,6 +561,9 @@ def test_smoke_summary_records_runtime_solvent_geometry_metadata() -> None:
         pd_indices=(0,),
         sam_count=1,
         solvent_count=7,
+        solvent_name="ethanol",
+        solvent_residue_name="EOH",
+        solvent_smiles="CCO",
         reactant_count=1,
         system=SimpleNamespace(getNumParticles=lambda: 2),
         platform_dimensions_nm=geometry.dimensions_nm,
@@ -629,6 +642,75 @@ def test_smoke_build_config_geometry_summary_uses_library_names() -> None:
     assert summary["solvent_count_planning_volume_nm3"] == pytest.approx(3.2)
     assert summary["solvent_padding_per_face_nm"] == pytest.approx(1.0)
     assert summary["molecule_counts"] == {"ethanol": 7}
+
+
+def test_smoke_build_config_uses_configured_solvent_metadata(tmp_path: Path) -> None:
+    """Serialize the actual configured solvent metadata in build config."""
+
+    smoke = load_smoke_tool()
+    geometry = smoke.RuntimeSolventGeometry(
+        solvent_boundary_z_bounds_nm=(1.0, 3.0),
+        fixed_solute_z_bounds_nm=(0.8, 3.2),
+        solvent_regions_nm=(((0.0, 2.0), (0.0, 2.0), (0.0, 0.8)),),
+        solvent_count_planning_volume_nm3=3.2,
+        solvent_padding_nm=2.0,
+        solvent_padding_per_face_nm=1.0,
+        solvent_clearance_nm=0.2,
+        dimensions_nm=(2.0, 2.0, 4.0),
+        z_shift_nm=0.5,
+        molecule_counts={"methanol": 4},
+    )
+    smoke_build = SimpleNamespace(
+        solvent_count=4,
+        solvent_name="methanol",
+        solvent_residue_name="MOH",
+        solvent_smiles="CO",
+        runtime_solvent_geometry=geometry,
+    )
+    args = Namespace(
+        platform="CPU",
+        seed=7,
+        pd_s_sigma_angstrom=2.2,
+        pd_s_epsilon_kcal_mol=2.0,
+        duration_ns=1.0,
+        steps=None,
+        timestep_fs=2.0,
+        friction_per_ps=1.0,
+        minimize_iterations=0,
+        sulfur_height_nm=0.18,
+    )
+    path = tmp_path / "build_config.yaml"
+
+    smoke.write_build_config(
+        path,
+        SAMMDConfig.model_validate(
+            {
+                "solvent": {
+                    "components": [
+                        {
+                            "name": "methanol",
+                            "residue_name": "MOH",
+                            "smiles": "CO",
+                            "mole_fraction": 1.0,
+                            "density": 0.792,
+                            "molar_mass": 32.04,
+                        }
+                    ]
+                }
+            }
+        ),
+        args,
+        smoke_build,
+        "CCS",
+        1,
+        smoke.RunSchedule(1.0, 1.0, 500, 10, 50, 2.0),
+    )
+
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+
+    assert payload["smoke_overrides"]["solvent_name"] == "methanol"
+    assert payload["smoke_overrides"]["solvent_residue_name"] == "MOH"
+    assert payload["smoke_overrides"]["solvent_smiles"] == "CO"
 
 
 def test_smoke_tool_defaults_match_canonical_metal_sulfur_strategy() -> None:
