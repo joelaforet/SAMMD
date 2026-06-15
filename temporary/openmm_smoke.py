@@ -331,13 +331,15 @@ class ComponentResidueAssigner:
     """Assign PolyzyMD-style wrapping chain/residue identifiers by component."""
 
     def __init__(self) -> None:
+        self._role_states: dict[str, dict[str, object]] = {}
+        self._states: dict[str, dict[str, object]] = {}
         self._component_ranges: dict[str, dict[str, object]] = {}
 
     @property
     def component_ranges(self) -> dict[str, dict[str, object]]:
         """Return serializable chain/residue ranges assigned so far."""
 
-        return dict(self._component_ranges)
+        return {key: dict(value) for key, value in self._component_ranges.items()}
 
     def allocate(
         self,
@@ -352,29 +354,67 @@ class ComponentResidueAssigner:
             raise ValueError(msg)
         role = component_role(component_name)
         chain_letters = chain_letters_for_role(role)
-        start_chain_index = chain_letters.index(SEMANTIC_CHAIN_STARTS[role])
-        chains_needed = math.ceil(residue_count / MAX_RESIDUES_PER_CHAIN)
-        stop_chain_index = start_chain_index + chains_needed - 1
-        if stop_chain_index >= len(chain_letters):
-            msg = "smoke topology exceeded available one-character chain identifiers"
-            raise RuntimeError(msg)
+        role_state = self._role_states.get(role)
+        if role_state is None:
+            role_state = {
+                "chain_ids": [SEMANTIC_CHAIN_STARTS[role]],
+                "chain_letters": chain_letters,
+                "next_residue_id": 1,
+                "next_chain_index": chain_letters.index(SEMANTIC_CHAIN_STARTS[role]),
+            }
+            self._role_states[role] = role_state
 
-        identities = tuple(
-            ResidueIdentity(
-                chain_id=chain_letters[start_chain_index + index // MAX_RESIDUES_PER_CHAIN],
-                residue_id=index % MAX_RESIDUES_PER_CHAIN + 1,
-                residue_name=residue_name,
+        state = self._states.get(component_name)
+        if state is None:
+            state = {
+                "residue_name": residue_name,
+                "residue_count": 0,
+                "chain_ids": [],
+            }
+            self._states[component_name] = state
+
+        identities: list[ResidueIdentity] = []
+        for _ in range(residue_count):
+            role_chain_ids = role_state["chain_ids"]
+            next_residue_id = int(role_state["next_residue_id"])
+            if next_residue_id > MAX_RESIDUES_PER_CHAIN:
+                role_chain_ids.append(self._next_chain_id(role_state))
+                next_residue_id = 1
+
+            chain_id = str(role_chain_ids[-1])
+            component_chain_ids = state["chain_ids"]
+            if chain_id not in component_chain_ids:
+                component_chain_ids.append(chain_id)
+
+            identities.append(
+                ResidueIdentity(
+                    chain_id=chain_id,
+                    residue_id=next_residue_id,
+                    residue_name=residue_name,
+                )
             )
-            for index in range(residue_count)
-        )
+            role_state["next_residue_id"] = next_residue_id + 1
+            state["residue_count"] = int(state["residue_count"]) + 1
+
         self._component_ranges[component_name] = {
             "residue_name": residue_name,
-            "residue_count": residue_count,
-            "first_chain_id": chain_letters[start_chain_index],
-            "last_chain_id": chain_letters[stop_chain_index],
+            "residue_count": state["residue_count"],
+            "chain_ids": tuple(state["chain_ids"]),
             "max_residues_per_chain": MAX_RESIDUES_PER_CHAIN,
         }
-        return identities
+        return tuple(identities)
+
+    def _next_chain_id(self, role_state: dict[str, object]) -> str:
+        """Return the next available chain ID for a semantic role."""
+
+        chain_letters = str(role_state["chain_letters"])
+        next_chain_index = int(role_state["next_chain_index"]) + 1
+        if next_chain_index >= len(chain_letters):
+            msg = "smoke topology exceeded available one-character chain identifiers"
+            raise RuntimeError(msg)
+        chain_id = chain_letters[next_chain_index]
+        role_state["next_chain_index"] = next_chain_index
+        return chain_id
 
 
 def chain_letters_for_role(role: str) -> str:
@@ -390,10 +430,12 @@ def component_role(component_name: str) -> str:
 
     if component_name == "palladium_slab":
         return "metal"
-    if component_name == "propanethiolate_sam":
+    if component_name == "propanethiolate_sam" or component_name.startswith("sam:"):
         return "sam"
-    if component_name == "cinnamaldehyde":
+    if component_name == "cinnamaldehyde" or component_name.startswith("reactant:"):
         return "reactant"
+    if component_name.startswith("solvent:"):
+        return "solvent"
     return "solvent"
 
 

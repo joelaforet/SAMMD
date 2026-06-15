@@ -175,10 +175,54 @@ def test_component_residue_assigner_uses_semantic_component_chains() -> None:
     assert assigner.component_ranges["ethanol"] == {
         "residue_name": "EOH",
         "residue_count": 10000,
-        "first_chain_id": "D",
-        "last_chain_id": "E",
+        "chain_ids": ("D", "E"),
         "max_residues_per_chain": 9999,
     }
+
+
+def test_component_residue_assigner_continues_same_role_namespaces(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Multiple components in the same role should share chain/residue namespaces."""
+
+    smoke = load_smoke_tool()
+    monkeypatch.setattr(smoke, "MAX_RESIDUES_PER_CHAIN", 2)
+    assigner = smoke.ComponentResidueAssigner()
+
+    first_solvent = assigner.allocate("solvent:ethanol", "EOH", 3)
+    second_solvent = assigner.allocate("solvent:water", "HOH", 2)
+    first_sam = assigner.allocate("sam:propanethiol", "PTL", 2)
+    second_sam = assigner.allocate("sam:mercaptoethanol", "MCE", 1)
+    first_reactant = assigner.allocate("reactant:cinnamaldehyde", "CIN", 2)
+    second_reactant = assigner.allocate("reactant:benzaldehyde", "BEN", 1)
+
+    assert first_solvent == (
+        smoke.ResidueIdentity("D", 1, "EOH"),
+        smoke.ResidueIdentity("D", 2, "EOH"),
+        smoke.ResidueIdentity("E", 1, "EOH"),
+    )
+    assert second_solvent == (
+        smoke.ResidueIdentity("E", 2, "HOH"),
+        smoke.ResidueIdentity("F", 1, "HOH"),
+    )
+    assert first_sam == (
+        smoke.ResidueIdentity("C", 1, "PTL"),
+        smoke.ResidueIdentity("C", 2, "PTL"),
+    )
+    assert second_sam == (smoke.ResidueIdentity("D", 1, "MCE"),)
+    assert first_reactant == (
+        smoke.ResidueIdentity("B", 1, "CIN"),
+        smoke.ResidueIdentity("B", 2, "CIN"),
+    )
+    assert second_reactant == (smoke.ResidueIdentity("C", 1, "BEN"),)
+    assert assigner.component_ranges["solvent:water"] == {
+        "residue_name": "HOH",
+        "residue_count": 2,
+        "chain_ids": ("E", "F"),
+        "max_residues_per_chain": 2,
+    }
+    assert assigner.component_ranges["sam:mercaptoethanol"]["chain_ids"] == ("D",)
+    assert assigner.component_ranges["reactant:benzaldehyde"]["chain_ids"] == ("C",)
 
 
 def test_default_run_schedule_records_300_frames_with_2fs_timestep() -> None:
