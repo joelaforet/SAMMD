@@ -41,6 +41,7 @@ from sammd.core.builders import build_system
 from sammd.core.config import SAMMDConfig, load_config
 from sammd.core.io import safe_write_text
 from sammd.model.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
+from sammd.model.solvation import plan_solution_composition
 from sammd.utils.geometry import (
     add_vectors,
     centroid,
@@ -368,7 +369,6 @@ def main(argv: list[str] | None = None) -> int:
         report_interval=args.report_interval,
     )
     solvent_component = config.solvent.components[0]
-    solvent_count = resolve_solvent_count(args.solvent_count, plan, solvent_component.name)
     reactant = config.reactants[0]
     reactant_count = resolve_reactant_count(args.reactant_count, plan, reactant.name)
     sam_template = molecule_template_from_smiles(
@@ -399,7 +399,7 @@ def main(argv: list[str] | None = None) -> int:
         sam_template,
         reactant_template,
         solvent_template,
-        solvent_count=solvent_count,
+        solvent_count=args.solvent_count,
         reactant_count=reactant_count,
         sulfur_height_nm=args.sulfur_height_nm,
         solvent_padding_nm=args.solvent_padding_nm,
@@ -414,7 +414,7 @@ def main(argv: list[str] | None = None) -> int:
         paths.build_config,
         config,
         args,
-        solvent_count,
+        smoke_build.solvent_count,
         sam_template.smiles,
         reactant_count,
         schedule,
@@ -731,12 +731,21 @@ def smoke_pressure_bar(config: SAMMDConfig) -> float:
     return getattr(simulation, "pressure_bar", DEFAULT_PRESSURE_BAR)
 
 
-def resolve_solvent_count(solvent_count: str, plan: Any, solvent_name: str) -> int:
-    """Resolve explicit or plan-derived solvent count."""
+def resolve_solvent_count(
+    solvent_count: str,
+    plan: Any,
+    solvent_name: str,
+    planning_volume_nm3: float | None = None,
+) -> int:
+    """Resolve explicit or actual-geometry-derived solvent count."""
 
     if solvent_count != "auto":
         return int(solvent_count)
-    for component in plan.solution.solvent_components:
+    if planning_volume_nm3 is None:
+        msg = "auto solvent count requires actual solvent packing volume"
+        raise ValueError(msg)
+    solution = plan_solution_composition(plan.config, planning_volume_nm3)
+    for component in solution.solvent_components:
         if component.name == solvent_name:
             return max(1, component.count)
     raise ValueError(f"solvent component {solvent_name!r} was not planned")
@@ -992,7 +1001,7 @@ def build_openmm_smoke_system(
     reactant_template: MoleculeTemplate,
     solvent_template: MoleculeTemplate,
     *,
-    solvent_count: int,
+    solvent_count: int | str,
     reactant_count: int,
     sulfur_height_nm: float,
     solvent_padding_nm: float,
@@ -1114,13 +1123,22 @@ def build_openmm_smoke_system(
     )
     if z_shift_nm != 0.0:
         positions_nm[:] = [shift_position_z(position, z_shift_nm) for position in positions_nm]
+        sulfur_references[:] = [
+            shift_position_z(position, z_shift_nm) for position in sulfur_references
+        ]
     set_periodic_box(modules, topology, system, box_dimensions_nm)
+    resolved_solvent_count = resolve_solvent_count(
+        str(solvent_count),
+        plan,
+        solvent_template.name,
+        solvent_packing_volume_nm3(solvent_regions_nm),
+    )
 
     packed_solution = pack_solution_with_packmol(
         topology=topology,
         solute_positions_nm=tuple(positions_nm),
         solvent_template=solvent_template,
-        solvent_count=solvent_count,
+        solvent_count=resolved_solvent_count,
         box_dimensions_nm=box_dimensions_nm,
         solvent_regions_nm=solvent_regions_nm,
         working_dir=packmol_working_dir,
@@ -1128,7 +1146,7 @@ def build_openmm_smoke_system(
     solvent_identities = residue_assigner.allocate(
         SOLVENT_NAME,
         SOLVENT_RESIDUE_NAME,
-        solvent_count,
+        resolved_solvent_count,
     )
     placed_solvent = add_solvent_molecules(
         modules,
@@ -1240,6 +1258,17 @@ def actual_solvent_packing_geometry(
         region for region in regions if region[2][1] > region[2][0]
     )
     return dimensions_nm, z_shift_nm, solvent_regions
+
+
+def solvent_packing_volume_nm3(solvent_regions_nm: tuple[BoxBounds, ...]) -> float:
+    """Return the combined volume of explicit solvent packing regions."""
+
+    return sum(
+        (region[0][1] - region[0][0])
+        * (region[1][1] - region[1][0])
+        * (region[2][1] - region[2][0])
+        for region in solvent_regions_nm
+    )
 
 
 def shift_position_z(position: Vector3, shift_nm: float) -> Vector3:

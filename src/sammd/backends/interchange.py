@@ -232,6 +232,7 @@ def export_interchange_backend(
         },
         openff_toolkit_version=result.openff_toolkit_version,
         openff_interchange_version=result.openff_interchange_version,
+        runtime_solvent_geometry=result.runtime_solvent_geometry,
     )
 
 

@@ -81,6 +81,55 @@ def test_interchange_build_summary_marks_completed_exports(tmp_path: Path) -> No
     assert override["epsilon_kcal_mol"] == METAL_SULFUR_EPSILON_KCAL_MOL
 
 
+def test_interchange_export_preserves_runtime_geometry_for_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Export wrapper should return runtime solvent geometry for emitted summaries."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    plan = build_system(SAMMDConfig(), output_dir=tmp_path)
+    geometry = backend.RuntimeSolventGeometry(
+        fixed_solute_z_bounds_nm=(1.0, 3.0),
+        solvent_regions_nm=(((0.0, 2.0), (0.0, 2.0), (0.0, 0.8)),),
+        solvent_count_planning_volume_nm3=3.2,
+        solvent_padding_nm=3.0,
+        solvent_padding_per_face_nm=1.5,
+        solvent_clearance_nm=0.18,
+        dimensions_nm=(2.0, 2.0, 4.0),
+        z_shift_nm=1.2,
+        molecule_counts={"ethanol": 17},
+    )
+    result = backend.BackendExportResult(
+        interchange=SimpleNamespace(model_dump_json=lambda indent: "{}"),
+        openmm_topology=object(),
+        metal_sulfur_collection=object(),
+        positions=object(),
+        positions_nm=((0.0, 0.0, 1.0), (0.1, 0.0, 1.1)),
+        sulfur_indices=(1,),
+        metal_indices=(0,),
+        anchor_pairs=((1, 0),),
+        component_ranges={},
+        files={},
+        openff_toolkit_version="0.18.0",
+        openff_interchange_version="0.5.3",
+        runtime_solvent_geometry=geometry,
+    )
+    monkeypatch.setattr(backend, "build_interchange_backend", lambda plan, progress=None: result)
+    monkeypatch.setattr(backend, "_write_pdbx", lambda *args, **kwargs: None)
+    monkeypatch.setattr(backend, "_write_pdb", lambda *args, **kwargs: None)
+
+    exported = backend.export_interchange_backend(plan, overwrite=True)
+    summary = backend.backend_build_summary(plan, exported)
+
+    assert exported.runtime_solvent_geometry == geometry
+    assert summary["box"]["dimensions_nm"] == [2.0, 2.0, 4.0]
+    assert summary["box"]["solvent_packing_regions_nm"] == [
+        [[0.0, 2.0], [0.0, 2.0], [0.0, 0.8]]
+    ]
+    assert summary["solution"]["molecule_counts"] == {"ethanol": 17}
+
+
 def test_interchange_export_rejects_salts_before_optional_imports(tmp_path: Path) -> None:
     """Avoid silently omitting schema-supported salts from export artifacts."""
 
