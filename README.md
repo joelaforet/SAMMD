@@ -33,10 +33,9 @@ SAMMD handles:
   placement.
 - **Composition planning**: solvent, reactant, and salt counts from the YAML
   settings.
-- **Interchange export**: optional OpenFF/OpenMM files for supported non-salt
-  systems.
+- **Interchange export**: OpenFF/OpenMM files for supported non-salt systems.
 - **Inspection files**: `sam_grafting_density.cif`, `build_summary.json`, and
-  `resolved_config.yaml` for the default dependency-light build.
+  `resolved_config.yaml` alongside the exported system files.
 
 SAMMD builds and exports chemistry, structure, and parameter artifacts. OpenMM
 runs minimization, equilibration, production, trajectories, and reporters.
@@ -64,22 +63,24 @@ git clone https://github.com/joelaforet/SAMMD.git
 cd SAMMD
 ```
 
-### 2. Install the dependency-light environment
+### 2. Install the default environment
 
-Use this environment for configuration, validation, tests, and docs. It does
-not require OpenMM, OpenFF, RDKit, PACKMOL, or a GPU.
+Use this environment for configuration, validation, builds, tests, and docs. It
+includes the OpenFF-related packages used by SAMMD build/export and does not
+require a GPU.
 
 ```bash
 pixi install
 pixi shell -e default
 ```
 
-After `pixi shell -e default`, the `sammd` command is on `PATH`, so validation
+After `pixi shell -e default`, the `sammd` command is on `PATH`, so SAMMD
 commands work normally:
 
 ```bash
 sammd init -o sammd.yaml
 sammd validate sammd.yaml
+sammd build sammd.yaml --output-dir outputs --overwrite
 ```
 
 Leave the active pixi shell with:
@@ -99,7 +100,7 @@ pixi run sammd validate sammd.yaml
 For named environments, add `-e <env>`:
 
 ```bash
-pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite
+pixi run sammd build sammd.yaml --output-dir outputs --overwrite
 ```
 
 ### 4. Switch environments
@@ -107,19 +108,19 @@ pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite
 Pixi does not use `conda activate`. Use `pixi shell -e <env>` instead.
 
 ```bash
-# Enter the default dependency-light environment
+# Enter the default environment
 pixi shell -e default
 
 # Leave it
 exit
 
-# Enter a CUDA export environment
+# Enter a CUDA environment when GPU OpenMM compatibility matters
 pixi shell -e cuda-12-4
 
 # Leave it before switching again
 exit
 
-# Enter a different CUDA export environment
+# Enter a different CUDA environment
 pixi shell -e cuda-12-6
 ```
 
@@ -127,12 +128,16 @@ pixi shell -e cuda-12-6
 
 | Environment | Use case | CUDA line | OpenMM pin |
 | --- | --- | --- | --- |
-| `default` | dependency-light config/validate/test workflow | none | none |
+| `default` | config, validation, builds, and routine checks | none | none |
 | `dev` | same as default, explicit dev environment | none | none |
 | `docs` | Sphinx documentation build | none | none |
-| `cuda-12-4` | OpenFF Interchange export and GPU OpenMM work | 12.4 | `openmm=8.1.2` |
-| `cuda-12-6` | OpenFF Interchange export and GPU OpenMM work | 12.6 | `openmm=8.4.0` |
-| `cuda-13-0` | OpenFF Interchange export and GPU OpenMM work | 13.0 | `openmm=8.5.1` |
+| `cuda-12-4` | GPU OpenMM work on CUDA 12.4 driver line | 12.4 | `openmm=8.1.2` |
+| `cuda-12-6` | GPU OpenMM work on CUDA 12.6 driver line | 12.6 | `openmm=8.4.0` |
+| `cuda-13-0` | GPU OpenMM work on CUDA 13.0 driver line | 13.0 | `openmm=8.5.1` |
+
+All SAMMD pixi environments include the OpenFF, RDKit, mBuild, and PACKMOL
+packages needed for `sammd build` export. The CUDA-labeled environments add
+specific OpenMM pins for machines where you want GPU OpenMM compatibility.
 
 OpenMM GPU support depends on the NVIDIA driver and CUDA version available on
 your machine. On a GPU node or workstation, run:
@@ -152,8 +157,7 @@ Known examples:
 | PSC Bridges2 | `cuda-12-6` |
 | Newer local NVIDIA drivers | `cuda-13-0`, if the driver supports CUDA 13.0 |
 
-When unsure, choose the older compatible environment. For Interchange export examples in
-this README, the default is `cuda-12-4`.
+When unsure for GPU OpenMM work, choose the older compatible CUDA environment.
 
 ## Quick Start
 
@@ -163,8 +167,6 @@ this README, the default is `cuda-12-4`.
 pixi shell -e default
 sammd init -o sammd.yaml
 sammd validate sammd.yaml
-exit
-pixi shell -e cuda-12-4
 sammd build sammd.yaml --output-dir outputs --overwrite
 ```
 
@@ -173,7 +175,7 @@ sammd build sammd.yaml --output-dir outputs --overwrite
 ```bash
 pixi run sammd init -o sammd.yaml
 pixi run sammd validate sammd.yaml
-pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite
+pixi run sammd build sammd.yaml --output-dir outputs --overwrite
 ```
 
 The build command writes:
@@ -196,21 +198,24 @@ stable `.cif` artifact names in its CLI and docs.
 ## OpenFF Interchange Export For OpenMM
 
 `sammd build` writes parameterized OpenFF/OpenMM files. Use a CUDA-labeled
-environment for builds. First choose the environment with `nvidia-smi`, then run
-the build command.
+environment only when you need a specific GPU OpenMM pin. For ordinary build and
+export work, the default environment is enough.
 
-Example for the default CUDA 12.4 export environment:
+Default build/export example:
 
 ```bash
-pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite
+pixi run sammd build sammd.yaml --output-dir outputs --overwrite
 ```
 
-Or enter the environment once:
+Or enter the default environment once:
 
 ```bash
-pixi shell -e cuda-12-4
+pixi shell -e default
 sammd build sammd.yaml --output-dir outputs --overwrite
 ```
+
+For GPU OpenMM compatibility, run `nvidia-smi` and choose a CUDA-labeled
+environment whose CUDA version is not newer than the CUDA version shown there.
 
 The Interchange export writes these files:
 
@@ -246,11 +251,10 @@ The OpenMM tutorial teaches the raw OpenMM Python API with
 | --- | --- |
 | `sammd init -o sammd.yaml` | Write a starter YAML file |
 | `sammd validate sammd.yaml` | Check the YAML before building |
-| `sammd build sammd.yaml --output-dir outputs --overwrite` | Write inspection and OpenFF Interchange export files from a CUDA pixi environment |
+| `sammd build sammd.yaml --output-dir outputs --overwrite` | Write inspection and OpenFF Interchange export files |
 
 Use `pixi run ...` outside a pixi shell. For shell-based workflows, use
-`pixi shell -e default` for `init` and `validate`, then switch to a CUDA-labeled
-environment for `build`.
+`pixi shell -e default` for normal `init`, `validate`, and `build` commands.
 
 CLI logs include a timestamp, full module path, level, and message. Add the root
 option `--verbose` before the subcommand to show DEBUG logs:
@@ -276,7 +280,7 @@ subcommand.
 
 ## Developer Checks
 
-Use the dependency-light development environment for routine checks:
+Use the default development environment for routine checks:
 
 ```bash
 pixi run lint

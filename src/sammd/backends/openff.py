@@ -1,4 +1,4 @@
-"""Lazy OpenFF Toolkit adapters for optional SAMMD parameterization steps."""
+"""Lazy OpenFF Toolkit adapters for SAMMD parameterization steps."""
 
 from __future__ import annotations
 
@@ -12,23 +12,21 @@ from typing import Any
 from sammd.utils.geometry import Vector3
 
 OPENFF_INSTALL_GUIDANCE = (
-    "OpenFF Toolkit is an optional SAMMD export dependency. Install and use the "
-    "appropriate SAMMD CUDA pixi environment, such as cuda-12-6, with OpenFF "
-    "Toolkit available before calling "
-    "OpenFF adapter utilities."
+    "OpenFF Toolkit is required for SAMMD build/export but was not discoverable. "
+    "Use a SAMMD pixi environment such as default, dev, docs, or a CUDA-labeled "
+    "environment when GPU OpenMM compatibility is needed."
 )
 
 OPENFF_INTERCHANGE_INSTALL_GUIDANCE = (
-    "OpenFF Interchange is an optional SAMMD export dependency. Install and use the "
-    "appropriate SAMMD CUDA pixi environment, such as cuda-12-6, with OpenFF "
-    "Interchange available before calling "
-    "OpenFF Interchange export utilities."
+    "OpenFF Interchange is required for SAMMD build/export but was not discoverable. "
+    "Use a SAMMD pixi environment such as default, dev, docs, or a CUDA-labeled "
+    "environment when GPU OpenMM compatibility is needed."
 )
 
 
 @dataclass(frozen=True)
 class OpenFFBackendAvailability:
-    """Structured optional OpenFF availability report without importing modules."""
+    """Structured OpenFF availability report without importing modules."""
 
     toolkit_available: bool
     interchange_available: bool
@@ -87,7 +85,7 @@ class PreparedMoleculeTemplate:
 
 
 def require_openff_toolkit() -> Any:
-    """Import and return the optional OpenFF Toolkit module.
+    """Import and return the OpenFF Toolkit module.
 
     Returns
     -------
@@ -107,7 +105,7 @@ def require_openff_toolkit() -> Any:
 
 
 def require_openff_interchange() -> Any:
-    """Import and return the optional OpenFF Interchange module."""
+    """Import and return the OpenFF Interchange module."""
 
     try:
         return import_module("openff.interchange")
@@ -125,7 +123,7 @@ def _dotted_module_is_available(name: str) -> bool:
 
 
 def check_openff_backend_availability() -> OpenFFBackendAvailability:
-    """Check optional OpenFF module availability without importing it."""
+    """Check OpenFF module availability without importing it."""
 
     toolkit_available = _dotted_module_is_available("openff.toolkit")
     interchange_available = _dotted_module_is_available("openff.interchange")

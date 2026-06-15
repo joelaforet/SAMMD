@@ -64,9 +64,9 @@ Important sections
 ``parameterization``
    Records the OpenFF small-molecule force field, charge model, INTERFACE metal
    force-field file, and nonbonded cutoff. ``sammd build`` uses these choices to
-   create a complete OpenMM-ready system in a CUDA-labeled pixi environment. The INTERFACE
-   metal file gives the base slab LJ parameters. SAMMD records sulfur-metal LJ
-   changes in the build summary; you do not configure them here.
+   create a complete OpenMM-ready system. The INTERFACE metal file gives the base
+   slab LJ parameters. SAMMD records sulfur-metal LJ changes in the build
+   summary; you do not configure them here.
 
 ``outputs``
      Names build output files. The ``sam_grafting_density`` key controls the
@@ -142,6 +142,6 @@ Beginner glossary
    ``sammd build``. It is a visual smoke test showing the configured surface and
    planned sulfur anchor positions for the SAM. Use it to check slab geometry,
    three-fold hollow-site placement, and grafting density. Full SAM, solvent,
-   and reactant coordinates are created in ``solvated_system.cif`` when you
-   run the OpenFF Interchange export.
+   and reactant coordinates are created in ``solvated_system.cif`` by
+   ``sammd build``.
    Trajectory frames are created later by OpenMM simulation scripts.

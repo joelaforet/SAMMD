@@ -8,7 +8,7 @@ Current package map
    Pydantic v2 models, YAML loading, CLI template text, and validation rules.
 
 ``sammd.cli``
-   Dependency-light ``sammd init``, ``sammd validate``, and ``sammd build`` commands.
+   ``sammd init``, ``sammd validate``, and ``sammd build`` commands.
 
 ``sammd.model.surfaces``
    Registered Fcc(111) lattice metadata, commensurate slab planning, and hollow
@@ -38,6 +38,6 @@ Keep the MVP importable without heavy scientific dependencies. Imports of
 OpenMM, OpenFF, MDAnalysis, ParmEd, mBuild, PDBFixer, or related export tools
 should stay lazy and out of module top level.
 
-Full OpenFF/OpenMM system construction is deferred. New work should preserve the
-current dependency-light path while making future Interchange export explicit and
-testable.
+OpenFF/OpenMM system construction should stay explicit and testable. New work
+should preserve lazy imports while treating OpenFF as part of the normal
+build/export path in SAMMD pixi environments.

@@ -13,7 +13,7 @@ ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def _patch_interchange_export(monkeypatch) -> None:
-    """Keep CLI tests focused without requiring optional OpenFF dependencies."""
+    """Keep CLI tests focused without constructing real OpenFF objects."""
 
     def fake_export_interchange_backend(plan, overwrite: bool = False):
         files = {

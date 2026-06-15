@@ -1,4 +1,4 @@
-"""Tests for dependency-light build-plan composition."""
+"""Tests for import-light build-plan composition."""
 
 import json
 import os

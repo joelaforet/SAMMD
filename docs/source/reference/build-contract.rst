@@ -24,11 +24,10 @@ The supported first-release command-line surface is:
    * - ``sammd validate CONFIG``
      - Load and validate a YAML configuration without writing build artifacts.
    * - ``sammd build CONFIG --output-dir DIR --overwrite``
-     - In a CUDA-labeled pixi environment, build the current deterministic plan
-       and write inspection, OpenFF Interchange, and OpenMM handoff artifacts
-       into ``DIR``. Existing artifacts are protected unless ``--overwrite`` is
-       supplied. Salt-containing configs are rejected until salt export is
-       implemented.
+     - Build the current deterministic plan and write inspection, OpenFF
+       Interchange, and OpenMM handoff artifacts into ``DIR``. Existing
+       artifacts are protected unless ``--overwrite`` is supplied.
+       Salt-containing configs are rejected until salt export is implemented.
 
 The ``build`` command does not run minimization, equilibration, production MD,
 trajectory writing, or reporter setup.
@@ -48,8 +47,8 @@ The supported first-release Python surface is:
    * - ``load_config_dict(data)``
      - Validate an already parsed mapping into ``SAMMDConfig``.
    * - ``build_system(config, output_dir=None, seed=None)``
-     - Return a dependency-light ``SAMMDBuildPlan`` from a ``SAMMDConfig``, YAML path,
-       or parsed mapping.
+     - Return a ``SAMMDBuildPlan`` from a ``SAMMDConfig``, YAML path, or parsed
+       mapping.
 
 The object returned by ``build_system`` is documented as ``SAMMDBuildPlan``. It
 exposes deterministic slab, SAM placement, solution composition, output paths,
@@ -57,24 +56,24 @@ exposes deterministic slab, SAM placement, solution composition, output paths,
 top-level public import in ``sammd.__all__``. ``SAMMDBuildPlan`` is not an OpenMM
 ``System``, an OpenFF ``Interchange``, or a simulation wrapper. Code that needs
 full Interchange construction should use the CLI build command or the internal
-Interchange module from a CUDA-labeled pixi environment.
+Interchange module from a SAMMD pixi environment.
 
 The ``build_summary()`` SAM section records the first-release metal-S interaction
-strategy as dependency-free metadata. The canonical mode is
+strategy as import-light metadata. The canonical mode is
 ``nonbonded_lj_override``: for each neutral thiol anchor, the export should use
 the three nearest registered Fcc(111) hollow-site metal atoms as selected pairs
 for a post-export OpenMM pair-specific LJ override with ``sigma = 0.22 nm`` and
 ``epsilon = 2.0 kcal/mol``. This is a strengthened nonbonded attraction layered
 on top of the base INTERFACE metal LJ model, not covalent, quantum, or reactive
 chemisorption. The first release records the strategy and selected pair indices
-in dependency-light mode. The explicit Interchange export applies those selected pairs as
+before export. The explicit Interchange export applies those selected pairs as
 post-Interchange OpenMM ``NonbondedForce`` exceptions and records them in
 ``anchor_metadata.json``.
 
 Validation gates
 ----------------
 
-The internal ``sammd.core.validation`` module provides dependency-free gates for the
+The internal ``sammd.core.validation`` module provides import-light gates for the
 current build plan and topology CIF text. These gates check surface
 atom metadata lengths, non-empty top and bottom binding-site labels, SAM counts,
 solution-volume/box-volume agreement, finite positive box dimensions/bounds and
@@ -83,14 +82,14 @@ metal-S pair counts and slab-local indices, canonical metal-S strategy metadata,
 current/reserved output suffixes, and inspection topology CIF atom counts and
 cell lengths.
 
-These gates intentionally do not require OpenMM, OpenFF, or full Interchange export
-artifacts before the export step runs. Missing export artifacts such as
+These gates intentionally do not require concrete Interchange export artifacts
+before the export step runs. Missing export artifacts such as
 ``solvated_system.cif``, ``interchange.json`` and ``anchor_metadata.json`` are
-not failures during dependency-free plan validation.
+not failures during plan validation.
 
-Interchange export validation gates should stay skipped/not required when optional
-dependencies or export artifacts are absent. Once ``sammd build`` writes concrete
-artifacts, those gates should check that:
+Interchange export validation gates should stay skipped/not required when export
+artifacts are absent. Once ``sammd build`` writes concrete artifacts, those gates
+should check that:
 
 * ``interchange.json`` reloads with ``Interchange.model_validate_json``.
 * The reloaded ``Interchange`` exports to an OpenMM ``System``.
@@ -165,6 +164,6 @@ Current limitation
 ``sammd build`` writes ``sam_grafting_density.cif``, ``build_summary.json``,
 ``resolved_config.yaml``, ``solvated_system.cif``,
 ``solvated_system_pymol.pdb``, ``interchange.json``, and
-``anchor_metadata.json`` from a CUDA-labeled pixi environment. Public SAMMD APIs should not
+``anchor_metadata.json`` from a SAMMD pixi environment. Public SAMMD APIs should not
 add equilibration, production simulation helpers, or direct GROMACS/LAMMPS/Amber
 command workflows as part of this contract.

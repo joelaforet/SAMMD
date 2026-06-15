@@ -35,7 +35,7 @@ def _collection_class() -> type[Any]:
         from openff.interchange.models import PotentialKey, TopologyKey
         from openff.interchange.smirnoff import SMIRNOFFCollection
         from openff.units import unit
-    except ImportError as error:  # pragma: no cover - dependency-light environments
+    except ImportError as error:  # pragma: no cover - import-light environments
         msg = "OpenFF Interchange is required to construct the SAMMD metal-S plugin collection."
         raise ImportError(msg) from error
 

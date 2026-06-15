@@ -1,4 +1,4 @@
-"""Tests for lazy optional OpenFF adapter utilities."""
+"""Tests for lazy OpenFF adapter utilities."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from sammd.core.config import SAMMDConfig, load_config_dict
 
 
 def test_adapter_import_does_not_import_openff_eagerly() -> None:
-    """Keep importing the adapter independent of optional OpenFF dependencies."""
+    """Keep importing the adapter independent of OpenFF imports."""
 
     optional_prefixes = ("openff", "openmm", "rdkit")
     optional_modules_before = _loaded_optional_modules(optional_prefixes)
@@ -150,7 +150,7 @@ def test_parameterization_plan_from_build_plan_records_counts_and_stays_inspecta
 
 
 def test_require_openff_toolkit_fails_with_guidance(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Explain that optional OpenFF export requires a CUDA pixi environment."""
+    """Explain that OpenFF build/export uses common SAMMD pixi environments."""
 
     openff_adapter = importlib.import_module("sammd.backends.openff")
     real_import_module = importlib.import_module
@@ -162,7 +162,7 @@ def test_require_openff_toolkit_fails_with_guidance(monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setattr(openff_adapter, "import_module", fake_import_module)
 
-    with pytest.raises(ImportError, match="CUDA pixi environment"):
+    with pytest.raises(ImportError, match="default, dev, docs"):
         openff_adapter.require_openff_toolkit()
 
 

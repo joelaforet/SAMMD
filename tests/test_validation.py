@@ -143,7 +143,7 @@ def test_topology_cif_cell_mismatch_fails_validation(tmp_path: Path) -> None:
 
 
 def test_module_import_avoids_heavy_optional_modules() -> None:
-    """Validation import should not pull OpenMM/OpenFF-style optional modules."""
+    """Validation import should not pull heavy OpenMM/OpenFF-style modules."""
 
     heavy_modules = ("openmm", "openff", "rdkit", "mbuild", "MDAnalysis", "parmed", "pdbfixer")
     code = (

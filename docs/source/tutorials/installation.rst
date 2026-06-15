@@ -27,11 +27,12 @@ Restart your shell if the installer asks you to.
    git clone https://github.com/joelaforet/SAMMD.git
    cd SAMMD
 
-3. Use the dependency-light environment
----------------------------------------
+3. Use the default environment
+------------------------------
 
-The default environment is for YAML files, validation, testing, and docs. It
-does not need OpenMM, OpenFF, RDKit, PACKMOL, or a GPU.
+The default environment is for YAML files, validation, builds, testing, and docs.
+It includes the OpenFF-related packages used by SAMMD build/export and does not
+need a GPU.
 
 .. code-block:: bash
 
@@ -65,7 +66,7 @@ For a named environment, add ``-e``:
 
 .. code-block:: bash
 
-   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite
+   pixi run sammd build sammd.yaml --output-dir outputs --overwrite
 
 5. Switch environments
 ----------------------
@@ -103,7 +104,7 @@ Use an environment whose CUDA version is not newer than the CUDA version shown b
      - CUDA line
      - OpenMM pin
    * - ``default``
-     - dependency-light config, validation, builds, tests
+     - config, validation, builds, tests
      - none
      - none
    * - ``docs``
@@ -111,15 +112,15 @@ Use an environment whose CUDA version is not newer than the CUDA version shown b
      - none
      - none
    * - ``cuda-12-4``
-     - OpenFF Interchange export and GPU OpenMM work
+     - GPU OpenMM work on CUDA 12.4 driver line
      - 12.4
      - ``openmm=8.1.2``
    * - ``cuda-12-6``
-     - OpenFF Interchange export and GPU OpenMM work
+     - GPU OpenMM work on CUDA 12.6 driver line
      - 12.6
      - ``openmm=8.4.0``
    * - ``cuda-13-0``
-     - OpenFF Interchange export and GPU OpenMM work
+     - GPU OpenMM work on CUDA 13.0 driver line
      - 13.0
      - ``openmm=8.5.1``
 
@@ -128,8 +129,9 @@ Known examples:
 * CU Boulder Blanca older-GPU nodes: ``cuda-12-4``
 * PSC Bridges2: ``cuda-12-6``
 
-When unsure, choose the older compatible environment. The SAMMD tutorials use
-``cuda-12-4`` as the default Interchange export example.
+All SAMMD pixi environments include OpenFF, RDKit, mBuild, and PACKMOL for
+``sammd build`` export. When unsure for GPU OpenMM work, choose the older
+compatible CUDA environment.
 
 7. Use pixi environments as VSCode notebook kernels
 ---------------------------------------------------
@@ -153,10 +155,9 @@ shows in the notebook kernel picker.
      --name sammd-cuda-12-4 \
      --display-name "Python (SAMMD cuda-12-4)"
 
-Use ``sammd-default`` for dependency-light notebooks such as building YAML configs and
-checking ``sam_grafting_density.cif``. Use a CUDA-labeled kernel, for example
-``sammd-cuda-12-4``, when a notebook needs OpenFF, OpenMM, PACKMOL, or full MD
-export files.
+Use ``sammd-default`` for normal notebooks that initialize, validate, and build
+SAMMD systems. Use a CUDA-labeled kernel, for example ``sammd-cuda-12-4``, when a
+notebook needs a specific GPU OpenMM pin for downstream MD work.
 
 To use a notebook in VSCode:
 

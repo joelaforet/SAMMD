@@ -110,8 +110,8 @@ def test_structure_artifact_terminology_is_documented() -> None:
     assert ".mmcif" in combined
 
 
-def test_cuda_pixi_environment_guidance_is_documented() -> None:
-    """Keep export/OpenMM setup tied to explicit CUDA pixi environments."""
+def test_pixi_environment_guidance_is_documented() -> None:
+    """Keep OpenFF available in common envs and CUDA guidance GPU-specific."""
 
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     openmm_page = (
@@ -123,7 +123,7 @@ def test_cuda_pixi_environment_guidance_is_documented() -> None:
         assert "nvidia-smi" in content
         assert "cuda-12-4" in content
         assert "cuda-12-6" in content
-        assert "pixi run -e cuda-12-4 sammd build" in content
+        assert "pixi run sammd build" in content
 
     installation = (
         PROJECT_ROOT / "docs" / "source" / "tutorials" / "installation.rst"
@@ -135,12 +135,15 @@ def test_cuda_pixi_environment_guidance_is_documented() -> None:
 
     for env_name in ["cuda-12-4", "cuda-12-6", "cuda-13-0"]:
         assert env_name in pixi
+    assert 'default = ["dev", "interchange"]' in pixi
+    assert 'dev = ["dev", "interchange"]' in pixi
+    assert 'docs = ["dev", "docs", "interchange"]' in pixi
     assert "science =" not in pixi
     assert "[feature.science" not in pixi
 
 
-def test_build_tutorial_documents_default_and_export_outputs() -> None:
-    """Keep the first tutorial clear about default vs export build files."""
+def test_build_tutorial_documents_normal_build_outputs() -> None:
+    """Keep the first tutorial clear that build writes normal output files."""
 
     tutorial = (
         PROJECT_ROOT / "docs" / "source" / "tutorials" / "canonical-workflow.rst"
@@ -163,8 +166,7 @@ def test_build_tutorial_documents_default_and_export_outputs() -> None:
     for export_output in export_outputs:
         assert export_output in combined
     assert "--full" not in combined
-    assert "RUN_INTERCHANGE_EXPORT = False" in notebook
-    assert "SAMMD_PIXI_ENV = \"cuda-12-4\"" in notebook
+    assert "pixi run sammd build" in notebook
 
 
 def test_openmm_tutorial_teaches_raw_openmm_route() -> None:
@@ -199,7 +201,7 @@ def test_openmm_tutorial_teaches_raw_openmm_route() -> None:
 
 
 def test_building_systems_notebook_workflow_smoke(tmp_path: Path) -> None:
-    """Reproduce the dependency-light notebook workflow with package APIs."""
+    """Reproduce the notebook planning workflow with package APIs."""
 
     config_path = tmp_path / "sammd.yaml"
     output_dir = tmp_path / "outputs"

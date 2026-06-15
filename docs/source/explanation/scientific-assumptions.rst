@@ -1,9 +1,10 @@
 Scientific assumptions
 ======================
 
-SAMMD currently builds a dependency-light, deterministic plan for self-assembled
-monolayer systems. These assumptions describe what that plan means physically
-and what remains outside SAMMD's ownership in this release.
+SAMMD builds deterministic self-assembled monolayer systems and exports OpenFF
+Interchange artifacts for OpenMM handoff. These assumptions describe what that
+build means physically and what remains outside SAMMD's ownership in this
+release.
 
 Surface and SAM placement
 -------------------------
@@ -32,9 +33,8 @@ Force-field assumptions
 -----------------------
 
 Base metal Lennard-Jones parameters come from the INTERFACE Fcc metal data. The
-target route for organic molecules is OpenFF. The current default code
-records and validates force-field choices, but it does not yet export a full
-OpenFF/OpenMM-ready system.
+target route for organic molecules is OpenFF, and ``sammd build`` exports the
+OpenFF/OpenMM-ready system artifacts for supported non-salt configs.
 
 The selected metal-S Lennard-Jones override is an internal, post-export proxy for
 a tunable strengthened nonbonded interaction. It is not covalent, quantum, or

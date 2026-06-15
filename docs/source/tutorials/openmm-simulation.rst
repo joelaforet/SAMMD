@@ -10,21 +10,22 @@ Use the raw OpenMM Python API here, not a SAMMD OpenMM wrapper.
 Before starting
 ---------------
 
-From the repository root, build the files in a CUDA-labeled pixi environment.
-Run ``nvidia-smi`` on the machine first, then choose an environment whose CUDA
-version is not newer than the CUDA version shown there. For example, use
+From the repository root, build the files in the default pixi environment. Use a
+CUDA-labeled environment only when you need a specific GPU OpenMM pin. For GPU
+work, run ``nvidia-smi`` on the machine first, then choose an environment whose
+CUDA version is not newer than the CUDA version shown there. For example, use
 ``cuda-12-4`` for CU Boulder Blanca older-GPU nodes and ``cuda-12-6`` on PSC
-Bridges2. The default example here uses ``cuda-12-4``:
+Bridges2:
 
 .. tip::
 
-   You can run each command with ``pixi run -e cuda-12-4 ...`` or enter the
-   environment once with ``pixi shell -e cuda-12-4``. Leave the environment with
-   ``exit`` before switching to another pixi environment.
+   You can run each command with ``pixi run ...`` or enter the environment once
+   with ``pixi shell -e default``. Leave the environment with ``exit`` before
+   switching to another pixi environment.
 
 .. code-block:: bash
 
-   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite
+   pixi run sammd build sammd.yaml --output-dir outputs --overwrite
 
 This writes files such as ``interchange.json``, ``solvated_system.cif``,
 ``solvated_system_pymol.pdb``, and ``anchor_metadata.json``. The

@@ -7,9 +7,9 @@ OpenMM. SAMMD builds; OpenMM runs.
 
 .. note::
 
-   Use the dependency-light ``default`` environment for initialization and
-   validation. Use a CUDA-labeled environment for ``sammd build`` because builds
-   write OpenFF Interchange export files.
+   Use the ``default`` environment for initialization, validation, and builds.
+   CUDA-labeled environments are only needed when you want a specific GPU OpenMM
+   pin for downstream simulation work.
 
 1. Create config
 ----------------
@@ -40,11 +40,11 @@ errors before any output files are written.
 3. Build the starting model
 ---------------------------
 
-Build the starting model in a CUDA-labeled pixi environment:
+Build the starting model:
 
 .. code-block:: bash
 
-   pixi run -e cuda-12-4 sammd build sammd.yaml --output-dir outputs --overwrite
+   pixi run sammd build sammd.yaml --output-dir outputs --overwrite
 
 This command writes these output files:
 
@@ -82,11 +82,12 @@ exact validated YAML that produced the plan.
 5. Interchange output files
 ---------------------------
 
-Use a CUDA-labeled pixi environment when you want SAMMD to write files for
-OpenFF/OpenMM. Run ``nvidia-smi`` on the machine first, then choose an
-environment whose CUDA version is not newer than the CUDA version shown there.
-For example, use ``cuda-12-4`` for CU Boulder Blanca older-GPU nodes and
-``cuda-12-6`` for PSC Bridges2. The default example here uses ``cuda-12-4``.
+``sammd build`` writes files for OpenFF/OpenMM in the default environment. Use a
+CUDA-labeled pixi environment only when you want a matching GPU OpenMM pin. Run
+``nvidia-smi`` on the machine first, then choose an environment whose CUDA
+version is not newer than the CUDA version shown there. For example, use
+``cuda-12-4`` for CU Boulder Blanca older-GPU nodes and ``cuda-12-6`` for PSC
+Bridges2.
 
 The build command writes these Interchange files:
 
@@ -135,5 +136,5 @@ this version.
 Notebook version
 ----------------
 
-The related notebook ``notebooks/building_systems_with_sammd.ipynb`` demonstrates the
-dependency-light planning and inspection steps interactively.
+The related notebook ``notebooks/building_systems_with_sammd.ipynb`` demonstrates
+the planning, build, and inspection steps interactively.

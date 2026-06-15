@@ -58,9 +58,9 @@ cuda-version = "=13.0"
 cuda = "13.0"
 
 [environments]
-default = ["dev"]
-dev = ["dev"]
-docs = ["dev", "docs"]
+default = ["dev", "interchange"]
+dev = ["dev", "interchange"]
+docs = ["dev", "docs", "interchange"]
 interchange = ["dev", "interchange"]
 cuda-12-4 = ["dev", "interchange", "cuda-12-4"]
 cuda-12-6 = ["dev", "interchange", "cuda-12-6"]
