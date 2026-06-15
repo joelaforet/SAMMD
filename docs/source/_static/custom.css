@@ -153,7 +153,7 @@ body {
   background: var(--sammd-slate);
   border-bottom: 1px solid rgba(244, 241, 234, 0.14);
   margin: 0 0 1.25rem;
-  padding: 0.95rem 0.9rem 1.05rem;
+  padding: 1rem 0.9rem 1.05rem;
 }
 
 .sidebar-search-container input {

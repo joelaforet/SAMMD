@@ -346,7 +346,7 @@ def _load_build_config(config: SAMMDConfig | str | Path | dict[str, Any]) -> SAM
 def _topology_atom_records(plan: SAMMDBuildPlan) -> tuple[AtomRecord, ...]:
     """Return atom records for the current inspectable topology CIF."""
 
-    records = list(slab_to_atom_records(plan.slab, chain_id="A"))
+    records = list(slab_to_atom_records(plan.slab, chain_id="M"))
     serial = len(records) + 1
     for residue_id, placement in enumerate(plan.sam_placements.placements, start=1):
         records.append(
@@ -356,7 +356,7 @@ def _topology_atom_records(plan: SAMMDBuildPlan) -> tuple[AtomRecord, ...]:
                 element="S",
                 residue_name=placement.component_residue_name,
                 residue_id=residue_id,
-                chain_id="B" if placement.side == "bottom" else "C",
+                chain_id="C",
                 component_label=f"SAM {placement.component_name} {placement.side}",
                 coordinates_nm=placement.anchor_pose.sulfur_position_nm,
             )
@@ -463,7 +463,7 @@ def _estimate_sam_length(component: Any) -> SAMLengthEstimate:
     else:
         try:
             estimated_length_nm = _estimate_smiles_contour_length_nm(component.smiles)
-        except Exception as exc:
+        except (ValueError, RuntimeError, ImportError) as exc:
             msg = (
                 f"SAM length estimation failed for component {component.name!r}; "
                 "set extended_length_nm for this SAM component to override automatic "

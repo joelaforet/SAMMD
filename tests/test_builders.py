@@ -347,6 +347,12 @@ def test_build_plan_writes_topology_cif_and_refuses_overwrite(tmp_path) -> None:
     assert text.count("HETATM") == len(plan.slab.positions_nm) + len(
         plan.sam_placements.placements
     )
+    records = builders._topology_atom_records(plan)
+    metal_records = [record for record in records if record.component_label.startswith("metal_")]
+    sam_records = [record for record in records if record.component_label.startswith("SAM ")]
+    assert {record.chain_id for record in metal_records} == {"M"}
+    assert {record.chain_id for record in sam_records} == {"C"}
+    assert " B " not in text
     assert " PTL " in text
     first_placement = plan.sam_placements.placements[0]
     first_sulfur_z_angstrom = first_placement.anchor_pose.sulfur_position_nm[2] * 10.0

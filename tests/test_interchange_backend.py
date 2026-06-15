@@ -319,8 +319,8 @@ def test_openmm_identity_repair_labels_nonmetal_residues() -> None:
     atoms = [SimpleNamespace(name="", residue=residue), SimpleNamespace(name="", residue=residue)]
     topology = SimpleNamespace(atoms=lambda: iter(atoms))
     records = (
-        AtomRecord(1, "C1", "C", "EOH", 12, "A", "solvent:ethanol", (0.0, 0.0, 0.0)),
-        AtomRecord(2, "O2", "O", "EOH", 12, "A", "solvent:ethanol", (0.1, 0.0, 0.0)),
+        AtomRecord(1, "C1", "C", "EOH", 12, "D", "solvent:ethanol", (0.0, 0.0, 0.0)),
+        AtomRecord(2, "O2", "O", "EOH", 12, "D", "solvent:ethanol", (0.1, 0.0, 0.0)),
     )
 
     backend._apply_openmm_atom_identities(topology, records)
@@ -328,7 +328,7 @@ def test_openmm_identity_repair_labels_nonmetal_residues() -> None:
     assert [atom.name for atom in atoms] == ["C1", "O2"]
     assert residue.name == "EOH"
     assert residue.id == "12"
-    assert residue.chain.id == "A"
+    assert residue.chain.id == "D"
 
 
 def test_component_residue_assigner_wraps_solvent_from_semantic_chain() -> None:
