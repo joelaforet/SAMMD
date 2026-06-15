@@ -75,6 +75,182 @@ def test_smoke_explicit_zero_solvent_count_is_valid() -> None:
     smoke.validate_args(args)
 
 
+def test_smoke_solvent_chain_wrapping_skips_reserved_metal_chain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Wrap solvent chains through runtime-allowed IDs without using metal chain M."""
+
+    smoke = load_smoke_module()
+    monkeypatch.setattr(smoke, "MAX_RESIDUES_PER_CHAIN", 1)
+    assigner = smoke.ComponentResidueAssigner()
+
+    identities = assigner.allocate("ethanol", "EOH", 10)
+
+    assert [identity.chain_id for identity in identities] == [
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "N",
+    ]
+    assert "M" not in {identity.chain_id for identity in identities}
+
+
+def test_smoke_build_skips_solvent_allocation_when_resolved_count_is_zero(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Allow the full smoke build path to complete without zero-count solvent identities."""
+
+    smoke = load_smoke_module()
+
+    class FakeForce:
+        """Minimal force object for smoke build unit tests."""
+
+        PME = "PME"
+
+        def setNonbondedMethod(self, method: object) -> None:  # noqa: N802
+            """Accept a nonbonded method without constructing OpenMM objects."""
+
+        def setCutoffDistance(self, cutoff: object) -> None:  # noqa: N802
+            """Accept a cutoff without constructing OpenMM objects."""
+
+        def setUseSwitchingFunction(self, enabled: bool) -> None:  # noqa: N802
+            """Accept switching configuration without constructing OpenMM objects."""
+
+        def setSwitchingDistance(self, distance: object) -> None:  # noqa: N802
+            """Accept switching distance without constructing OpenMM objects."""
+
+        def setUseDispersionCorrection(self, enabled: bool) -> None:  # noqa: N802
+            """Accept dispersion configuration without constructing OpenMM objects."""
+
+        def addException(self, *args: object, **kwargs: object) -> None:  # noqa: N802
+            """Accept exception parameters without constructing OpenMM objects."""
+
+    class FakeSystem:
+        """Minimal OpenMM system replacement for smoke build unit tests."""
+
+        def __init__(self) -> None:
+            self.forces = []
+
+        def setDefaultPeriodicBoxVectors(self, *vectors: object) -> None:  # noqa: N802
+            """Accept periodic box vectors without constructing OpenMM objects."""
+
+        def addForce(self, force: object) -> None:  # noqa: N802
+            """Record added forces for summary metadata."""
+
+            self.forces.append(force)
+
+        def getNumParticles(self) -> int:  # noqa: N802
+            """Return a stable particle count for summary metadata."""
+
+            return 0
+
+    class FakeTopology:
+        """Minimal topology replacement for smoke build unit tests."""
+
+        def setPeriodicBoxVectors(self, vectors: object) -> None:  # noqa: N802
+            """Accept periodic box vectors without constructing OpenMM objects."""
+
+    class FakeVec3(tuple):
+        """Tuple-backed vector that supports OpenMM-like unit multiplication."""
+
+        def __new__(cls, *coordinates: float) -> FakeVec3:
+            return super().__new__(cls, coordinates)
+
+        def __mul__(self, scalar: object) -> FakeVec3:
+            return self
+
+    fake_openmm = SimpleNamespace(
+        System=FakeSystem,
+        NonbondedForce=FakeForce,
+        HarmonicBondForce=FakeForce,
+        HarmonicAngleForce=FakeForce,
+        PeriodicTorsionForce=FakeForce,
+        CMMotionRemover=lambda: SimpleNamespace(),
+        Vec3=FakeVec3,
+    )
+    fake_unit = SimpleNamespace(
+        nanometer=1.0,
+        elementary_charge=1.0,
+        kilojoule_per_mole=1.0,
+        Quantity=lambda values, unit: (values, unit),
+    )
+    modules = SimpleNamespace(
+        openmm=fake_openmm,
+        app=SimpleNamespace(Topology=FakeTopology),
+        unit=fake_unit,
+    )
+    plan = SimpleNamespace(
+        config=SimpleNamespace(
+            parameterization=SimpleNamespace(nonbonded_cutoff=1.0),
+            packing=SimpleNamespace(packmol=SimpleNamespace(tolerance=1.8)),
+        ),
+        slab=SimpleNamespace(positions_nm=((0.0, 0.0, 0.0),)),
+        sam_placements=SimpleNamespace(placements=(SimpleNamespace(),)),
+        box_plan=SimpleNamespace(dimensions_nm=(2.0, 2.0, 4.0)),
+    )
+
+    def add_pd_position(*args: object, **kwargs: object) -> None:
+        """Populate Pd positions without adding chemical details."""
+
+        positions_nm = args[6]
+        positions_nm.append((1.0, 1.0, 1.0))
+
+    def add_sam_position(*args: object, **kwargs: object) -> None:
+        """Populate SAM positions without adding chemical details."""
+
+        positions_nm = args[9]
+        positions_nm.append((1.0, 1.0, 1.2))
+
+    def add_reactant_position(*args: object, **kwargs: object) -> None:
+        """Populate reactant positions without adding chemical details."""
+
+        positions_nm = args[9]
+        positions_nm.append((1.0, 1.0, 2.0))
+
+    def fail_solvent_call(*args: object, **kwargs: object) -> None:
+        """Fail if the zero-count branch tries to pack or add solvent."""
+
+        raise AssertionError("zero-count solvent should not be packed or added")
+
+    monkeypatch.setattr(smoke, "add_pd_slab", add_pd_position)
+    monkeypatch.setattr(smoke, "add_sam_layer", add_sam_position)
+    monkeypatch.setattr(
+        smoke,
+        "place_reactants_above_surface",
+        lambda *args: (((1.0, 1.0, 2.0),),),
+    )
+    monkeypatch.setattr(smoke, "add_reactants", add_reactant_position)
+    monkeypatch.setattr(smoke, "pack_solution_with_packmol", fail_solvent_call)
+    monkeypatch.setattr(smoke, "add_solvent_molecules", fail_solvent_call)
+
+    smoke_build = smoke.build_openmm_smoke_system(
+        modules,
+        plan,
+        SimpleNamespace(),
+        SimpleNamespace(),
+        SimpleNamespace(name="ethanol"),
+        solvent_count=0,
+        reactant_count=1,
+        sulfur_height_nm=0.18,
+        solvent_padding_nm=1.0,
+        packmol_working_dir=tmp_path,
+        pressure_bar=1.0,
+        temperature_k=300.0,
+        pd_s_sigma_nm=0.22,
+        pd_s_epsilon_kcal_mol=1.0,
+    )
+
+    assert smoke_build.solvent_count == 0
+    assert "ethanol" not in smoke_build.component_chain_ranges
+
+
 def test_smoke_fixed_solute_containment_accepts_tolerance() -> None:
     """Allow tiny numerical drift at runtime box boundaries."""
 

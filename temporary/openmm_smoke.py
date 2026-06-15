@@ -83,6 +83,7 @@ PACKMOL_TOLERANCE_ANGSTROM = 1.8
 PACKMOL_NLOOP = 200
 MAX_RESIDUES_PER_CHAIN = 9999
 CHAIN_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+NON_METAL_CHAIN_LETTERS = "ABCDEFGHIJKLNOPQRSTUVWXYZ"
 SEMANTIC_CHAIN_STARTS = {
     "metal": "M",
     "reactant": "B",
@@ -330,16 +331,17 @@ class ComponentResidueAssigner:
             msg = "residue_count must be positive"
             raise ValueError(msg)
         role = component_role(component_name)
-        start_chain_index = CHAIN_LETTERS.index(SEMANTIC_CHAIN_STARTS[role])
+        chain_letters = chain_letters_for_role(role)
+        start_chain_index = chain_letters.index(SEMANTIC_CHAIN_STARTS[role])
         chains_needed = math.ceil(residue_count / MAX_RESIDUES_PER_CHAIN)
         stop_chain_index = start_chain_index + chains_needed - 1
-        if stop_chain_index >= len(CHAIN_LETTERS):
+        if stop_chain_index >= len(chain_letters):
             msg = "smoke topology exceeded available one-character chain identifiers"
             raise RuntimeError(msg)
 
         identities = tuple(
             ResidueIdentity(
-                chain_id=CHAIN_LETTERS[start_chain_index + index // MAX_RESIDUES_PER_CHAIN],
+                chain_id=chain_letters[start_chain_index + index // MAX_RESIDUES_PER_CHAIN],
                 residue_id=index % MAX_RESIDUES_PER_CHAIN + 1,
                 residue_name=residue_name,
             )
@@ -348,11 +350,19 @@ class ComponentResidueAssigner:
         self._component_ranges[component_name] = {
             "residue_name": residue_name,
             "residue_count": residue_count,
-            "first_chain_id": CHAIN_LETTERS[start_chain_index],
-            "last_chain_id": CHAIN_LETTERS[stop_chain_index],
+            "first_chain_id": chain_letters[start_chain_index],
+            "last_chain_id": chain_letters[stop_chain_index],
             "max_residues_per_chain": MAX_RESIDUES_PER_CHAIN,
         }
         return identities
+
+
+def chain_letters_for_role(role: str) -> str:
+    """Return allowed chain IDs for a semantic smoke component role."""
+
+    if role == "metal":
+        return CHAIN_LETTERS
+    return NON_METAL_CHAIN_LETTERS
 
 
 def component_role(component_name: str) -> str:
@@ -864,7 +874,9 @@ def molecule_template_from_smiles(
         ConstraintParameter(
             atom1=openmm_system.getConstraintParameters(index)[0],
             atom2=openmm_system.getConstraintParameters(index)[1],
-            distance_nm=openmm_system.getConstraintParameters(index)[2].value_in_unit(unit.nanometer),
+            distance_nm=openmm_system.getConstraintParameters(index)[2].value_in_unit(
+                unit.nanometer
+            ),
         )
         for index in range(openmm_system.getNumConstraints())
     )
@@ -945,23 +957,19 @@ def extract_openff_forces(
                     epsilon.value_in_unit(unit.kilojoule_per_mole),
                 )
                 for charge, sigma, epsilon in (
-                    force.getParticleParameters(index)
-                    for index in range(force.getNumParticles())
+                    force.getParticleParameters(index) for index in range(force.getNumParticles())
                 )
             ]
             exceptions = [
                 ExceptionParameter(
                     atom1=atom1,
                     atom2=atom2,
-                    chargeprod_e2=chargeprod.value_in_unit(
-                        unit.elementary_charge**2
-                    ),
+                    chargeprod_e2=chargeprod.value_in_unit(unit.elementary_charge**2),
                     sigma_nm=sigma.value_in_unit(unit.nanometer),
                     epsilon_kj_mol=epsilon.value_in_unit(unit.kilojoule_per_mole),
                 )
                 for atom1, atom2, chargeprod, sigma, epsilon in (
-                    force.getExceptionParameters(index)
-                    for index in range(force.getNumExceptions())
+                    force.getExceptionParameters(index) for index in range(force.getNumExceptions())
                 )
             ]
         elif isinstance(force, openmm.HarmonicBondForce):
@@ -970,9 +978,7 @@ def extract_openff_forces(
                     atom1=atom1,
                     atom2=atom2,
                     length_nm=length.value_in_unit(unit.nanometer),
-                    k_kj_mol_nm2=k.value_in_unit(
-                        unit.kilojoule_per_mole / unit.nanometer**2
-                    ),
+                    k_kj_mol_nm2=k.value_in_unit(unit.kilojoule_per_mole / unit.nanometer**2),
                 )
                 for atom1, atom2, length, k in (
                     force.getBondParameters(index) for index in range(force.getNumBonds())
@@ -985,9 +991,7 @@ def extract_openff_forces(
                     atom2=atom2,
                     atom3=atom3,
                     angle_rad=angle.value_in_unit(unit.radian),
-                    k_kj_mol_rad2=k.value_in_unit(
-                        unit.kilojoule_per_mole / unit.radian**2
-                    ),
+                    k_kj_mol_rad2=k.value_in_unit(unit.kilojoule_per_mole / unit.radian**2),
                 )
                 for atom1, atom2, atom3, angle, k in (
                     force.getAngleParameters(index) for index in range(force.getNumAngles())
@@ -1005,8 +1009,7 @@ def extract_openff_forces(
                     k_kj_mol=k.value_in_unit(unit.kilojoule_per_mole),
                 )
                 for atom1, atom2, atom3, atom4, periodicity, phase, k in (
-                    force.getTorsionParameters(index)
-                    for index in range(force.getNumTorsions())
+                    force.getTorsionParameters(index) for index in range(force.getNumTorsions())
                 )
             ]
     if not nonbonded:
@@ -1161,36 +1164,38 @@ def build_openmm_smoke_system(
         solvent_packing_volume_nm3(solvent_regions_nm),
     )
 
-    packed_solution = pack_solution_with_packmol(
-        topology=topology,
-        solute_positions_nm=tuple(positions_nm),
-        solvent_template=solvent_template,
-        solvent_count=resolved_solvent_count,
-        box_dimensions_nm=box_dimensions_nm,
-        solvent_regions_nm=solvent_regions_nm,
-        working_dir=packmol_working_dir,
-    )
-    solvent_identities = residue_assigner.allocate(
-        SOLVENT_NAME,
-        SOLVENT_RESIDUE_NAME,
-        resolved_solvent_count,
-    )
-    placed_solvent = add_solvent_molecules(
-        modules,
-        topology,
-        system,
-        nonbonded,
-        bond_force,
-        angle_force,
-        torsion_force,
-        atom_handles,
-        chain_cache,
-        positions_nm,
-        all_bonds,
-        solvent_template,
-        packed_solution.solvent_positions_nm,
-        solvent_identities,
-    )
+    placed_solvent = 0
+    if resolved_solvent_count > 0:
+        packed_solution = pack_solution_with_packmol(
+            topology=topology,
+            solute_positions_nm=tuple(positions_nm),
+            solvent_template=solvent_template,
+            solvent_count=resolved_solvent_count,
+            box_dimensions_nm=box_dimensions_nm,
+            solvent_regions_nm=solvent_regions_nm,
+            working_dir=packmol_working_dir,
+        )
+        solvent_identities = residue_assigner.allocate(
+            SOLVENT_NAME,
+            SOLVENT_RESIDUE_NAME,
+            resolved_solvent_count,
+        )
+        placed_solvent = add_solvent_molecules(
+            modules,
+            topology,
+            system,
+            nonbonded,
+            bond_force,
+            angle_force,
+            torsion_force,
+            atom_handles,
+            chain_cache,
+            positions_nm,
+            all_bonds,
+            solvent_template,
+            packed_solution.solvent_positions_nm,
+            solvent_identities,
+        )
     system.addForce(nonbonded)
     system.addForce(bond_force)
     system.addForce(angle_force)
@@ -1294,9 +1299,7 @@ def actual_solvent_packing_geometry(
             (shifted_max_z + clearance_nm, solvent_z_max + z_shift_nm),
         ),
     )
-    solvent_regions = tuple(
-        region for region in regions if region[2][1] > region[2][0]
-    )
+    solvent_regions = tuple(region for region in regions if region[2][1] > region[2][0])
     return dimensions_nm, z_shift_nm, solvent_regions
 
 
@@ -2082,6 +2085,7 @@ def create_simulation_with_platform_fallback(
     openmm = modules.openmm
     app = modules.app
     unit = modules.unit
+    openmm_exception = getattr(openmm, "OpenMMException", RuntimeError)
     available = available_platform_names(openmm)
     candidates = auto_platform_candidates(available) if platform_name == "auto" else [platform_name]
     errors = []
@@ -2106,7 +2110,7 @@ def create_simulation_with_platform_fallback(
             )
             simulation.context.setPositions(smoke_build.positions_quantity)
             simulation.context.getState(getEnergy=True)
-        except Exception as error:
+        except openmm_exception as error:
             errors.append(f"{candidate}: {error}")
             continue
         return PlatformSelection(
