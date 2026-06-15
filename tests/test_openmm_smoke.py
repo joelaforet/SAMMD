@@ -49,6 +49,32 @@ def test_smoke_auto_solvent_count_allows_zero(monkeypatch: pytest.MonkeyPatch) -
     assert count == 0
 
 
+def test_smoke_explicit_zero_solvent_count_is_valid() -> None:
+    """Allow explicit zero solvent count to reach the zero-solvent path."""
+
+    smoke = load_smoke_module()
+
+    args = SimpleNamespace(
+        lateral_size_nm=2.0,
+        solvent_padding_nm=3.0,
+        timestep_fs=2.0,
+        friction_per_ps=1.0,
+        pd_s_sigma_angstrom=2.0,
+        pd_s_epsilon_kcal_mol=1.0,
+        duration_ns=1.0,
+        sulfur_height_nm=0.18,
+        seed=1,
+        steps=1,
+        minimize_iterations=0,
+        frames=1,
+        report_interval=1,
+        reactant_count=None,
+        solvent_count="0",
+    )
+
+    smoke.validate_args(args)
+
+
 def test_smoke_fixed_solute_containment_accepts_tolerance() -> None:
     """Allow tiny numerical drift at runtime box boundaries."""
 

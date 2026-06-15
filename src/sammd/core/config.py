@@ -448,8 +448,10 @@ reactants:
 # ============================================================================
 # Solvent
 # ============================================================================
-# Solvent is packed only into explicit reservoirs just outside the generated
-# slab/SAM/reactant geometry, not throughout the full simulation box.
+# Solvent is packed only into explicit reservoirs bounded by the generated
+# slab/SAM geometry, not throughout the full simulation box. Reactants are fixed
+# contained solutes avoided locally by Packmol, but they do not define global
+# planar reservoir boundaries.
 #
 # Padding is the total z reservoir thickness across both exposed SAM faces.
 # SAMMD splits this equally, so padding: 3.0 gives 1.5 nm per face. Counts are
@@ -539,8 +541,8 @@ salts: []
 # ============================================================================
 # Packing
 # ============================================================================
-# PACKMOL options used when placing solvent molecules around the fixed
-# slab/SAM/reactant structure.
+# PACKMOL options used when placing solvent molecules in reservoirs bounded by
+# slab/SAM geometry while avoiding the fixed slab/SAM/reactant structure.
 #
 packing:
   packmol:

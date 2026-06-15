@@ -600,9 +600,9 @@ def validate_args(args: argparse.Namespace) -> None:
         try:
             solvent_count = int(args.solvent_count)
         except ValueError as error:
-            raise SystemExit("--solvent-count must be 'auto' or a positive integer") from error
-        if solvent_count <= 0:
-            raise SystemExit("--solvent-count must be 'auto' or a positive integer")
+            raise SystemExit("--solvent-count must be 'auto' or a non-negative integer") from error
+        if solvent_count < 0:
+            raise SystemExit("--solvent-count must be 'auto' or a non-negative integer")
 
 
 def require_openmm_modules() -> Any:
