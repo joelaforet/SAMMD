@@ -68,7 +68,7 @@ def test_fcc111_slab_geometry_is_centered_and_deterministic_for_pd() -> None:
 
 
 def test_noncommensurate_lateral_size_is_adjusted_upward() -> None:
-    """Report the effective commensurate periodic cell, not the requested minimum."""
+    """Round requested slab dimensions up to the next whole-lattice periodic cell."""
 
     slab = plan_fcc111_slab("Pd", (1.01, 1.01), 3)
 
