@@ -26,7 +26,6 @@ from sammd.model.solvation import SolutionPlan, plan_solution_composition
 from sammd.model.surfaces import BindingSite, SurfaceSlab, generate_binding_sites, plan_fcc111_slab
 
 DEFAULT_SOLVENT_PADDING_NM = 3.0
-DEFAULT_SAM_EXTENDED_LENGTH_NM = 0.95
 SLAB_CUTOFF_BUFFER_NM = 0.5
 
 
@@ -471,12 +470,8 @@ def _estimate_sam_length(component: Any) -> SAMLengthEstimate:
                 "OpenFF/RDKit conformer-based estimation."
             )
             raise ValueError(msg) from exc
-        length_nm = max(DEFAULT_SAM_EXTENDED_LENGTH_NM, estimated_length_nm)
-        source = (
-            "openff_conformer"
-            if estimated_length_nm > DEFAULT_SAM_EXTENDED_LENGTH_NM
-            else "minimum_default"
-        )
+        length_nm = estimated_length_nm
+        source = "openff_conformer"
     return SAMLengthEstimate(
         component_name=component.name,
         residue_name=component.residue_name,

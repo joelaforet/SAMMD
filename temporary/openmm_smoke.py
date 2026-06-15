@@ -78,7 +78,6 @@ REFERENCE_PD_S_EPSILON_KCAL_MOL = 1.0
 DEFAULT_PD_S_EPSILON_KCAL_MOL = METAL_SULFUR_EPSILON_KCAL_MOL
 OPENFF_FORCE_FIELD = "openff-2.2.1.offxml"
 NAGL_CHARGE_MODEL = "openff-gnn-am1bcc-1.0.0.pt"
-SAM_TAIL_CLEARANCE_NM = 0.95
 PACKMOL_TOLERANCE_ANGSTROM = 1.8
 PACKMOL_NLOOP = 200
 MAX_RESIDUES_PER_CHAIN = 9999
@@ -1108,13 +1107,22 @@ def build_openmm_smoke_system(
         reactant_positions,
         reactant_identities,
     )
+    box_dimensions_nm, z_shift_nm, solvent_regions_nm = actual_solvent_packing_geometry(
+        plan,
+        tuple(positions_nm),
+        solvent_padding_nm,
+    )
+    if z_shift_nm != 0.0:
+        positions_nm[:] = [shift_position_z(position, z_shift_nm) for position in positions_nm]
+    set_periodic_box(modules, topology, system, box_dimensions_nm)
+
     packed_solution = pack_solution_with_packmol(
         topology=topology,
         solute_positions_nm=tuple(positions_nm),
         solvent_template=solvent_template,
         solvent_count=solvent_count,
         box_dimensions_nm=box_dimensions_nm,
-        solvent_regions_nm=runtime_solvent_packing_regions(plan),
+        solvent_regions_nm=solvent_regions_nm,
         working_dir=packmol_working_dir,
     )
     solvent_identities = residue_assigner.allocate(
@@ -1195,6 +1203,49 @@ def runtime_solvent_packing_regions(plan: Any) -> tuple[BoxBounds, ...]:
         )
         for region in plan.box_plan.solvent_packing_regions_nm
     )
+
+
+def actual_solvent_packing_geometry(
+    plan: Any,
+    fixed_solute_positions_nm: tuple[Vector3, ...],
+    solvent_padding_nm: float,
+) -> tuple[Vector3, float, tuple[BoxBounds, ...]]:
+    """Return box dimensions and solvent regions from actual fixed-solute geometry."""
+
+    if not fixed_solute_positions_nm:
+        raise ValueError("actual solvent packing geometry requires fixed-solute positions")
+    padding_per_face_nm = solvent_padding_nm / 2.0
+    clearance_nm = PACKMOL_TOLERANCE_ANGSTROM / 10.0
+    fixed_min_z = min(position[2] for position in fixed_solute_positions_nm)
+    fixed_max_z = max(position[2] for position in fixed_solute_positions_nm)
+    z_min = fixed_min_z - padding_per_face_nm
+    z_max = fixed_max_z + padding_per_face_nm
+    z_shift_nm = -z_min
+    dimensions_nm = (
+        plan.box_plan.dimensions_nm[0],
+        plan.box_plan.dimensions_nm[1],
+        z_max - z_min,
+    )
+    shifted_min_z = fixed_min_z + z_shift_nm
+    shifted_max_z = fixed_max_z + z_shift_nm
+    regions = (
+        ((0.0, dimensions_nm[0]), (0.0, dimensions_nm[1]), (0.0, shifted_min_z - clearance_nm)),
+        (
+            (0.0, dimensions_nm[0]),
+            (0.0, dimensions_nm[1]),
+            (shifted_max_z + clearance_nm, dimensions_nm[2]),
+        ),
+    )
+    solvent_regions = tuple(
+        region for region in regions if region[2][1] > region[2][0]
+    )
+    return dimensions_nm, z_shift_nm, solvent_regions
+
+
+def shift_position_z(position: Vector3, shift_nm: float) -> Vector3:
+    """Return a position shifted along z."""
+
+    return (position[0], position[1], position[2] + shift_nm)
 
 
 def set_periodic_box(modules: Any, topology: Any, system: Any, dimensions_nm: Vector3) -> None:
@@ -1606,7 +1657,7 @@ def place_reactants_above_surface(
 ) -> tuple[tuple[Vector3, ...], ...]:
     """Place reactant molecule(s) in the upper solvent before Packmol solvent packing."""
 
-    top_z = plan.slab.top_z_nm + SAM_TAIL_CLEARANCE_NM + 0.75
+    top_z = plan.slab.top_z_nm + plan.box_plan.sam_extended_length_nm + 0.75
     centers = solvent_centers(reactant_count, plan.slab.lateral_size_nm, top_z)
     return tuple(
         center_template(template, clamp_to_box(add_vectors(center, shift_nm), box_dimensions_nm))

@@ -32,6 +32,7 @@ from sammd.backends.packmol import (
 )
 from sammd.core.io import AtomRecord, safe_write_text
 from sammd.model.sam import SAMPlacement
+from sammd.model.solvation import SolutionPlan, plan_solution_composition
 from sammd.utils.geometry import (
     Vector3,
     add_vectors,
@@ -66,6 +67,24 @@ class BackendExportResult:
     files: dict[str, Path]
     openff_toolkit_version: str | None
     openff_interchange_version: str | None
+    runtime_solvent_geometry: RuntimeSolventGeometry | None = None
+
+
+@dataclass(frozen=True)
+class RuntimeSolventGeometry:
+    """Actual fixed-solute geometry used for runtime solvent packing."""
+
+    fixed_solute_z_bounds_nm: tuple[float, float]
+    solvent_regions_nm: tuple[
+        tuple[tuple[float, float], tuple[float, float], tuple[float, float]], ...
+    ]
+    solvent_count_planning_volume_nm3: float
+    solvent_padding_nm: float
+    solvent_padding_per_face_nm: float
+    solvent_clearance_nm: float
+    dimensions_nm: Vector3
+    z_shift_nm: float
+    molecule_counts: dict[str, int]
 
 
 @dataclass(frozen=True)
@@ -240,6 +259,45 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
         "sulfur_metal_pair_count": len(result.anchor_pairs),
         "metal_sulfur_override": _anchor_metadata(result),
     }
+    runtime_solvent_geometry = getattr(result, "runtime_solvent_geometry", None)
+    if runtime_solvent_geometry is not None:
+        geometry = runtime_solvent_geometry
+        box_summary = dict(summary["box"])
+        box_summary.update(
+            {
+                "dimensions_nm": list(geometry.dimensions_nm),
+                "bounds_nm": [
+                    [0.0, geometry.dimensions_nm[0]],
+                    [0.0, geometry.dimensions_nm[1]],
+                    [0.0, geometry.dimensions_nm[2]],
+                ],
+                "volume_nm3": (
+                    geometry.dimensions_nm[0]
+                    * geometry.dimensions_nm[1]
+                    * geometry.dimensions_nm[2]
+                ),
+                "actual_fixed_solute_z_bounds_nm": list(geometry.fixed_solute_z_bounds_nm),
+                "solvent_packing_regions_nm": [
+                    [list(axis_bounds) for axis_bounds in region]
+                    for region in geometry.solvent_regions_nm
+                ],
+                "solvent_count_planning_volume_nm3": (
+                    geometry.solvent_count_planning_volume_nm3
+                ),
+                "solvent_padding_nm": geometry.solvent_padding_nm,
+                "solvent_padding_per_face_nm": geometry.solvent_padding_per_face_nm,
+                "solvent_clearance_nm": geometry.solvent_clearance_nm,
+            }
+        )
+        summary["box"] = box_summary
+        solution_summary = dict(summary["solution"])
+        solution_summary.update(
+            {
+                "count_planning_volume_nm3": geometry.solvent_count_planning_volume_nm3,
+                "molecule_counts": geometry.molecule_counts,
+            }
+        )
+        summary["solution"] = solution_summary
     return summary
 
 
@@ -389,11 +447,30 @@ def build_interchange_backend(
             )
     _timed_progress(progress, "  reactants placed", stage_start)
 
-    solvent_count = sum(solvent.count for solvent in plan.solution.solvent_components)
+    runtime_geometry = _runtime_solvent_geometry(plan, tuple(atom_records))
+    if runtime_geometry.z_shift_nm != 0.0:
+        positions_nm[:] = [
+            _shift_position_z(position, runtime_geometry.z_shift_nm) for position in positions_nm
+        ]
+        atom_records[:] = [
+            _shift_atom_record_z(record, runtime_geometry.z_shift_nm) for record in atom_records
+        ]
+
+    runtime_solution = plan_solution_composition(
+        plan.config,
+        runtime_geometry.solvent_count_planning_volume_nm3,
+    )
+    runtime_geometry = _runtime_geometry_with_counts(
+        runtime_geometry,
+        runtime_solution,
+        plan.solution,
+    )
+
+    solvent_count = sum(solvent.count for solvent in runtime_solution.solvent_components)
     stage_start = perf_counter()
     _progress(progress, f"Preparing {solvent_count} solvent molecules")
     solvent_templates: list[tuple[Any, PreparedMoleculeTemplate]] = []
-    for solvent in plan.solution.solvent_components:
+    for solvent in runtime_solution.solvent_components:
         if solvent.smiles is None:
             msg = (
                 f"solvent component {solvent.name!r} requires explicit SMILES for "
@@ -431,9 +508,9 @@ def build_interchange_backend(
             )
             for solvent, template in solvent_templates
         ),
-        dimensions_nm=plan.box_plan.dimensions_nm,
+        dimensions_nm=runtime_geometry.dimensions_nm,
         working_dir=_packmol_working_dir(plan, "mixed_solvent"),
-        solvent_regions_nm=_runtime_solvent_regions(plan),
+        solvent_regions_nm=runtime_geometry.solvent_regions_nm,
         tolerance_angstrom=plan.config.packing.packmol.tolerance,
         nloop=plan.config.packing.packmol.nloop,
     )
@@ -472,9 +549,9 @@ def build_interchange_backend(
     topology = toolkit.Topology.from_molecules(molecules)
     stage_start = _timed_progress(progress, "  OpenFF topology object ready", stage_start)
     topology.box_vectors = [
-        [plan.box_plan.dimensions_nm[0], 0.0, 0.0],
-        [0.0, plan.box_plan.dimensions_nm[1], 0.0],
-        [0.0, 0.0, plan.box_plan.dimensions_nm[2]],
+        [runtime_geometry.dimensions_nm[0], 0.0, 0.0],
+        [0.0, runtime_geometry.dimensions_nm[1], 0.0],
+        [0.0, 0.0, runtime_geometry.dimensions_nm[2]],
     ] * unit.nanometer
     positions = positions_nm * unit.nanometer
     _timed_progress(progress, f"  positions array ready ({len(positions_nm)} atoms)", stage_start)
@@ -525,6 +602,7 @@ def build_interchange_backend(
         files={},
         openff_toolkit_version=_package_version("openff-toolkit"),
         openff_interchange_version=_package_version("openff-interchange"),
+        runtime_solvent_geometry=runtime_geometry,
     )
 
 
@@ -625,6 +703,118 @@ def _runtime_solvent_regions(plan: Any) -> tuple[Any, ...]:
             for axis_bounds, axis_lower in zip(region, box_lowers, strict=True)
         )
         for region in plan.box_plan.solvent_packing_regions_nm
+    )
+
+
+def _runtime_solvent_geometry(
+    plan: Any,
+    fixed_solute_records: tuple[AtomRecord, ...],
+) -> RuntimeSolventGeometry:
+    """Derive runtime solvent regions from actual fixed-solute z extents."""
+
+    if not fixed_solute_records:
+        msg = "runtime solvent geometry requires fixed-solute atom records"
+        raise ValueError(msg)
+    padding_nm = float(getattr(plan.config.solvent, "padding", 3.0))
+    padding_per_face_nm = padding_nm / 2.0
+    clearance_nm = float(plan.config.packing.packmol.tolerance) / 10.0
+    fixed_min_z = min(record.coordinates_nm[2] for record in fixed_solute_records)
+    fixed_max_z = max(record.coordinates_nm[2] for record in fixed_solute_records)
+    final_z_min = fixed_min_z - padding_per_face_nm
+    final_z_max = fixed_max_z + padding_per_face_nm
+    z_shift_nm = -final_z_min
+    dimensions_nm = (
+        plan.box_plan.dimensions_nm[0],
+        plan.box_plan.dimensions_nm[1],
+        final_z_max - final_z_min,
+    )
+    fixed_bounds = (fixed_min_z + z_shift_nm, fixed_max_z + z_shift_nm)
+    bottom_region = (
+        (0.0, dimensions_nm[0]),
+        (0.0, dimensions_nm[1]),
+        (0.0, fixed_bounds[0] - clearance_nm),
+    )
+    top_region = (
+        (0.0, dimensions_nm[0]),
+        (0.0, dimensions_nm[1]),
+        (fixed_bounds[1] + clearance_nm, dimensions_nm[2]),
+    )
+    solvent_regions_nm = tuple(
+        region for region in (bottom_region, top_region) if region[2][1] > region[2][0]
+    )
+    count_volume_nm3 = sum(_region_volume_nm3(region) for region in solvent_regions_nm)
+    return RuntimeSolventGeometry(
+        fixed_solute_z_bounds_nm=fixed_bounds,
+        solvent_regions_nm=solvent_regions_nm,
+        solvent_count_planning_volume_nm3=count_volume_nm3,
+        solvent_padding_nm=padding_nm,
+        solvent_padding_per_face_nm=padding_per_face_nm,
+        solvent_clearance_nm=clearance_nm,
+        dimensions_nm=dimensions_nm,
+        z_shift_nm=z_shift_nm,
+        molecule_counts={},
+    )
+
+
+def _runtime_geometry_with_counts(
+    geometry: RuntimeSolventGeometry,
+    solvent_solution: SolutionPlan,
+    fixed_solution: SolutionPlan,
+) -> RuntimeSolventGeometry:
+    """Return runtime solvent geometry annotated with solution counts."""
+
+    molecule_counts: dict[str, int] = {}
+    for component in solvent_solution.solvent_components:
+        molecule_counts[component.name] = molecule_counts.get(component.name, 0) + component.count
+    for component in fixed_solution.reactants:
+        molecule_counts[component.name] = molecule_counts.get(component.name, 0) + component.count
+    for salt in fixed_solution.salts:
+        molecule_counts[salt.cation] = molecule_counts.get(salt.cation, 0) + salt.cation_count
+        molecule_counts[salt.anion] = molecule_counts.get(salt.anion, 0) + salt.anion_count
+
+    return RuntimeSolventGeometry(
+        fixed_solute_z_bounds_nm=geometry.fixed_solute_z_bounds_nm,
+        solvent_regions_nm=geometry.solvent_regions_nm,
+        solvent_count_planning_volume_nm3=geometry.solvent_count_planning_volume_nm3,
+        solvent_padding_nm=geometry.solvent_padding_nm,
+        solvent_padding_per_face_nm=geometry.solvent_padding_per_face_nm,
+        solvent_clearance_nm=geometry.solvent_clearance_nm,
+        dimensions_nm=geometry.dimensions_nm,
+        z_shift_nm=geometry.z_shift_nm,
+        molecule_counts=molecule_counts,
+    )
+
+
+def _region_volume_nm3(
+    region: tuple[tuple[float, float], tuple[float, float], tuple[float, float]],
+) -> float:
+    """Return the volume of one orthorhombic region."""
+
+    return (
+        (region[0][1] - region[0][0])
+        * (region[1][1] - region[1][0])
+        * (region[2][1] - region[2][0])
+    )
+
+
+def _shift_position_z(position: Vector3, shift_nm: float) -> Vector3:
+    """Return a position shifted along z."""
+
+    return (position[0], position[1], position[2] + shift_nm)
+
+
+def _shift_atom_record_z(record: AtomRecord, shift_nm: float) -> AtomRecord:
+    """Return an atom record shifted along z."""
+
+    return AtomRecord(
+        serial=record.serial,
+        atom_name=record.atom_name,
+        element=record.element,
+        residue_name=record.residue_name,
+        residue_id=record.residue_id,
+        chain_id=record.chain_id,
+        component_label=record.component_label,
+        coordinates_nm=_shift_position_z(record.coordinates_nm, shift_nm),
     )
 
 

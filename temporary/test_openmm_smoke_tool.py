@@ -171,7 +171,12 @@ def test_packmol_input_packs_solvent_around_fixed_solute() -> None:
     assert "  number 13" in solvent_blocks[0]
     assert "  number 12" in solvent_blocks[1]
     assert "  inside box 0 0 0 22.0052 23.8213 15" in solvent_blocks[0]
-    assert "  inside box 0 0 53.3212 22.0052 23.8213 68.3212" in solvent_blocks[1]
+    top_region_start_angstrom = regions[1][2][0] * 10.0
+    top_region_stop_angstrom = regions[1][2][1] * 10.0
+    assert (
+        f"  inside box 0 0 {top_region_start_angstrom:.4f} "
+        f"22.0052 23.8213 {top_region_stop_angstrom:.4f}"
+    ) in solvent_blocks[1]
     assert "structure fixed_pd_sam.pdb" in text
     assert "fixed 0. 0. 0. 0. 0. 0." in text
     assert "  inside box 0 0 0 22.0052 23.8213 68.3212" not in text

@@ -10,7 +10,6 @@ import pytest
 
 import sammd.core.builders as builders
 from sammd.core.builders import (
-    DEFAULT_SAM_EXTENDED_LENGTH_NM,
     DEFAULT_SOLVENT_PADDING_NM,
     build_system,
 )
@@ -137,16 +136,17 @@ def test_default_box_plan_uses_sam_tip_padding_and_centered_slab() -> None:
 
     plan = build_system(SAMMDConfig())
     expected_padding_per_face = DEFAULT_SOLVENT_PADDING_NM / 2.0
+    expected_sam_length = plan.box_plan.sam_length_estimates[0].length_nm
     expected_z_min = (
         plan.slab.bottom_z_nm
         - DEFAULT_SULFUR_HEIGHT_NM
-        - DEFAULT_SAM_EXTENDED_LENGTH_NM
+        - expected_sam_length
         - expected_padding_per_face
     )
     expected_z_max = (
         plan.slab.top_z_nm
         + DEFAULT_SULFUR_HEIGHT_NM
-        + DEFAULT_SAM_EXTENDED_LENGTH_NM
+        + expected_sam_length
         + expected_padding_per_face
     )
     expected_z = expected_z_max - expected_z_min
@@ -156,22 +156,22 @@ def test_default_box_plan_uses_sam_tip_padding_and_centered_slab() -> None:
     assert plan.box_plan.dimensions_nm == pytest.approx(
         (plan.slab.lateral_size_nm[0], plan.slab.lateral_size_nm[1], expected_z)
     )
-    assert plan.box_plan.sam_extended_length_nm == DEFAULT_SAM_EXTENDED_LENGTH_NM
+    assert plan.box_plan.sam_extended_length_nm == pytest.approx(expected_sam_length)
     assert plan.box_plan.solvent_padding_nm == DEFAULT_SOLVENT_PADDING_NM
     assert plan.box_plan.solvent_padding_per_face_nm == expected_padding_per_face
     assert plan.box_plan.solvent_packing_regions_nm[0][2] == pytest.approx(
         (
             expected_z_min,
-            plan.slab.bottom_z_nm - DEFAULT_SULFUR_HEIGHT_NM - DEFAULT_SAM_EXTENDED_LENGTH_NM,
+            plan.slab.bottom_z_nm - DEFAULT_SULFUR_HEIGHT_NM - expected_sam_length,
         )
     )
     assert plan.box_plan.solvent_packing_regions_nm[1][2] == pytest.approx(
         (
-            plan.slab.top_z_nm + DEFAULT_SULFUR_HEIGHT_NM + DEFAULT_SAM_EXTENDED_LENGTH_NM,
+            plan.slab.top_z_nm + DEFAULT_SULFUR_HEIGHT_NM + expected_sam_length,
             expected_z_max,
         )
     )
-    assert plan.box_plan.sam_length_estimates[0].source == "minimum_default"
+    assert plan.box_plan.sam_length_estimates[0].source == "openff_conformer"
     assert plan.box_plan.sam_length_estimates[0].estimated_length_nm is not None
 
 
@@ -257,7 +257,7 @@ def test_configured_sam_length_override_changes_box_and_solution_counts() -> Non
 
 
 def test_long_sam_length_uses_openff_conformer_graph_path() -> None:
-    """Use bonded heavy-atom contour length when it exceeds the minimum default."""
+    """Use bonded heavy-atom contour length from the generated conformer."""
 
     plan = build_system(
         SAMMDConfig(
@@ -277,8 +277,36 @@ def test_long_sam_length_uses_openff_conformer_graph_path() -> None:
 
     assert estimate.source == "openff_conformer"
     assert estimate.estimated_length_nm is not None
-    assert estimate.estimated_length_nm > DEFAULT_SAM_EXTENDED_LENGTH_NM
     assert estimate.length_nm == pytest.approx(estimate.estimated_length_nm)
+
+
+def test_short_sam_length_is_not_clamped_to_old_minimum(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Use the actual short conformer estimate without a fixed 0.95 nm floor."""
+
+    monkeypatch.setattr(builders, "_estimate_smiles_contour_length_nm", lambda smiles: 0.62)
+
+    plan = build_system(
+        SAMMDConfig(
+            sam={
+                "components": [
+                    {
+                        "name": "thioglycerol",
+                        "residue_name": "TGL",
+                        "smiles": "C(C(CS)O)O",
+                        "fraction": 1.0,
+                    }
+                ]
+            }
+        )
+    )
+    estimate = plan.box_plan.sam_length_estimates[0]
+
+    assert estimate.source == "openff_conformer"
+    assert estimate.estimated_length_nm == pytest.approx(0.62)
+    assert estimate.length_nm == pytest.approx(0.62)
+    assert plan.box_plan.sam_extended_length_nm == pytest.approx(0.62)
 
 
 def test_sam_length_estimation_failure_suggests_configured_override(

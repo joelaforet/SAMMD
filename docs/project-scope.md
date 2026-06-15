@@ -295,7 +295,7 @@ The registered Fcc(111) slab atoms are not restrained by SAMMD. They are represe
 
 SAMMD chooses the number of slab layers automatically from the registered metal geometry, configured nonbonded cutoff, and an internal buffer so the two decorated interfaces do not see each other through the slab in the `z` direction. Users choose the metal, facet, and lateral size; slab thickness is treated as a modeling detail handled by the builder.
 
-For the first notebook/demo, a practical starting system is roughly 5 x 5 nm in the lateral plane, an automatically selected default Pd(111) slab thickness, SAMs on both faces, and at least 3 nm total solvent padding split across the two solvent reservoirs from the fully extended SAM tips to the box boundaries before PBC wrapping. This is large enough for a full SAM coating and multiple cinnamaldehyde reactants (`C1=CC=C(C=C1)/C=C/C=O`) while still being plausible for prototype runs.
+For the first notebook/demo, a practical starting system is roughly 5 x 5 nm in the lateral plane, an automatically selected default Pd(111) slab thickness, SAMs on both faces, and at least 3 nm total solvent padding split across the two solvent reservoirs outside the generated fixed-solute geometry before PBC wrapping. This is large enough for a full SAM coating and multiple cinnamaldehyde reactants (`C1=CC=C(C=C1)/C=C/C=O`) while still being plausible for prototype runs.
 
 Default metal-sulfur anchoring should begin as an internal nonbonded proxy:
 

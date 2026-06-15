@@ -344,6 +344,32 @@ def test_runtime_solvent_regions_match_packmol_input_after_shift(tmp_path, monke
     assert "inside box 0 0 35 20 20 40" in input_text
 
 
+def test_actual_fixed_solute_geometry_defines_solvent_regions_for_short_sam() -> None:
+    """Place solvent next to actual fixed-solute bounds without a 0.95 nm SAM gap."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    from sammd.core.io import AtomRecord
+
+    plan = SimpleNamespace(
+        config=SimpleNamespace(
+            solvent=SimpleNamespace(padding=3.0),
+            packing=SimpleNamespace(packmol=SimpleNamespace(tolerance=1.8)),
+        ),
+        box_plan=SimpleNamespace(dimensions_nm=(2.0, 2.0, 5.0)),
+    )
+    records = (
+        AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (1.0, 1.0, 1.0)),
+        AtomRecord(2, "O", "O", "TGL", 2, "A", "sam:thioglycerol", (1.0, 1.0, 1.62)),
+    )
+
+    geometry = backend._runtime_solvent_geometry(plan, records)
+
+    assert geometry.fixed_solute_z_bounds_nm == pytest.approx((1.5, 2.12))
+    assert geometry.solvent_regions_nm[0][2] == pytest.approx((0.0, 1.32))
+    assert geometry.solvent_regions_nm[1][2] == pytest.approx((2.3, 3.62))
+    assert geometry.solvent_count_planning_volume_nm3 == pytest.approx(10.56)
+
+
 def _region_volume(region) -> float:
     """Return simple orthorhombic region volume for test assertions."""
 

@@ -385,8 +385,8 @@ surface:
 # Larger grafting_density values mean fewer SAM molecules on the surface.
 #
 # extended_length_nm is an optional advanced override for the fully extended SAM
-# length from sulfur anchor to tail tip. If omitted, SAMMD uses a dependency-free,
-# conservative SMILES heuristic with a 0.95 nm minimum default.
+# length from sulfur anchor to tail tip. If omitted, SAMMD estimates it from an
+# OpenFF/RDKit conformer without applying a fixed minimum length.
 #
 sam:
   grafting_density: 0.25  # nm^2 / molecule
@@ -448,8 +448,8 @@ reactants:
 # ============================================================================
 # Solvent
 # ============================================================================
-# Solvent is packed only into explicit reservoirs above and below the
-# slab/SAM/reactant system, not throughout the full simulation box.
+# Solvent is packed only into explicit reservoirs just outside the generated
+# slab/SAM/reactant geometry, not throughout the full simulation box.
 #
 # Padding is the total z reservoir thickness across both exposed SAM faces.
 # SAMMD splits this equally, so padding: 3.0 gives 1.5 nm per face. Counts are
