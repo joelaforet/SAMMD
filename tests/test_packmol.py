@@ -567,6 +567,33 @@ def test_fixed_solute_helper_rejects_explicit_full_box_region(tmp_path) -> None:
     assert not (tmp_path / "packmol_input.inp").exists()
 
 
+def test_fixed_solute_helper_rejects_full_box_region_with_extra_region(tmp_path) -> None:
+    """Reject any full-box solvent region before writing Packmol input."""
+
+    with pytest.raises(ValueError, match="must not reproduce full-box solvent packing"):
+        pack_fixed_solute_with_solvent(
+            solute_records=(
+                AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (0.0, 0.0, 0.0)),
+            ),
+            solvent_template=PackmolMoleculeTemplate(
+                residue_name="EOH",
+                positions_nm=((0.0, 0.0, 0.0),),
+                atom_symbols=("C",),
+                atom_names=("C1",),
+            ),
+            solvent_name="ethanol",
+            solvent_count=2,
+            dimensions_nm=(2.0, 2.0, 2.0),
+            working_dir=tmp_path,
+            solvent_regions_nm=(
+                zero_origin_box_bounds((2.0, 2.0, 2.0)),
+                ((0.0, 2.0), (0.0, 2.0), (0.0, 0.5)),
+            ),
+        )
+
+    assert not (tmp_path / "packmol_input.inp").exists()
+
+
 def test_fixed_solute_helper_uses_explicit_regions_without_full_box(tmp_path, monkeypatch) -> None:
     """High-level packing keeps solute fixed and only uses explicit solvent regions."""
 
@@ -654,6 +681,32 @@ def test_mixed_solvent_helper_rejects_explicit_full_box_region(tmp_path) -> None
             dimensions_nm=(2.0, 2.0, 2.0),
             working_dir=tmp_path,
             solvent_regions_nm=(zero_origin_box_bounds((2.0, 2.0, 2.0)),),
+        )
+
+    assert not (tmp_path / "packmol_input.inp").exists()
+
+
+def test_mixed_solvent_helper_rejects_full_box_region_with_extra_region(tmp_path) -> None:
+    """Reject any mixed-solvent full-box region before writing Packmol input."""
+
+    with pytest.raises(ValueError, match="must not reproduce full-box solvent packing"):
+        pack_fixed_solute_with_solvent_components(
+            solute_records=(
+                AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (0.0, 0.0, 0.0)),
+            ),
+            solvent_components=(
+                PackmolSolventComponent(
+                    "water",
+                    PackmolMoleculeTemplate("HOH", ((0.0, 0.0, 0.0),), ("O",), ("O1",)),
+                    2,
+                ),
+            ),
+            dimensions_nm=(2.0, 2.0, 2.0),
+            working_dir=tmp_path,
+            solvent_regions_nm=(
+                zero_origin_box_bounds((2.0, 2.0, 2.0)),
+                ((0.0, 2.0), (0.0, 2.0), (1.5, 2.0)),
+            ),
         )
 
     assert not (tmp_path / "packmol_input.inp").exists()

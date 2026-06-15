@@ -480,6 +480,9 @@ def _require_explicit_solvent_regions(
     for region in regions_nm:
         _validate_bounds(region)
         _validate_region_inside_box(region, box_bounds_nm)
+        if _region_matches_box(region, box_bounds_nm):
+            msg = "explicit solvent_regions_nm must not reproduce full-box solvent packing"
+            raise ValueError(msg)
     if _regions_fill_box(regions_nm, box_bounds_nm):
         msg = "explicit solvent_regions_nm must not reproduce full-box solvent packing"
         raise ValueError(msg)
@@ -502,6 +505,26 @@ def _regions_fill_box(regions_nm: tuple[BoxBounds, ...], box_bounds_nm: BoxBound
     region_volume = sum(_region_volume_nm3(region) for region in regions_nm)
     tolerance = max(FULL_BOX_REGION_ABS_TOL_NM3, box_volume * FULL_BOX_REGION_REL_TOL)
     return abs(region_volume - box_volume) <= tolerance
+
+
+def _region_matches_box(region: BoxBounds, box_bounds_nm: BoxBounds) -> bool:
+    """Return whether one region reproduces the runtime Packmol box bounds."""
+
+    return all(
+        abs(region_lower - box_lower) <= _axis_match_tolerance_nm(box_lower, box_upper)
+        and abs(region_upper - box_upper) <= _axis_match_tolerance_nm(box_lower, box_upper)
+        for (region_lower, region_upper), (box_lower, box_upper) in zip(
+            region,
+            box_bounds_nm,
+            strict=True,
+        )
+    )
+
+
+def _axis_match_tolerance_nm(lower_nm: float, upper_nm: float) -> float:
+    """Return an absolute tolerance for comparing one box axis in nanometers."""
+
+    return max(FULL_BOX_REGION_ABS_TOL_NM3, abs(upper_nm - lower_nm) * FULL_BOX_REGION_REL_TOL)
 
 
 def read_pdb_positions_nm(path: str | Path) -> tuple[Vector3, ...]:
