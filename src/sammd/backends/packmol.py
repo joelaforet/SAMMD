@@ -194,14 +194,15 @@ def pack_fixed_solute_with_solvent(
 ) -> tuple[tuple[Vector3, ...], ...]:
     """Pack solvent in explicit regions around one fixed solute and return positions."""
 
-    if solvent_count <= 0:
-        return ()
     solute_atoms = tuple(solute_records)
     if not solute_atoms:
         msg = "fixed-solute packing requires at least one solute atom record"
         raise ValueError(msg)
-
     box_bounds_nm = zero_origin_box_bounds(dimensions_nm)
+    _validate_atom_records_inside_box(solute_atoms, box_bounds_nm)
+    if solvent_count <= 0:
+        return ()
+
     regions_nm = _require_explicit_solvent_regions(solvent_regions_nm, box_bounds_nm)
 
     workdir = Path(working_dir)
@@ -283,15 +284,16 @@ def pack_fixed_solute_with_solvent_components(
     raw_components = tuple(solvent_components)
     for component in raw_components:
         _validate_solvent_component(component)
-    components = tuple(component for component in raw_components if component.count > 0)
-    if not components:
-        return {}
     solute_atoms = tuple(solute_records)
     if not solute_atoms:
         msg = "fixed-solute packing requires at least one solute atom record"
         raise ValueError(msg)
-
     box_bounds_nm = zero_origin_box_bounds(dimensions_nm)
+    _validate_atom_records_inside_box(solute_atoms, box_bounds_nm)
+    components = tuple(component for component in raw_components if component.count > 0)
+    if not components:
+        return {}
+
     regions_nm = _require_explicit_solvent_regions(solvent_regions_nm, box_bounds_nm)
 
     workdir = Path(working_dir)
@@ -396,6 +398,26 @@ def solvent_regions_around_solute(
         (max(solute_z_values) + clearance_nm, box_bounds_nm[2][1]),
     )
     return tuple(region for region in (bottom_region, top_region) if region[2][1] > region[2][0])
+
+
+def _validate_atom_records_inside_box(
+    atom_records: tuple[AtomRecord, ...],
+    box_bounds_nm: BoxBounds,
+) -> None:
+    """Validate fixed-solute atom records before PACKMOL file generation."""
+
+    _validate_bounds(box_bounds_nm)
+    tolerance_nm = 1.0e-9
+    for atom_index, record in enumerate(atom_records, start=1):
+        coordinates = _validate_vector3(record.coordinates_nm, "coordinates_nm")
+        for axis, coordinate, bounds in zip("xyz", coordinates, box_bounds_nm, strict=True):
+            lower, upper = bounds
+            if coordinate < lower - tolerance_nm or coordinate > upper + tolerance_nm:
+                msg = (
+                    f"fixed-solute atom {atom_index} {axis}-coordinate {coordinate:g} nm "
+                    f"lies outside runtime box bounds {lower:g} to {upper:g} nm"
+                )
+                raise ValueError(msg)
 
 
 def split_count_by_region_volume(

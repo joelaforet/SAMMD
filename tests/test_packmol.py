@@ -670,6 +670,48 @@ def test_fixed_solute_helper_uses_explicit_regions_without_full_box(tmp_path, mo
     assert "inside box 0 0 0 20 20 20" not in input_text
 
 
+def test_fixed_solute_helper_validates_solute_records_before_zero_count(tmp_path) -> None:
+    """Reject missing fixed solute records before zero-count short-circuiting."""
+
+    with pytest.raises(ValueError, match="requires at least one solute atom record"):
+        pack_fixed_solute_with_solvent(
+            solute_records=(),
+            solvent_template=PackmolMoleculeTemplate(
+                residue_name="EOH",
+                positions_nm=((0.0, 0.0, 0.0),),
+                atom_symbols=("C",),
+                atom_names=("C1",),
+            ),
+            solvent_name="ethanol",
+            solvent_count=0,
+            dimensions_nm=(2.0, 2.0, 2.0),
+            working_dir=tmp_path,
+            solvent_regions_nm=(((0.0, 2.0), (0.0, 2.0), (0.0, 0.5)),),
+        )
+
+
+def test_fixed_solute_helper_validates_containment_before_zero_count(tmp_path) -> None:
+    """Reject outside-box fixed solute records before zero-count short-circuiting."""
+
+    with pytest.raises(ValueError, match="fixed-solute atom 1 x-coordinate"):
+        pack_fixed_solute_with_solvent(
+            solute_records=(
+                AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (2.5, 0.0, 0.0)),
+            ),
+            solvent_template=PackmolMoleculeTemplate(
+                residue_name="EOH",
+                positions_nm=((0.0, 0.0, 0.0),),
+                atom_symbols=("C",),
+                atom_names=("C1",),
+            ),
+            solvent_name="ethanol",
+            solvent_count=0,
+            dimensions_nm=(2.0, 2.0, 2.0),
+            working_dir=tmp_path,
+            solvent_regions_nm=(((0.0, 2.0), (0.0, 2.0), (0.0, 0.5)),),
+        )
+
+
 def test_mixed_solvent_helper_requires_explicit_solvent_regions(tmp_path) -> None:
     """Mixed-solvent helper should reject accidental full-box solvent packing."""
 
@@ -836,6 +878,46 @@ def test_mixed_solvent_helper_uses_shared_explicit_regions(tmp_path, monkeypatch
     assert input_text.count("inside box 0 0 15 20 20 20") == 2
     assert "CIN" in fixed_solute_text
     assert "reactant:cinnamaldehyde" not in fixed_solute_text
+
+
+def test_mixed_solvent_helper_validates_solute_records_before_zero_counts(tmp_path) -> None:
+    """Reject missing fixed solute records before all-zero mixed solvent returns."""
+
+    with pytest.raises(ValueError, match="requires at least one solute atom record"):
+        pack_fixed_solute_with_solvent_components(
+            solute_records=(),
+            solvent_components=(
+                PackmolSolventComponent(
+                    "water",
+                    PackmolMoleculeTemplate("HOH", ((0.0, 0.0, 0.0),), ("O",), ("O1",)),
+                    0,
+                ),
+            ),
+            dimensions_nm=(2.0, 2.0, 2.0),
+            working_dir=tmp_path,
+            solvent_regions_nm=(((0.0, 2.0), (0.0, 2.0), (0.0, 0.5)),),
+        )
+
+
+def test_mixed_solvent_helper_validates_containment_before_zero_counts(tmp_path) -> None:
+    """Reject outside-box fixed solute records before all-zero mixed solvent returns."""
+
+    with pytest.raises(ValueError, match="fixed-solute atom 1 z-coordinate"):
+        pack_fixed_solute_with_solvent_components(
+            solute_records=(
+                AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (0.0, 0.0, 2.5)),
+            ),
+            solvent_components=(
+                PackmolSolventComponent(
+                    "water",
+                    PackmolMoleculeTemplate("HOH", ((0.0, 0.0, 0.0),), ("O",), ("O1",)),
+                    0,
+                ),
+            ),
+            dimensions_nm=(2.0, 2.0, 2.0),
+            working_dir=tmp_path,
+            solvent_regions_nm=(((0.0, 2.0), (0.0, 2.0), (0.0, 0.5)),),
+        )
 
 
 def test_mixed_solvent_low_counts_are_split_across_equal_regions(tmp_path, monkeypatch) -> None:

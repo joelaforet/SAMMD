@@ -252,6 +252,24 @@ def test_packmol_input_packs_solvent_around_actual_fixed_solute() -> None:
     assert "nloop 200" in text
 
 
+def test_packmol_input_uses_non_default_configured_tolerance() -> None:
+    """Render Packmol input with the active runtime clearance tolerance."""
+
+    smoke = load_smoke_tool()
+
+    text = smoke.build_packmol_input(
+        solute_path=Path("fixed_pd_sam.pdb"),
+        solvent_path=Path("ethanol.pdb"),
+        output_path=Path("packmol_output.pdb"),
+        solvent_count=1,
+        box_dimensions_nm=(2.0, 2.0, 2.0),
+        solvent_regions_nm=(((0.0, 2.0), (0.0, 2.0), (0.0, 0.5)),),
+        tolerance_angstrom=2.7,
+    )
+
+    assert text.startswith("tolerance 2.7\n")
+
+
 def test_actual_solvent_regions_exclude_generated_fixed_solute_envelope() -> None:
     """Smoke solvent regions should stay outside actual slab/SAM extents."""
 
@@ -454,6 +472,18 @@ def test_smoke_summary_records_seed_provenance() -> None:
         ensemble="NVT",
         pressure_bar=1.0,
         temperature_k=300.0,
+        runtime_solvent_geometry=smoke.RuntimeSolventGeometry(
+            solvent_boundary_z_bounds_nm=(1.0, 3.0),
+            fixed_solute_z_bounds_nm=(0.8, 3.2),
+            solvent_regions_nm=(((0.0, 2.0), (0.0, 2.0), (0.0, 0.8)),),
+            solvent_count_planning_volume_nm3=3.2,
+            solvent_padding_nm=2.0,
+            solvent_padding_per_face_nm=1.0,
+            solvent_clearance_nm=0.2,
+            dimensions_nm=(2.0, 2.0, 4.0),
+            z_shift_nm=0.5,
+            molecule_counts={"ethanol": 1},
+        ),
     )
     fake_plan = SimpleNamespace(
         sam_placements=SimpleNamespace(selected_sites_per_side=1),
@@ -499,6 +529,106 @@ def test_smoke_summary_records_seed_provenance() -> None:
     assert summary["run"]["build_seed"] == 1234
     assert summary["run"]["velocity_seed"] == 1234
     assert summary["run"]["canonical_validation_seed"] == smoke.DEFAULT_SEED
+
+
+def test_smoke_summary_records_runtime_solvent_geometry_metadata() -> None:
+    """Expose actual solvent packing geometry in smoke summaries."""
+
+    smoke = load_smoke_tool()
+    geometry = smoke.RuntimeSolventGeometry(
+        solvent_boundary_z_bounds_nm=(1.0, 3.0),
+        fixed_solute_z_bounds_nm=(0.8, 3.2),
+        solvent_regions_nm=(((0.0, 2.0), (0.0, 2.0), (0.0, 0.8)),),
+        solvent_count_planning_volume_nm3=3.2,
+        solvent_padding_nm=2.0,
+        solvent_padding_per_face_nm=1.0,
+        solvent_clearance_nm=0.2,
+        dimensions_nm=(2.0, 2.0, 4.0),
+        z_shift_nm=0.5,
+        molecule_counts={"ethanol": 7},
+    )
+    fake_build = SimpleNamespace(
+        pd_indices=(0,),
+        sam_count=1,
+        solvent_count=7,
+        reactant_count=1,
+        system=SimpleNamespace(getNumParticles=lambda: 2),
+        platform_dimensions_nm=geometry.dimensions_nm,
+        anchor_pairs=(),
+        anchor_scaling=SimpleNamespace(pairs_added=0, sigma_nm=(), epsilon_delta_kj_mol=()),
+        component_chain_ranges={},
+        ensemble="NVT",
+        pressure_bar=1.0,
+        temperature_k=300.0,
+        runtime_solvent_geometry=geometry,
+    )
+    fake_plan = SimpleNamespace(sam_placements=SimpleNamespace(selected_sites_per_side=1))
+    fake_paths = SimpleNamespace(
+        output_dir=Path("outputs"),
+        topology=Path("topology.cif"),
+        trajectory=Path("trajectory.dcd"),
+        thermodynamics=Path("thermo.csv"),
+        checkpoint=Path("state.chk"),
+        state_xml=Path("state.xml"),
+        system_xml=Path("system.xml"),
+        anchor_metadata=Path("anchor.json"),
+        summary=Path("summary.json"),
+        packmol_dir=Path("packmol"),
+    )
+    schedule = smoke.RunSchedule(1.0, 1.0, 500, 10, 50, 2.0)
+    energy = smoke.EnergyRecord(0.0, 0.0, 300.0)
+
+    summary = smoke.smoke_summary(
+        plan=fake_plan,
+        smoke_build=fake_build,
+        paths=fake_paths,
+        platform_name="CPU",
+        platform_errors=(),
+        initial=energy,
+        minimized=energy,
+        final=energy,
+        pd_displacements=(0.0,),
+        sulfur_displacements=(0.0,),
+        schedule=schedule,
+        minimize_iterations=0,
+        seed=1234,
+    )
+
+    assert summary["system"]["solvent_packing_regions_nm"] == [
+        [[0.0, 2.0], [0.0, 2.0], [0.0, 0.8]]
+    ]
+    assert summary["system"]["solvent_count_planning_volume_nm3"] == pytest.approx(3.2)
+    assert summary["system"]["solvent_padding_per_face_nm"] == pytest.approx(1.0)
+    assert summary["system"]["solvent_clearance_nm"] == pytest.approx(0.2)
+    assert summary["system"]["solvent_z_shift_nm"] == pytest.approx(0.5)
+    assert summary["solution"]["molecule_counts"] == {"ethanol": 7}
+
+
+def test_smoke_build_config_geometry_summary_uses_library_names() -> None:
+    """Serialize runtime solvent geometry for smoke build configuration."""
+
+    smoke = load_smoke_tool()
+    geometry = smoke.RuntimeSolventGeometry(
+        solvent_boundary_z_bounds_nm=(1.0, 3.0),
+        fixed_solute_z_bounds_nm=(0.8, 3.2),
+        solvent_regions_nm=(((0.0, 2.0), (0.0, 2.0), (0.0, 0.8)),),
+        solvent_count_planning_volume_nm3=3.2,
+        solvent_padding_nm=2.0,
+        solvent_padding_per_face_nm=1.0,
+        solvent_clearance_nm=0.2,
+        dimensions_nm=(2.0, 2.0, 4.0),
+        z_shift_nm=0.5,
+        molecule_counts={"ethanol": 7},
+    )
+
+    summary = smoke.runtime_solvent_geometry_summary(geometry)
+
+    assert summary["solvent_packing_regions_nm"] == [
+        [[0.0, 2.0], [0.0, 2.0], [0.0, 0.8]]
+    ]
+    assert summary["solvent_count_planning_volume_nm3"] == pytest.approx(3.2)
+    assert summary["solvent_padding_per_face_nm"] == pytest.approx(1.0)
+    assert summary["molecule_counts"] == {"ethanol": 7}
 
 
 def test_smoke_tool_defaults_match_canonical_metal_sulfur_strategy() -> None:

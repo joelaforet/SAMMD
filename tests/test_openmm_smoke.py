@@ -249,6 +249,7 @@ def test_smoke_build_skips_solvent_allocation_when_resolved_count_is_zero(
 
     assert smoke_build.solvent_count == 0
     assert "ethanol" not in smoke_build.component_chain_ranges
+    assert smoke_build.runtime_solvent_geometry.molecule_counts == {"ethanol": 0}
 
 
 def test_smoke_fixed_solute_containment_accepts_tolerance() -> None:

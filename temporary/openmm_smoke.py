@@ -259,6 +259,23 @@ class SmokeBuild:
     ensemble: str
     pressure_bar: float
     temperature_k: float
+    runtime_solvent_geometry: RuntimeSolventGeometry
+
+
+@dataclass(frozen=True)
+class RuntimeSolventGeometry:
+    """Actual fixed-solute geometry used for runtime solvent packing."""
+
+    solvent_boundary_z_bounds_nm: tuple[float, float]
+    fixed_solute_z_bounds_nm: tuple[float, float]
+    solvent_regions_nm: tuple[BoxBounds, ...]
+    solvent_count_planning_volume_nm3: float
+    solvent_padding_nm: float
+    solvent_padding_per_face_nm: float
+    solvent_clearance_nm: float
+    dimensions_nm: Vector3
+    z_shift_nm: float
+    molecule_counts: dict[str, int]
 
 
 @dataclass(frozen=True)
@@ -444,7 +461,7 @@ def main(argv: list[str] | None = None) -> int:
         paths.build_config,
         config,
         args,
-        smoke_build.solvent_count,
+        smoke_build,
         sam_template.smiles,
         reactant_count,
         schedule,
@@ -1140,12 +1157,15 @@ def build_openmm_smoke_system(
         reactant_positions,
         reactant_identities,
     )
-    box_dimensions_nm, z_shift_nm, solvent_regions_nm = actual_solvent_packing_geometry(
+    runtime_solvent_geometry = build_runtime_solvent_geometry(
         plan,
         tuple(positions_nm),
         solvent_padding_nm,
         solvent_boundary_positions_nm=solvent_boundary_positions_nm,
     )
+    box_dimensions_nm = runtime_solvent_geometry.dimensions_nm
+    z_shift_nm = runtime_solvent_geometry.z_shift_nm
+    solvent_regions_nm = runtime_solvent_geometry.solvent_regions_nm
     if z_shift_nm != 0.0:
         positions_nm[:] = [shift_position_z(position, z_shift_nm) for position in positions_nm]
         sulfur_references[:] = [
@@ -1161,7 +1181,11 @@ def build_openmm_smoke_system(
         str(solvent_count),
         plan,
         solvent_template.name,
-        solvent_packing_volume_nm3(solvent_regions_nm),
+        runtime_solvent_geometry.solvent_count_planning_volume_nm3,
+    )
+    runtime_solvent_geometry = replace_runtime_solvent_molecule_counts(
+        runtime_solvent_geometry,
+        {solvent_template.name: resolved_solvent_count},
     )
 
     placed_solvent = 0
@@ -1174,6 +1198,7 @@ def build_openmm_smoke_system(
             box_dimensions_nm=box_dimensions_nm,
             solvent_regions_nm=solvent_regions_nm,
             working_dir=packmol_working_dir,
+            tolerance_angstrom=plan.config.packing.packmol.tolerance,
         )
         solvent_identities = residue_assigner.allocate(
             SOLVENT_NAME,
@@ -1232,6 +1257,7 @@ def build_openmm_smoke_system(
         ensemble="NVT",
         pressure_bar=pressure_bar,
         temperature_k=temperature_k,
+        runtime_solvent_geometry=runtime_solvent_geometry,
     )
 
 
@@ -1263,6 +1289,24 @@ def actual_solvent_packing_geometry(
     solvent_boundary_positions_nm: tuple[Vector3, ...] | None = None,
 ) -> tuple[Vector3, float, tuple[BoxBounds, ...]]:
     """Return box dimensions and solvent regions from actual slab/SAM geometry."""
+
+    geometry = build_runtime_solvent_geometry(
+        plan,
+        fixed_solute_positions_nm,
+        solvent_padding_nm,
+        solvent_boundary_positions_nm=solvent_boundary_positions_nm,
+    )
+    return geometry.dimensions_nm, geometry.z_shift_nm, geometry.solvent_regions_nm
+
+
+def build_runtime_solvent_geometry(
+    plan: Any,
+    fixed_solute_positions_nm: tuple[Vector3, ...],
+    solvent_padding_nm: float,
+    *,
+    solvent_boundary_positions_nm: tuple[Vector3, ...] | None = None,
+) -> RuntimeSolventGeometry:
+    """Return runtime solvent metadata from actual slab/SAM geometry."""
 
     if not fixed_solute_positions_nm:
         raise ValueError("actual solvent packing geometry requires fixed-solute positions")
@@ -1300,7 +1344,39 @@ def actual_solvent_packing_geometry(
         ),
     )
     solvent_regions = tuple(region for region in regions if region[2][1] > region[2][0])
-    return dimensions_nm, z_shift_nm, solvent_regions
+    count_volume_nm3 = solvent_packing_volume_nm3(solvent_regions)
+    return RuntimeSolventGeometry(
+        solvent_boundary_z_bounds_nm=(boundary_min_z, boundary_max_z),
+        fixed_solute_z_bounds_nm=(fixed_min_z, fixed_max_z),
+        solvent_regions_nm=solvent_regions,
+        solvent_count_planning_volume_nm3=count_volume_nm3,
+        solvent_padding_nm=solvent_padding_nm,
+        solvent_padding_per_face_nm=padding_per_face_nm,
+        solvent_clearance_nm=clearance_nm,
+        dimensions_nm=dimensions_nm,
+        z_shift_nm=z_shift_nm,
+        molecule_counts={},
+    )
+
+
+def replace_runtime_solvent_molecule_counts(
+    geometry: RuntimeSolventGeometry,
+    molecule_counts: dict[str, int],
+) -> RuntimeSolventGeometry:
+    """Return runtime solvent metadata with resolved molecule counts."""
+
+    return RuntimeSolventGeometry(
+        solvent_boundary_z_bounds_nm=geometry.solvent_boundary_z_bounds_nm,
+        fixed_solute_z_bounds_nm=geometry.fixed_solute_z_bounds_nm,
+        solvent_regions_nm=geometry.solvent_regions_nm,
+        solvent_count_planning_volume_nm3=geometry.solvent_count_planning_volume_nm3,
+        solvent_padding_nm=geometry.solvent_padding_nm,
+        solvent_padding_per_face_nm=geometry.solvent_padding_per_face_nm,
+        solvent_clearance_nm=geometry.solvent_clearance_nm,
+        dimensions_nm=geometry.dimensions_nm,
+        z_shift_nm=geometry.z_shift_nm,
+        molecule_counts=dict(molecule_counts),
+    )
 
 
 def solvent_packing_volume_nm3(solvent_regions_nm: tuple[BoxBounds, ...]) -> float:
@@ -1405,6 +1481,7 @@ def pack_solution_with_packmol(
     box_dimensions_nm: Vector3,
     solvent_regions_nm: tuple[BoxBounds, ...],
     working_dir: Path,
+    tolerance_angstrom: float = PACKMOL_TOLERANCE_ANGSTROM,
 ) -> PackmolSolutionPositions:
     """Use Packmol to place solvent molecules around Pd+SAM+reactant solute."""
 
@@ -1433,6 +1510,7 @@ def pack_solution_with_packmol(
         solvent_count=solvent_count,
         box_dimensions_nm=box_dimensions_nm,
         solvent_regions_nm=solvent_regions_nm,
+        tolerance_angstrom=tolerance_angstrom,
     )
     input_path.write_text(input_text, encoding="utf-8")
     run_packmol(input_path, working_dir, stdout_path)
@@ -1466,6 +1544,7 @@ def build_packmol_input(
     solvent_count: int,
     box_dimensions_nm: Vector3,
     solvent_regions_nm: tuple[BoxBounds, ...],
+    tolerance_angstrom: float = PACKMOL_TOLERANCE_ANGSTROM,
 ) -> str:
     """Build Packmol input text for the smoke solvent placement."""
 
@@ -1499,7 +1578,7 @@ def build_packmol_input(
             *solvent_structures,
         ),
         box_bounds_nm=box_bounds_nm,
-        tolerance_angstrom=PACKMOL_TOLERANCE_ANGSTROM,
+        tolerance_angstrom=tolerance_angstrom,
         nloop=PACKMOL_NLOOP,
     )
     return render_packmol_input(job)
@@ -2261,6 +2340,25 @@ def smoke_summary(
             "reactant_molecules": smoke_build.reactant_count,
             "total_atoms": smoke_build.system.getNumParticles(),
             "box_dimensions_nm": list(smoke_build.platform_dimensions_nm),
+            "actual_solvent_boundary_z_bounds_nm": list(
+                smoke_build.runtime_solvent_geometry.solvent_boundary_z_bounds_nm
+            ),
+            "actual_fixed_solute_z_bounds_nm": list(
+                smoke_build.runtime_solvent_geometry.fixed_solute_z_bounds_nm
+            ),
+            "solvent_packing_regions_nm": [
+                [list(axis_bounds) for axis_bounds in region]
+                for region in smoke_build.runtime_solvent_geometry.solvent_regions_nm
+            ],
+            "solvent_count_planning_volume_nm3": (
+                smoke_build.runtime_solvent_geometry.solvent_count_planning_volume_nm3
+            ),
+            "solvent_padding_nm": smoke_build.runtime_solvent_geometry.solvent_padding_nm,
+            "solvent_padding_per_face_nm": (
+                smoke_build.runtime_solvent_geometry.solvent_padding_per_face_nm
+            ),
+            "solvent_clearance_nm": smoke_build.runtime_solvent_geometry.solvent_clearance_nm,
+            "solvent_z_shift_nm": smoke_build.runtime_solvent_geometry.z_shift_nm,
             "anchor_pairs": len(smoke_build.anchor_pairs),
             "anchor_pairs_added": smoke_build.anchor_scaling.pairs_added,
             "pd_s_anchor_sigma_nm": smoke_build.anchor_scaling.sigma_nm[0]
@@ -2270,6 +2368,12 @@ def smoke_summary(
             if smoke_build.anchor_scaling.epsilon_delta_kj_mol
             else None,
             "component_chain_ranges": smoke_build.component_chain_ranges,
+        },
+        "solution": {
+            "count_planning_volume_nm3": (
+                smoke_build.runtime_solvent_geometry.solvent_count_planning_volume_nm3
+            ),
+            "molecule_counts": smoke_build.runtime_solvent_geometry.molecule_counts,
         },
         "run": {
             "platform": platform_name,
@@ -2327,7 +2431,7 @@ def write_build_config(
     path: Path,
     config: SAMMDConfig,
     args: argparse.Namespace,
-    solvent_count: int,
+    smoke_build: SmokeBuild,
     sam_template_smiles: str,
     reactant_count: int,
     schedule: RunSchedule,
@@ -2344,7 +2448,10 @@ def write_build_config(
             "solvent_name": SOLVENT_NAME,
             "solvent_residue_name": SOLVENT_RESIDUE_NAME,
             "solvent_smiles": SOLVENT_SMILES,
-            "solvent_count": solvent_count,
+            "solvent_count": smoke_build.solvent_count,
+            "runtime_solvent_geometry": runtime_solvent_geometry_summary(
+                smoke_build.runtime_solvent_geometry
+            ),
             "sam_template_smiles": sam_template_smiles,
             "organic_force_field": OPENFF_FORCE_FIELD,
             "organic_charge_model": NAGL_CHARGE_MODEL,
@@ -2366,6 +2473,25 @@ def write_build_config(
         },
     }
     safe_write_text(path, yaml.safe_dump(payload, sort_keys=False), overwrite=True)
+
+
+def runtime_solvent_geometry_summary(geometry: RuntimeSolventGeometry) -> dict[str, Any]:
+    """Return serializable runtime solvent geometry metadata."""
+
+    return {
+        "actual_solvent_boundary_z_bounds_nm": list(geometry.solvent_boundary_z_bounds_nm),
+        "actual_fixed_solute_z_bounds_nm": list(geometry.fixed_solute_z_bounds_nm),
+        "solvent_packing_regions_nm": [
+            [list(axis_bounds) for axis_bounds in region] for region in geometry.solvent_regions_nm
+        ],
+        "solvent_count_planning_volume_nm3": geometry.solvent_count_planning_volume_nm3,
+        "solvent_padding_nm": geometry.solvent_padding_nm,
+        "solvent_padding_per_face_nm": geometry.solvent_padding_per_face_nm,
+        "solvent_clearance_nm": geometry.solvent_clearance_nm,
+        "dimensions_nm": list(geometry.dimensions_nm),
+        "z_shift_nm": geometry.z_shift_nm,
+        "molecule_counts": dict(geometry.molecule_counts),
+    }
 
 
 def anchor_metadata(smoke_build: SmokeBuild) -> dict[str, Any]:
