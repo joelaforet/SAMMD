@@ -19,7 +19,6 @@ def test_public_imports() -> None:
     assert "require_openmm" not in sammd.__all__
     assert "SolutionPlan" not in sammd.__all__
     assert "plan_solution_composition" not in sammd.__all__
-    assert "plan_pd111_slab" not in sammd.__all__
     assert "plan_sam_placements" not in sammd.__all__
 
 

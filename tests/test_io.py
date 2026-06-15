@@ -12,7 +12,7 @@ from sammd.core.io import (
     safe_write_text,
     slab_to_atom_records,
 )
-from sammd.model.surfaces import plan_pd111_slab
+from sammd.model.surfaces import plan_fcc111_slab
 
 
 def _base_atom_record(**overrides) -> AtomRecord:
@@ -250,7 +250,7 @@ def test_mmcif_writer_rejects_values_with_both_quote_types() -> None:
 def test_slab_to_atom_records_gives_deterministic_pd_layer_labels() -> None:
     """Label Pd slab atoms with deterministic metal component roles."""
 
-    slab = plan_pd111_slab((0.4, 0.4), 3)
+    slab = plan_fcc111_slab("Pd", (0.4, 0.4), 3)
     records = slab_to_atom_records(slab)
 
     assert len(records) == len(slab.positions_nm)

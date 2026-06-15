@@ -8,7 +8,6 @@ from sammd.model.surfaces import (
     generate_binding_sites,
     get_fcc_surface_metadata,
     plan_fcc111_slab,
-    plan_pd111_slab,
 )
 
 
@@ -46,13 +45,13 @@ def test_fcc111_slab_supports_non_pd_registered_metal() -> None:
     assert slab.lateral_size_nm[0] == pytest.approx(
         slab.supercell_counts[0] * metadata.nearest_neighbor_spacing_nm
     )
-    assert slab.lateral_size_nm != plan_pd111_slab((1.0, 1.0), 3).lateral_size_nm
+    assert slab.lateral_size_nm != plan_fcc111_slab("Pd", (1.0, 1.0), 3).lateral_size_nm
 
 
-def test_pd111_slab_geometry_is_centered_and_deterministic() -> None:
-    """Plan a small centered Pd(111) slab with deterministic atom metadata."""
+def test_fcc111_slab_geometry_is_centered_and_deterministic_for_pd() -> None:
+    """Plan a small centered Fcc(111) slab with deterministic Pd metadata."""
 
-    slab = plan_pd111_slab((1.0, 1.0), 3)
+    slab = plan_fcc111_slab("Pd", (1.0, 1.0), 3)
 
     assert slab.metal == "Pd"
     assert slab.facet == "111"
@@ -65,13 +64,13 @@ def test_pd111_slab_geometry_is_centered_and_deterministic() -> None:
     assert slab.top_z_nm == pytest.approx(0.2245892547, rel=1e-6)
     assert slab.top_z_nm == pytest.approx(-slab.bottom_z_nm)
     assert slab.slab_extent_nm == pytest.approx((*slab.lateral_size_nm, 2 * 0.389 / 3**0.5))
-    assert plan_pd111_slab((1.0, 1.0), 3) == slab
+    assert plan_fcc111_slab("Pd", (1.0, 1.0), 3) == slab
 
 
 def test_noncommensurate_lateral_size_is_adjusted_upward() -> None:
     """Report the effective commensurate periodic cell, not the requested minimum."""
 
-    slab = plan_pd111_slab((1.01, 1.01), 3)
+    slab = plan_fcc111_slab("Pd", (1.01, 1.01), 3)
 
     assert slab.requested_lateral_size_nm == (1.01, 1.01)
     assert slab.supercell_counts == (4, 6)
@@ -80,10 +79,10 @@ def test_noncommensurate_lateral_size_is_adjusted_upward() -> None:
     assert slab.supercell_counts[1] % 2 == 0
 
 
-def test_pd111_binding_sites_include_opposite_faces() -> None:
+def test_fcc111_binding_sites_include_opposite_faces() -> None:
     """Generate top and bottom fcc hollow sites with opposite normals."""
 
-    slab = plan_pd111_slab((1.0, 1.0), 3)
+    slab = plan_fcc111_slab("Pd", (1.0, 1.0), 3)
     sites = generate_binding_sites(slab)
     top_sites = [site for site in sites if site.side == "top"]
     bottom_sites = [site for site in sites if site.side == "bottom"]
@@ -112,7 +111,7 @@ def test_binding_sites_support_non_pd_fcc111_slab() -> None:
 def test_fcc_and_hcp_hollows_are_stack_aware_on_both_faces() -> None:
     """Distinguish outward fcc and inward hcp hollow projections by slab side."""
 
-    slab = plan_pd111_slab((1.0, 1.0), 3)
+    slab = plan_fcc111_slab("Pd", (1.0, 1.0), 3)
     fcc_sites = generate_binding_sites(slab, site_kind="fcc_hollow")
     hcp_sites = generate_binding_sites(slab, site_kind="hcp_hollow")
 
@@ -130,7 +129,7 @@ def test_fcc_and_hcp_hollows_are_stack_aware_on_both_faces() -> None:
 def test_hollow_nearest_metals_use_periodic_minimum_image() -> None:
     """Assign edge hollow neighbors across the lateral periodic boundary."""
 
-    slab = plan_pd111_slab((1.0, 1.0), 3)
+    slab = plan_fcc111_slab("Pd", (1.0, 1.0), 3)
     face_indices = [index for index, layer in enumerate(slab.layer_indices) if layer == 0]
     edge_site, naive_nearest = next(
         (site, _naive_nearest_xy(site.position_nm, slab, face_indices))
@@ -149,7 +148,7 @@ def test_periodic_surface_neighbors_are_uniform_across_seams() -> None:
     """Keep Pd nearest-neighbor spacing uniform at x and y periodic seams."""
 
     metadata = get_fcc_surface_metadata("Pd", "111")
-    slab = plan_pd111_slab((1.0, 1.0), 3)
+    slab = plan_fcc111_slab("Pd", (1.0, 1.0), 3)
     face_indices = [index for index, layer in enumerate(slab.layer_indices) if layer == 0]
     edge_indices = [
         index
@@ -172,7 +171,7 @@ def test_too_small_lateral_cells_fail_clearly() -> None:
     """Reject cells too small to define three-fold hollow sites."""
 
     with pytest.raises(ValueError, match="at least two columns and two rows"):
-        plan_pd111_slab((0.2, 0.2), 3)
+        plan_fcc111_slab("Pd", (0.2, 0.2), 3)
 
     with pytest.raises(ValueError, match="cannot assign 3 nearest atoms from 2 candidates"):
         _nearest_indices_xy(
@@ -187,7 +186,7 @@ def test_too_small_lateral_cells_fail_clearly() -> None:
 def test_unsupported_binding_site_kind_fails_clearly() -> None:
     """Reject future site labels until their geometry is implemented."""
 
-    slab = plan_pd111_slab((1.0, 1.0), 3)
+    slab = plan_fcc111_slab("Pd", (1.0, 1.0), 3)
 
     with pytest.raises(ValueError, match="unsupported binding site kind 'bridge'"):
         generate_binding_sites(slab, site_kind="bridge")

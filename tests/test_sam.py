@@ -18,19 +18,19 @@ from sammd.model.sam import (
     plan_sam_placements,
     sam_azimuth_rad,
 )
-from sammd.model.surfaces import generate_binding_sites, plan_pd111_slab
+from sammd.model.surfaces import generate_binding_sites, plan_fcc111_slab
 
 
 def _binding_sites():
-    """Return deterministic binding sites for a small Pd(111) slab."""
+    """Return deterministic binding sites for a small Fcc(111) slab."""
 
-    return generate_binding_sites(plan_pd111_slab((1.0, 1.0), 3))
+    return generate_binding_sites(plan_fcc111_slab("Pd", (1.0, 1.0), 3))
 
 
 def _mixed_binding_sites():
     """Return fcc and hcp binding sites for one deterministic slab."""
 
-    slab = plan_pd111_slab((1.0, 1.0), 3)
+    slab = plan_fcc111_slab("Pd", (1.0, 1.0), 3)
     return generate_binding_sites(slab, "fcc_hollow") + generate_binding_sites(slab, "hcp_hollow")
 
 
@@ -78,7 +78,7 @@ def test_fraction_mode_assignment_sums_exactly_and_is_seeded() -> None:
 def test_site_selection_avoids_nearest_neighbor_clustering() -> None:
     """Dense smoke systems should not place SAM anchors on adjacent hollow sites."""
 
-    slab = plan_pd111_slab((2.0, 2.0), 5)
+    slab = plan_fcc111_slab("Pd", (2.0, 2.0), 5)
     lateral_area_nm2 = slab.lateral_size_nm[0] * slab.lateral_size_nm[1]
     plan = plan_sam_placements(
         SAMConfig(), generate_binding_sites(slab), lateral_area_nm2=lateral_area_nm2, seed=2026

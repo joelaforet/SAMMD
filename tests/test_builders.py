@@ -23,7 +23,7 @@ from sammd.model.metal_sulfur import (
     METAL_SULFUR_SIGMA_NM,
 )
 from sammd.model.solvation import round_half_up
-from sammd.model.surfaces import plan_fcc111_slab, plan_pd111_slab
+from sammd.model.surfaces import plan_fcc111_slab
 
 
 def test_build_system_accepts_config_dict_and_yaml_path(tmp_path) -> None:
@@ -119,7 +119,7 @@ def test_box_plan_uses_adjusted_commensurate_lateral_dimensions() -> None:
 
     requested_lateral_size = (5.0, 5.0)
     config = SAMMDConfig(surface={"lateral_size": requested_lateral_size})
-    slab = plan_pd111_slab(requested_lateral_size, 8)
+    slab = plan_fcc111_slab("Pd", requested_lateral_size, 8)
 
     plan = build_system(config)
 

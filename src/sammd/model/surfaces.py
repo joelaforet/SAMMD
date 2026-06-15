@@ -228,17 +228,6 @@ def plan_fcc111_slab(
     )
 
 
-def plan_pd111_slab(
-    lateral_size_nm: tuple[float, float],
-    layers: int,
-    *,
-    centered: bool = True,
-) -> SurfaceSlab:
-    """Plan a deterministic centered Pd(111) slab in nanometers."""
-
-    return plan_fcc111_slab("Pd", lateral_size_nm, layers, centered=centered)
-
-
 def generate_binding_sites(
     slab: SurfaceSlab, site_kind: str = "fcc_hollow"
 ) -> tuple[BindingSite, ...]:
