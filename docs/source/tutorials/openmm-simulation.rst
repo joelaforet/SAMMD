@@ -25,7 +25,7 @@ Bridges2:
 
 .. code-block:: bash
 
-   pixi run sammd build sammd.yaml --output-dir outputs --overwrite
+   pixi run sammd build sammd-project/sammd.yaml --output-dir sammd-project/outputs --overwrite
 
 This writes files such as ``interchange.json``, ``solvated_system.cif``,
 ``solvated_system_pymol.pdb``, and ``anchor_metadata.json``. The
@@ -52,7 +52,7 @@ repository root.
    from openmm.app import DCDReporter, Simulation, StateDataReporter
    from sammd.backends.interchange_plugins import register_interchange_plugin_collection
 
-   output_dir = Path("outputs")
+   output_dir = Path("sammd-project/outputs")
    interchange_path = output_dir / "interchange.json"
    trajectory_path = output_dir / "trajectory.dcd"
    thermo_path = output_dir / "thermodynamics.csv"
@@ -229,8 +229,8 @@ trajectory into the same object:
 
 .. code-block:: text
 
-   load outputs/solvated_system_pymol.pdb, sammd_system
-   load_traj outputs/trajectory.dcd, sammd_system
+   load sammd-project/outputs/solvated_system_pymol.pdb, sammd_system
+   load_traj sammd-project/outputs/trajectory.dcd, sammd_system
 
 The DCD uses the atom order from the OpenMM topology. Loading the PyMOL PDB first
 gives PyMOL the atoms and explicit connectivity, then ``load_traj`` adds the

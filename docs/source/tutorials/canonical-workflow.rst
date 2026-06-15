@@ -14,16 +14,17 @@ OpenMM. SAMMD builds; OpenMM runs.
 1. Create config
 ----------------
 
-From the repository root, create a starter YAML file:
+From the repository root, create a starter project directory:
 
 .. code-block:: bash
 
-   pixi run sammd init -o sammd.yaml
+   pixi run sammd init -o sammd-project
 
-The template follows the defaults summarized in :doc:`yaml-configuration`. It
-describes the surface, SAM, solution composition, and output names used for the
-build step. It does not describe minimization, equilibration, production MD,
-thermostats, barostats, trajectories, or reporters.
+The command writes ``sammd-project/sammd.yaml``. The template follows the
+defaults summarized in :doc:`yaml-configuration`. It describes the surface, SAM,
+solution composition, and output names used for the build step. It does not
+describe minimization, equilibration, production MD, thermostats, barostats,
+trajectories, or reporters.
 
 2. Validate config
 ------------------
@@ -32,7 +33,7 @@ Validate the YAML before building anything:
 
 .. code-block:: bash
 
-   pixi run sammd validate sammd.yaml
+   pixi run sammd validate sammd-project/sammd.yaml
 
 Validation checks that SAMMD can interpret the file and reports configuration
 errors before any output files are written.
@@ -44,7 +45,7 @@ Build the starting model:
 
 .. code-block:: bash
 
-   pixi run sammd build sammd.yaml --output-dir outputs --overwrite
+   pixi run sammd build sammd-project/sammd.yaml --output-dir sammd-project/outputs --overwrite
 
 This command writes these output files:
 
@@ -68,16 +69,17 @@ parameterized Interchange export.
 4. Inspect outputs
 ------------------
 
-Open ``outputs/sam_grafting_density.cif`` in a molecule viewer such as PyMOL to
-inspect the configured surface and the sulfur anchor atoms. This is a useful
-smoke test: you can see the Pd(111) slab geometry and check whether the thiol
-sulfur atoms land at the intended three-fold hollow sites with the expected
-grafting density. It does not contain the rest of each SAM molecule or solvent
-coordinates.
+Open ``sammd-project/outputs/sam_grafting_density.cif`` in a molecule viewer
+such as PyMOL to inspect the configured surface and the sulfur anchor atoms.
+This is a useful smoke test: you can see the Pd(111) slab geometry and check
+whether the thiol sulfur atoms land at the intended three-fold hollow sites with
+the expected grafting density. It does not contain the rest of each SAM molecule
+or solvent coordinates.
 
-Use ``outputs/build_summary.json`` to confirm the same build choices in a
-machine-readable form. Use ``outputs/resolved_config.yaml`` when you need the
-exact validated YAML that produced the plan.
+Use ``sammd-project/outputs/build_summary.json`` to confirm the same build
+choices in a machine-readable form. Use
+``sammd-project/outputs/resolved_config.yaml`` when you need the exact validated
+YAML that produced the plan.
 
 5. Interchange output files
 ---------------------------
@@ -104,9 +106,10 @@ The ``interchange.json`` file is OpenFF Interchange JSON written with
 not guaranteed across OpenFF Interchange versions. Configs that include salt are
 rejected until Interchange export supports salt.
 
-Inspect ``outputs/solvated_system.cif`` if you want to see full SAM molecules,
-solvent, and reactants. ``outputs/sam_grafting_density.cif`` remains the
-separate grafting-density smoke test.
+Inspect ``sammd-project/outputs/solvated_system.cif`` if you want to see full
+SAM molecules, solvent, and reactants.
+``sammd-project/outputs/sam_grafting_density.cif`` remains the separate
+grafting-density smoke test.
 
 6. Use these files with OpenMM
 ------------------------------

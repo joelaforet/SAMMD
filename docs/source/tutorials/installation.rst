@@ -43,9 +43,9 @@ After ``pixi shell -e default``, the ``sammd`` command is available directly:
 
 .. code-block:: bash
 
-   sammd init -o sammd.yaml
-   sammd validate sammd.yaml
-   sammd build sammd.yaml --output-dir outputs --overwrite
+   sammd init -o sammd-project
+   sammd validate sammd-project/sammd.yaml
+   sammd build sammd-project/sammd.yaml --output-dir sammd-project/outputs --overwrite
 
 Leave the pixi shell with:
 
@@ -60,13 +60,13 @@ If you are not inside a pixi shell, prefix commands with ``pixi run``:
 
 .. code-block:: bash
 
-   pixi run sammd validate sammd.yaml
+   pixi run sammd validate sammd-project/sammd.yaml
 
 For a named environment, add ``-e``:
 
 .. code-block:: bash
 
-   pixi run sammd build sammd.yaml --output-dir outputs --overwrite
+   pixi run sammd build sammd-project/sammd.yaml --output-dir sammd-project/outputs --overwrite
 
 5. Switch environments
 ----------------------
