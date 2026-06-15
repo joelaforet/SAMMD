@@ -50,15 +50,26 @@ def main(verbose: bool, no_color: bool) -> None:
 
 
 @main.command()
-@click.option("-o", "--output", type=click.Path(path_type=Path), default=Path("sammd.yaml"))
-@click.option("--force", is_flag=True, help="Overwrite an existing output file.")
+@click.option("-o", "--output", type=click.Path(path_type=Path), default=Path("sammd-project"))
+@click.option("--force", is_flag=True, help="Overwrite an existing sammd.yaml file.")
 def init(output: Path, force: bool) -> None:
     """Write a commented SAMMD YAML template."""
 
-    if output.exists() and not force:
-        raise click.ClickException(f"{output} already exists; use --force to overwrite")
-    output.write_text(CONFIG_TEMPLATE, encoding="utf-8")
-    LOGGER.info("INIT Created a SAMMD configuration template at %s", output)
+    if output.suffix.lower() in {".yaml", ".yml"}:
+        raise click.ClickException(
+            "sammd init --output expects a directory and writes "
+            "<directory>/sammd.yaml; pass a directory path instead"
+        )
+    if output.exists() and not output.is_dir():
+        raise click.ClickException(f"{output} exists and is not a directory")
+
+    output.mkdir(parents=True, exist_ok=True)
+    config_path = output / "sammd.yaml"
+    if config_path.exists() and not force:
+        raise click.ClickException(f"{config_path} already exists; use --force to overwrite")
+
+    config_path.write_text(CONFIG_TEMPLATE, encoding="utf-8")
+    LOGGER.info("INIT Created a SAMMD configuration template at %s", config_path)
 
 
 @main.command()
