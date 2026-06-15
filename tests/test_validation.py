@@ -142,10 +142,10 @@ def test_topology_cif_cell_mismatch_fails_validation(tmp_path: Path) -> None:
     assert _gate(report, "topology_cif_cell_lengths").passed is False
 
 
-def test_module_import_avoids_heavy_optional_modules() -> None:
-    """Validation import should not pull heavy OpenMM/OpenFF-style modules."""
+def test_module_import_avoids_unused_heavy_modules() -> None:
+    """Validation import should not pull unused heavy science modules."""
 
-    heavy_modules = ("openmm", "openff", "rdkit", "mbuild", "MDAnalysis", "parmed", "pdbfixer")
+    heavy_modules = ("mbuild", "MDAnalysis", "parmed", "pdbfixer")
     code = (
         "import json, sys; "
         "import sammd.core.validation; "

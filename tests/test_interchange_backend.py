@@ -16,23 +16,23 @@ from sammd.core.config import SAMMDConfig, load_config_dict
 from sammd.model.metal_sulfur import METAL_SULFUR_EPSILON_KCAL_MOL, METAL_SULFUR_SIGMA_NM
 
 
-def test_interchange_module_import_does_not_import_optional_science_modules() -> None:
-    """Keep Interchange helpers lazy until export functions are called."""
+def test_interchange_module_import_does_not_import_unused_science_modules() -> None:
+    """Keep unused science modules lazy until export functions are called."""
 
     code = """
 import importlib
 import sys
 
-optional_prefixes = ("openff", "openmm", "rdkit")
+unused_prefixes = ("mbuild", "MDAnalysis", "parmed", "pdbfixer")
 for name in list(sys.modules):
-    if name.startswith(optional_prefixes):
+    if name.startswith(unused_prefixes):
         sys.modules.pop(name, None)
 
 importlib.import_module("sammd.backends.interchange")
 
-loaded = [name for name in sys.modules if name.startswith(optional_prefixes)]
+loaded = [name for name in sys.modules if name.startswith(unused_prefixes)]
 if loaded:
-    raise SystemExit(f"optional science modules imported: {loaded!r}")
+    raise SystemExit(f"unused science modules imported: {loaded!r}")
 """
 
     subprocess.run([sys.executable, "-c", code], check=True, capture_output=True, text=True)

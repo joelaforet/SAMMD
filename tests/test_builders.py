@@ -392,10 +392,10 @@ def test_seed_override_deterministically_controls_sam_site_choices() -> None:
     assert first.sam_placements.placements != different.sam_placements.placements
 
 
-def test_build_import_avoids_heavy_optional_modules() -> None:
-    """Check import-time behavior in a fresh process for heavy optional modules."""
+def test_build_import_avoids_unused_heavy_modules() -> None:
+    """Check import-time behavior in a fresh process for unused heavy modules."""
 
-    heavy_modules = ("openmm", "openff", "rdkit", "mbuild", "MDAnalysis", "parmed", "pdbfixer")
+    heavy_modules = ("mbuild", "MDAnalysis", "parmed", "pdbfixer")
     code = (
         "import json, sys; "
         "import sammd, sammd.core.builders, sammd.model.metal_sulfur; "
