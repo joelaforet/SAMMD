@@ -200,6 +200,9 @@ def pack_fixed_solute_with_solvent(
         msg = "fixed-solute packing requires at least one solute atom record"
         raise ValueError(msg)
 
+    box_bounds_nm = zero_origin_box_bounds(dimensions_nm)
+    regions_nm = _require_explicit_solvent_regions(solvent_regions_nm)
+
     workdir = Path(working_dir)
     workdir.mkdir(parents=True, exist_ok=True)
     solute_path = workdir / "fixed_solute.pdb"
@@ -210,8 +213,6 @@ def pack_fixed_solute_with_solvent(
 
     write_atom_records_pdb(solute_path, solute_atoms)
     write_template_pdb(solvent_path, solvent_template)
-    box_bounds_nm = zero_origin_box_bounds(dimensions_nm)
-    regions_nm = tuple(solvent_regions_nm) if solvent_regions_nm is not None else (box_bounds_nm,)
     solvent_counts = split_count_by_region_volume(solvent_count, regions_nm)
     solvent_structures = tuple(
         PackmolStructure(
@@ -289,6 +290,9 @@ def pack_fixed_solute_with_solvent_components(
         msg = "fixed-solute packing requires at least one solute atom record"
         raise ValueError(msg)
 
+    box_bounds_nm = zero_origin_box_bounds(dimensions_nm)
+    regions_nm = _require_explicit_solvent_regions(solvent_regions_nm)
+
     workdir = Path(working_dir)
     workdir.mkdir(parents=True, exist_ok=True)
     solute_path = workdir / "fixed_solute.pdb"
@@ -297,16 +301,18 @@ def pack_fixed_solute_with_solvent_components(
     stdout_path = workdir / "packmol_stdout.log"
 
     write_atom_records_pdb(solute_path, solute_atoms)
-    box_bounds_nm = zero_origin_box_bounds(dimensions_nm)
-    regions_nm = tuple(solvent_regions_nm) if solvent_regions_nm is not None else (box_bounds_nm,)
     solvent_structures: list[PackmolStructure] = []
     component_atom_counts: dict[str, int] = {}
     component_region_counts: dict[str, tuple[int, ...]] = {}
-    for component in components:
+    for component_index, component in enumerate(components):
         solvent_path = workdir / f"{packmol_file_stem(component.name)}.pdb"
         write_template_pdb(solvent_path, component.template)
         component_atom_counts[component.name] = len(component.template.positions_nm)
-        region_counts = split_count_by_region_volume(component.count, regions_nm)
+        region_counts = split_count_by_region_volume(
+            component.count,
+            regions_nm,
+            tie_break_offset=component_index,
+        )
         component_region_counts[component.name] = region_counts
         solvent_structures.extend(
             PackmolStructure(
@@ -391,8 +397,23 @@ def solvent_regions_around_solute(
     return tuple(region for region in (bottom_region, top_region) if region[2][1] > region[2][0])
 
 
-def split_count_by_region_volume(count: int, regions_nm: tuple[BoxBounds, ...]) -> tuple[int, ...]:
-    """Split a molecule count across regions proportional to region volume."""
+def split_count_by_region_volume(
+    count: int,
+    regions_nm: tuple[BoxBounds, ...],
+    *,
+    tie_break_offset: int = 0,
+) -> tuple[int, ...]:
+    """Split a molecule count across regions proportional to region volume.
+
+    Parameters
+    ----------
+    count
+        Number of molecules to split.
+    regions_nm
+        Candidate solvent packing regions in nanometers.
+    tie_break_offset
+        Cyclic region offset used to distribute equal remainders across components.
+    """
 
     if isinstance(count, bool) or not isinstance(count, int) or count < 0:
         msg = "count must be a non-negative integer"
@@ -408,18 +429,49 @@ def split_count_by_region_volume(count: int, regions_nm: tuple[BoxBounds, ...]) 
     raw_counts = tuple(count * volume / total_volume for volume in volumes)
     floor_counts = [int(raw_count) for raw_count in raw_counts]
     remaining = count - sum(floor_counts)
+    if isinstance(tie_break_offset, bool) or not isinstance(tie_break_offset, int):
+        msg = "tie_break_offset must be an integer"
+        raise ValueError(msg)
+    region_count = len(regions_nm)
     remainders = sorted(
         (
-            (raw_count - floor_count, index)
+            (-(raw_count - floor_count), (index - tie_break_offset) % region_count, index)
             for index, (raw_count, floor_count) in enumerate(
                 zip(raw_counts, floor_counts, strict=True)
             )
         ),
-        reverse=True,
     )
-    for _, index in remainders[:remaining]:
+    for _, _, index in remainders[:remaining]:
         floor_counts[index] += 1
     return tuple(floor_counts)
+
+
+def _require_explicit_solvent_regions(
+    solvent_regions_nm: tuple[BoxBounds, ...] | list[BoxBounds] | None,
+) -> tuple[BoxBounds, ...]:
+    """Return validated explicit regions for high-level SAMMD solvent packing.
+
+    Parameters
+    ----------
+    solvent_regions_nm
+        Explicit solvent packing regions in nanometers.
+
+    Returns
+    -------
+    tuple[BoxBounds, ...]
+        Validated immutable region bounds.
+    """
+
+    if solvent_regions_nm is None:
+        msg = "explicit solvent_regions_nm are required for SAMMD solvent packing"
+        raise ValueError(msg)
+    regions_nm = tuple(solvent_regions_nm)
+    if not regions_nm:
+        msg = "at least one explicit solvent packing region is required"
+        raise ValueError(msg)
+    for region in regions_nm:
+        _validate_bounds(region)
+    return regions_nm
 
 
 def read_pdb_positions_nm(path: str | Path) -> tuple[Vector3, ...]:

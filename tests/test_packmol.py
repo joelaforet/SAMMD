@@ -522,8 +522,29 @@ def test_pdb_coordinate_parser_returns_nanometers(tmp_path) -> None:
     assert positions[1] == pytest.approx((-0.1, 0.0, 1.2345))
 
 
-def test_fixed_solute_helper_uses_packmol_around_full_box(tmp_path, monkeypatch) -> None:
-    """High-level packing keeps solute fixed and allows solvent throughout box bounds."""
+def test_fixed_solute_helper_requires_explicit_solvent_regions(tmp_path) -> None:
+    """High-level SAMMD solvent packing should never fall back to full-box bounds."""
+
+    with pytest.raises(ValueError, match="explicit solvent_regions_nm are required"):
+        pack_fixed_solute_with_solvent(
+            solute_records=(
+                AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (0.0, 0.0, 0.0)),
+            ),
+            solvent_template=PackmolMoleculeTemplate(
+                residue_name="EOH",
+                positions_nm=((0.0, 0.0, 0.0),),
+                atom_symbols=("C",),
+                atom_names=("C1",),
+            ),
+            solvent_name="ethanol",
+            solvent_count=1,
+            dimensions_nm=(2.0, 2.0, 2.0),
+            working_dir=tmp_path,
+        )
+
+
+def test_fixed_solute_helper_uses_explicit_regions_without_full_box(tmp_path, monkeypatch) -> None:
+    """High-level packing keeps solute fixed and only uses explicit solvent regions."""
 
     import sammd.backends.packmol as packmol_backend
 
@@ -555,6 +576,10 @@ def test_fixed_solute_helper_uses_packmol_around_full_box(tmp_path, monkeypatch)
         solvent_count=2,
         dimensions_nm=(2.0, 2.0, 2.0),
         working_dir=tmp_path,
+        solvent_regions_nm=(
+            ((0.0, 2.0), (0.0, 2.0), (0.0, 0.5)),
+            ((0.0, 2.0), (0.0, 2.0), (1.5, 2.0)),
+        ),
     )
 
     assert solvent_positions == (packed_positions[1:3], packed_positions[3:5])
@@ -562,7 +587,29 @@ def test_fixed_solute_helper_uses_packmol_around_full_box(tmp_path, monkeypatch)
     assert "structure fixed_solute.pdb" in input_text
     assert "fixed 0. 0. 0. 0. 0. 0." in input_text
     assert "structure ethanol.pdb" in input_text
-    assert "inside box 0 0 0 20 20 20" in input_text
+    assert "inside box 0 0 0 20 20 5" in input_text
+    assert "inside box 0 0 15 20 20 20" in input_text
+    assert "inside box 0 0 0 20 20 20" not in input_text
+
+
+def test_mixed_solvent_helper_requires_explicit_solvent_regions(tmp_path) -> None:
+    """Mixed-solvent helper should reject accidental full-box solvent packing."""
+
+    with pytest.raises(ValueError, match="explicit solvent_regions_nm are required"):
+        pack_fixed_solute_with_solvent_components(
+            solute_records=(
+                AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (0.0, 0.0, 0.0)),
+            ),
+            solvent_components=(
+                PackmolSolventComponent(
+                    "water",
+                    PackmolMoleculeTemplate("HOH", ((0.0, 0.0, 0.0),), ("O",), ("O1",)),
+                    1,
+                ),
+            ),
+            dimensions_nm=(2.0, 2.0, 2.0),
+            working_dir=tmp_path,
+        )
 
 
 def test_mixed_solvent_helper_uses_shared_explicit_regions(tmp_path, monkeypatch) -> None:
@@ -631,3 +678,55 @@ def test_mixed_solvent_helper_uses_shared_explicit_regions(tmp_path, monkeypatch
     input_text = (tmp_path / "packmol_input.inp").read_text(encoding="utf-8")
     assert input_text.count("inside box 0 0 0 20 20 5") == 2
     assert input_text.count("inside box 0 0 15 20 20 20") == 2
+
+
+def test_mixed_solvent_low_counts_are_split_across_equal_regions(tmp_path, monkeypatch) -> None:
+    """Distribute one-count mixed components across equal top and bottom reservoirs."""
+
+    import sammd.backends.packmol as packmol_backend
+
+    captured_jobs = []
+    packed_positions = (
+        (0.0, 0.0, 0.0),
+        (0.1, 0.1, 0.2),
+        (0.2, 0.1, 1.8),
+    )
+
+    def fake_run_packmol(job, input_path, working_dir, stdout_path):
+        captured_jobs.append(job)
+        return SimpleNamespace(returncode=0, stdout="Success!")
+
+    monkeypatch.setattr(packmol_backend, "run_packmol", fake_run_packmol)
+    monkeypatch.setattr(packmol_backend, "read_pdb_positions_nm", lambda path: packed_positions)
+    regions = (
+        ((0.0, 2.0), (0.0, 2.0), (0.0, 0.5)),
+        ((0.0, 2.0), (0.0, 2.0), (1.5, 2.0)),
+    )
+
+    pack_fixed_solute_with_solvent_components(
+        solute_records=(
+            AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (0.0, 0.0, 0.0)),
+        ),
+        solvent_components=(
+            PackmolSolventComponent(
+                "water",
+                PackmolMoleculeTemplate("HOH", ((0.0, 0.0, 0.0),), ("O",), ("O1",)),
+                1,
+            ),
+            PackmolSolventComponent(
+                "ethanol",
+                PackmolMoleculeTemplate("EOH", ((0.0, 0.0, 0.0),), ("C",), ("C1",)),
+                1,
+            ),
+        ),
+        dimensions_nm=(2.0, 2.0, 2.0),
+        working_dir=tmp_path,
+        solvent_regions_nm=regions,
+    )
+
+    solvent_structures = captured_jobs[0].structures[1:]
+    assert [structure.name for structure in solvent_structures] == ["water_1", "ethanol_2"]
+    assert [structure.inside_box_bounds_nm for structure in solvent_structures] == [
+        regions[0],
+        regions[1],
+    ]

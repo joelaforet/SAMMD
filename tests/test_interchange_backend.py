@@ -286,6 +286,64 @@ def test_runtime_solvent_regions_preserve_planned_count_volume() -> None:
     )
 
 
+def test_runtime_solvent_regions_match_packmol_input_after_shift(tmp_path, monkeypatch) -> None:
+    """Planned solvent regions should be the exact shifted bounds sent to PACKMOL."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    import sammd.backends.packmol as packmol_backend
+    from sammd.backends.packmol import (
+        PackmolMoleculeTemplate,
+        PackmolSolventComponent,
+        pack_fixed_solute_with_solvent_components,
+    )
+    from sammd.core.io import AtomRecord
+
+    planned_regions = (
+        ((-1.0, 1.0), (-1.0, 1.0), (-2.0, -1.5)),
+        ((-1.0, 1.0), (-1.0, 1.0), (1.5, 2.0)),
+    )
+    plan = SimpleNamespace(
+        box_plan=SimpleNamespace(
+            bounds_nm=((-1.0, 1.0), (-1.0, 1.0), (-2.0, 2.0)),
+            solvent_packing_regions_nm=planned_regions,
+        )
+    )
+
+    monkeypatch.setattr(
+        packmol_backend,
+        "run_packmol",
+        lambda job, input_path, working_dir, stdout_path: SimpleNamespace(
+            returncode=0,
+            stdout="Success!",
+        ),
+    )
+    monkeypatch.setattr(
+        packmol_backend,
+        "read_pdb_positions_nm",
+        lambda path: ((0.0, 0.0, 0.0), (0.1, 0.1, 0.1), (0.2, 0.2, 3.8)),
+    )
+
+    pack_fixed_solute_with_solvent_components(
+        solute_records=(
+            AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (0.0, 0.0, 0.0)),
+        ),
+        solvent_components=(
+            PackmolSolventComponent(
+                "water",
+                PackmolMoleculeTemplate("HOH", ((0.0, 0.0, 0.0),), ("O",), ("O1",)),
+                2,
+            ),
+        ),
+        dimensions_nm=(2.0, 2.0, 4.0),
+        working_dir=tmp_path,
+        solvent_regions_nm=backend._runtime_solvent_regions(plan),
+    )
+
+    input_text = (tmp_path / "packmol_input.inp").read_text(encoding="utf-8")
+    assert "inside box 0 0 0 20 20 5" in input_text
+    assert "inside box 0 0 35 20 20 40" in input_text
+
+
 def _region_volume(region) -> float:
     """Return simple orthorhombic region volume for test assertions."""
 
