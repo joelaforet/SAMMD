@@ -571,8 +571,8 @@ def test_high_reactant_extends_runtime_box_without_lifting_solvent_region() -> N
     assert geometry.fixed_solute_z_bounds_nm[1] < geometry.dimensions_nm[2]
 
 
-def test_packmol_fixed_solute_coordinates_are_inside_runtime_box() -> None:
-    """Shifted fixed-solute coordinates should fit within Packmol dimensions."""
+def test_packmol_fixed_solute_copy_wraps_xy_without_expanding_slab() -> None:
+    """Packmol fixed-solute coordinates should wrap XY without expanding the slab."""
 
     backend = importlib.import_module("sammd.backends.interchange")
     from sammd.core.io import AtomRecord
@@ -598,20 +598,24 @@ def test_packmol_fixed_solute_coordinates_are_inside_runtime_box() -> None:
         records,
         solvent_boundary_records=boundary_records,
     )
-    shifted_positions = tuple(
-        backend._shift_position(record.coordinates_nm, geometry.coordinate_shift_nm)
-        for record in records
+    shifted_records = tuple(
+        backend._shift_atom_record(record, geometry.coordinate_shift_nm) for record in records
+    )
+    packmol_records = tuple(
+        backend._wrap_atom_record_xy(record, geometry.dimensions_nm) for record in shifted_records
     )
 
     backend._ensure_positions_inside_box(
-        shifted_positions,
+        tuple(record.coordinates_nm for record in packmol_records),
         geometry.dimensions_nm,
         context="test fixed solute",
     )
-    assert geometry.coordinate_shift_nm[0] > 0.0
-    assert geometry.coordinate_shift_nm[1] == pytest.approx(0.0)
-    assert shifted_positions[0][0] > 0.0
-    assert shifted_positions[2][1] < geometry.dimensions_nm[1]
+    assert geometry.dimensions_nm[:2] == pytest.approx((2.0, 2.0))
+    assert geometry.coordinate_shift_nm[:2] == pytest.approx((0.0, 0.0))
+    assert shifted_records[0].coordinates_nm[0] == pytest.approx(-0.1)
+    assert shifted_records[2].coordinates_nm[1] == pytest.approx(2.1)
+    assert packmol_records[0].coordinates_nm[0] == pytest.approx(1.9)
+    assert packmol_records[2].coordinates_nm[1] == pytest.approx(0.1)
 
 
 def _region_volume(region) -> float:
