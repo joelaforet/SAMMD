@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/source/index.rst">Documentation</a> •
+  <a href="https://sammd.readthedocs.io/en/latest/">Documentation</a> •
   <a href="#installation">Installation</a> •
   <a href="#quick-start">Quick Start</a> •
   <a href="#pixi-environments">Pixi Environments</a>
