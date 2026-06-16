@@ -90,6 +90,7 @@ class RuntimeSolventGeometry:
     dimensions_nm: Vector3
     z_shift_nm: float
     molecule_counts: dict[str, int]
+    coordinate_shift_nm: Vector3 = (0.0, 0.0, 0.0)
 
 
 @dataclass(frozen=True)
@@ -490,12 +491,14 @@ def build_interchange_backend(
         tuple(atom_records),
         solvent_boundary_records=solvent_boundary_records,
     )
-    if runtime_geometry.z_shift_nm != 0.0:
+    if runtime_geometry.coordinate_shift_nm != (0.0, 0.0, 0.0):
         positions_nm[:] = [
-            _shift_position_z(position, runtime_geometry.z_shift_nm) for position in positions_nm
+            _shift_position(position, runtime_geometry.coordinate_shift_nm)
+            for position in positions_nm
         ]
         atom_records[:] = [
-            _shift_atom_record_z(record, runtime_geometry.z_shift_nm) for record in atom_records
+            _shift_atom_record(record, runtime_geometry.coordinate_shift_nm)
+            for record in atom_records
         ]
     _ensure_positions_inside_box(
         tuple(record.coordinates_nm for record in atom_records),
@@ -773,16 +776,25 @@ def _runtime_solvent_geometry(
     clearance_nm = float(plan.config.packing.packmol.tolerance) / 10.0
     boundary_min_z = min(record.coordinates_nm[2] for record in boundary_records)
     boundary_max_z = max(record.coordinates_nm[2] for record in boundary_records)
+    fixed_min_x = min(record.coordinates_nm[0] for record in fixed_solute_records)
+    fixed_max_x = max(record.coordinates_nm[0] for record in fixed_solute_records)
+    fixed_min_y = min(record.coordinates_nm[1] for record in fixed_solute_records)
+    fixed_max_y = max(record.coordinates_nm[1] for record in fixed_solute_records)
     fixed_min_z = min(record.coordinates_nm[2] for record in fixed_solute_records)
     fixed_max_z = max(record.coordinates_nm[2] for record in fixed_solute_records)
     solvent_z_min = boundary_min_z - padding_per_face_nm
     solvent_z_max = boundary_max_z + padding_per_face_nm
+    x_min = min(0.0, fixed_min_x - clearance_nm)
+    x_max = max(plan.box_plan.dimensions_nm[0], fixed_max_x + clearance_nm)
+    y_min = min(0.0, fixed_min_y - clearance_nm)
+    y_max = max(plan.box_plan.dimensions_nm[1], fixed_max_y + clearance_nm)
     final_z_min = min(solvent_z_min, fixed_min_z - clearance_nm)
     final_z_max = max(solvent_z_max, fixed_max_z + clearance_nm)
-    z_shift_nm = -final_z_min
+    coordinate_shift_nm = (-x_min, -y_min, -final_z_min)
+    z_shift_nm = coordinate_shift_nm[2]
     dimensions_nm = (
-        plan.box_plan.dimensions_nm[0],
-        plan.box_plan.dimensions_nm[1],
+        x_max - x_min,
+        y_max - y_min,
         final_z_max - final_z_min,
     )
     boundary_bounds = (boundary_min_z + z_shift_nm, boundary_max_z + z_shift_nm)
@@ -812,6 +824,7 @@ def _runtime_solvent_geometry(
         dimensions_nm=dimensions_nm,
         z_shift_nm=z_shift_nm,
         molecule_counts={},
+        coordinate_shift_nm=coordinate_shift_nm,
     )
 
 
@@ -861,6 +874,7 @@ def _runtime_geometry_with_counts(
         dimensions_nm=geometry.dimensions_nm,
         z_shift_nm=geometry.z_shift_nm,
         molecule_counts=molecule_counts,
+        coordinate_shift_nm=geometry.coordinate_shift_nm,
     )
 
 
@@ -882,6 +896,16 @@ def _shift_position_z(position: Vector3, shift_nm: float) -> Vector3:
     return (position[0], position[1], position[2] + shift_nm)
 
 
+def _shift_position(position: Vector3, shift_nm: Vector3) -> Vector3:
+    """Return a position shifted by a three-axis vector."""
+
+    return (
+        position[0] + shift_nm[0],
+        position[1] + shift_nm[1],
+        position[2] + shift_nm[2],
+    )
+
+
 def _shift_atom_record_z(record: AtomRecord, shift_nm: float) -> AtomRecord:
     """Return an atom record shifted along z."""
 
@@ -894,6 +918,21 @@ def _shift_atom_record_z(record: AtomRecord, shift_nm: float) -> AtomRecord:
         chain_id=record.chain_id,
         component_label=record.component_label,
         coordinates_nm=_shift_position_z(record.coordinates_nm, shift_nm),
+    )
+
+
+def _shift_atom_record(record: AtomRecord, shift_nm: Vector3) -> AtomRecord:
+    """Return an atom record shifted by a three-axis vector."""
+
+    return AtomRecord(
+        serial=record.serial,
+        atom_name=record.atom_name,
+        element=record.element,
+        residue_name=record.residue_name,
+        residue_id=record.residue_id,
+        chain_id=record.chain_id,
+        component_label=record.component_label,
+        coordinates_nm=_shift_position(record.coordinates_nm, shift_nm),
     )
 
 

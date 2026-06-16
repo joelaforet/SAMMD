@@ -281,19 +281,25 @@ def test_packmol_input_packs_solvent_around_actual_fixed_solute() -> None:
     assert len(solvent_blocks) == 2
     assert "  number 13" in solvent_blocks[0]
     assert "  number 12" in solvent_blocks[1]
+    x_stop_angstrom = box[0] * 10.0
+    y_stop_angstrom = box[1] * 10.0
     bottom_region_stop_angstrom = regions[0][2][1] * 10.0
     assert (
-        f"  inside box 0 0 0 22.0052 23.8213 {bottom_region_stop_angstrom:g}"
+        f"  inside box 0 0 0 {x_stop_angstrom:g} {y_stop_angstrom:g} "
+        f"{bottom_region_stop_angstrom:g}"
     ) in solvent_blocks[0]
     top_region_start_angstrom = regions[1][2][0] * 10.0
     top_region_stop_angstrom = regions[1][2][1] * 10.0
     assert (
         f"  inside box 0 0 {top_region_start_angstrom:g} "
-        f"22.0052 23.8213 {top_region_stop_angstrom:g}"
+        f"{x_stop_angstrom:g} {y_stop_angstrom:g} {top_region_stop_angstrom:g}"
     ) in solvent_blocks[1]
     assert "structure fixed_pd_sam.pdb" in text
     assert "fixed 0. 0. 0. 0. 0. 0." in text
-    assert "  inside box 0 0 0 22.0052 23.8213 68.3212" not in text
+    assert (
+        f"  inside box 0 0 0 {x_stop_angstrom:g} {y_stop_angstrom:g} "
+        f"{box[2] * 10.0:g}"
+    ) not in text
     assert "nloop 200" in text
 
 

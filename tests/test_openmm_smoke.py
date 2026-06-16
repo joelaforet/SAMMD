@@ -326,6 +326,36 @@ def test_smoke_runtime_solvent_bounds_are_shifted() -> None:
     assert geometry.fixed_solute_z_bounds_nm == pytest.approx((0.5, 2.5))
 
 
+def test_smoke_runtime_geometry_shifts_negative_lateral_solute() -> None:
+    """Move negative lateral fixed-solute coordinates into the Packmol frame."""
+
+    smoke = load_smoke_module()
+    plan = SimpleNamespace(
+        config=SimpleNamespace(
+            packing=SimpleNamespace(packmol=SimpleNamespace(tolerance=1.0)),
+        ),
+        box_plan=SimpleNamespace(dimensions_nm=(2.0, 2.0, 1.0)),
+    )
+
+    geometry = smoke.build_runtime_solvent_geometry(
+        plan,
+        ((-0.05, 0.5, 0.0), (0.5, 2.05, 1.0)),
+        2.0,
+    )
+    shifted_positions = tuple(
+        smoke.shift_position(position, geometry.coordinate_shift_nm)
+        for position in ((-0.05, 0.5, 0.0), (0.5, 2.05, 1.0))
+    )
+
+    smoke.ensure_positions_inside_box(
+        shifted_positions,
+        geometry.dimensions_nm,
+        context="test fixed solute",
+    )
+    assert geometry.dimensions_nm[:2] == pytest.approx((2.15, 2.15))
+    assert shifted_positions[0][0] > 0.0
+
+
 def test_smoke_nonzero_solvent_rejects_clearance_removed_regions() -> None:
     """Do not silently accept empty solvent reservoirs for requested solvent."""
 

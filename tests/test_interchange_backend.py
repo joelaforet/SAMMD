@@ -566,12 +566,12 @@ def test_packmol_fixed_solute_coordinates_are_inside_runtime_box() -> None:
         box_plan=SimpleNamespace(dimensions_nm=(2.0, 2.0, 8.0)),
     )
     boundary_records = (
-        AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (1.0, 1.0, 1.0)),
+        AtomRecord(1, "Pd", "Pd", "Pdx", 1, "M", "metal_slab", (-0.1, 0.2, 1.0)),
         AtomRecord(2, "O", "O", "TGL", 2, "A", "sam:thioglycerol", (1.0, 1.0, 1.62)),
     )
     records = (
         *boundary_records,
-        AtomRecord(3, "C1", "C", "CIN", 3, "B", "reactant", (1.0, 1.0, 4.5)),
+        AtomRecord(3, "C1", "C", "CIN", 3, "B", "reactant", (1.0, 2.1, 4.5)),
     )
 
     geometry = backend._runtime_solvent_geometry(
@@ -580,7 +580,8 @@ def test_packmol_fixed_solute_coordinates_are_inside_runtime_box() -> None:
         solvent_boundary_records=boundary_records,
     )
     shifted_positions = tuple(
-        backend._shift_position_z(record.coordinates_nm, geometry.z_shift_nm) for record in records
+        backend._shift_position(record.coordinates_nm, geometry.coordinate_shift_nm)
+        for record in records
     )
 
     backend._ensure_positions_inside_box(
@@ -588,6 +589,10 @@ def test_packmol_fixed_solute_coordinates_are_inside_runtime_box() -> None:
         geometry.dimensions_nm,
         context="test fixed solute",
     )
+    assert geometry.coordinate_shift_nm[0] > 0.0
+    assert geometry.coordinate_shift_nm[1] == pytest.approx(0.0)
+    assert shifted_positions[0][0] > 0.0
+    assert shifted_positions[2][1] < geometry.dimensions_nm[1]
 
 
 def _region_volume(region) -> float:

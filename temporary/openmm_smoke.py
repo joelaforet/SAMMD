@@ -279,6 +279,7 @@ class RuntimeSolventGeometry:
     dimensions_nm: Vector3
     z_shift_nm: float
     molecule_counts: dict[str, int]
+    coordinate_shift_nm: Vector3 = (0.0, 0.0, 0.0)
 
 
 @dataclass(frozen=True)
@@ -1230,12 +1231,14 @@ def build_openmm_smoke_system(
         solvent_boundary_positions_nm=solvent_boundary_positions_nm,
     )
     box_dimensions_nm = runtime_solvent_geometry.dimensions_nm
-    z_shift_nm = runtime_solvent_geometry.z_shift_nm
+    coordinate_shift_nm = runtime_solvent_geometry.coordinate_shift_nm
     solvent_regions_nm = runtime_solvent_geometry.solvent_regions_nm
-    if z_shift_nm != 0.0:
-        positions_nm[:] = [shift_position_z(position, z_shift_nm) for position in positions_nm]
+    if coordinate_shift_nm != (0.0, 0.0, 0.0):
+        positions_nm[:] = [
+            shift_position(position, coordinate_shift_nm) for position in positions_nm
+        ]
         sulfur_references[:] = [
-            shift_position_z(position, z_shift_nm) for position in sulfur_references
+            shift_position(position, coordinate_shift_nm) for position in sulfur_references
         ]
     set_periodic_box(modules, topology, system, box_dimensions_nm)
     ensure_positions_inside_box(
@@ -1388,16 +1391,25 @@ def build_runtime_solvent_geometry(
     clearance_nm = plan.config.packing.packmol.tolerance / 10.0
     boundary_min_z = min(position[2] for position in boundary_positions_nm)
     boundary_max_z = max(position[2] for position in boundary_positions_nm)
+    fixed_min_x = min(position[0] for position in fixed_solute_positions_nm)
+    fixed_max_x = max(position[0] for position in fixed_solute_positions_nm)
+    fixed_min_y = min(position[1] for position in fixed_solute_positions_nm)
+    fixed_max_y = max(position[1] for position in fixed_solute_positions_nm)
     fixed_min_z = min(position[2] for position in fixed_solute_positions_nm)
     fixed_max_z = max(position[2] for position in fixed_solute_positions_nm)
     solvent_z_min = boundary_min_z - padding_per_face_nm
     solvent_z_max = boundary_max_z + padding_per_face_nm
+    x_min = min(0.0, fixed_min_x - clearance_nm)
+    x_max = max(plan.box_plan.dimensions_nm[0], fixed_max_x + clearance_nm)
+    y_min = min(0.0, fixed_min_y - clearance_nm)
+    y_max = max(plan.box_plan.dimensions_nm[1], fixed_max_y + clearance_nm)
     z_min = min(solvent_z_min, fixed_min_z - clearance_nm)
     z_max = max(solvent_z_max, fixed_max_z + clearance_nm)
-    z_shift_nm = -z_min
+    coordinate_shift_nm = (-x_min, -y_min, -z_min)
+    z_shift_nm = coordinate_shift_nm[2]
     dimensions_nm = (
-        plan.box_plan.dimensions_nm[0],
-        plan.box_plan.dimensions_nm[1],
+        x_max - x_min,
+        y_max - y_min,
         z_max - z_min,
     )
     shifted_min_z = boundary_min_z + z_shift_nm
@@ -1429,6 +1441,7 @@ def build_runtime_solvent_geometry(
         dimensions_nm=dimensions_nm,
         z_shift_nm=z_shift_nm,
         molecule_counts={},
+        coordinate_shift_nm=coordinate_shift_nm,
     )
 
 
@@ -1475,6 +1488,7 @@ def replace_runtime_solvent_molecule_counts(
         dimensions_nm=geometry.dimensions_nm,
         z_shift_nm=geometry.z_shift_nm,
         molecule_counts=dict(molecule_counts),
+        coordinate_shift_nm=geometry.coordinate_shift_nm,
     )
 
 
@@ -1493,6 +1507,16 @@ def shift_position_z(position: Vector3, shift_nm: float) -> Vector3:
     """Return a position shifted along z."""
 
     return (position[0], position[1], position[2] + shift_nm)
+
+
+def shift_position(position: Vector3, shift_nm: Vector3) -> Vector3:
+    """Return a position shifted by a three-axis vector."""
+
+    return (
+        position[0] + shift_nm[0],
+        position[1] + shift_nm[1],
+        position[2] + shift_nm[2],
+    )
 
 
 def ensure_positions_inside_box(
