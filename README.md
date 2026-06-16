@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/source/_static/sammd-logo.png" alt="SAMMD logo" width="430">
+</p>
+
 <h1 align="center">SAMMD</h1>
 
 <p align="center">

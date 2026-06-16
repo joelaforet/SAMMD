@@ -1,3 +1,9 @@
+.. image:: _static/sammd-logo.png
+   :alt: SAMMD logo
+   :align: center
+   :class: sammd-hero-logo
+   :width: 430px
+
 SAMMD documentation
 ===================
 

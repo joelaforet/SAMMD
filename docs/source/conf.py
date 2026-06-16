@@ -32,8 +32,12 @@ html_theme = "furo"
 html_title = "SAMMD documentation"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
+html_logo = "_static/sammd-logo-compact.png"
+html_favicon = "_static/sammd-logo-compact.png"
 html_theme_options = {
     "sidebar_hide_name": True,
+    "light_logo": "sammd-logo-compact.png",
+    "dark_logo": "sammd-logo-compact.png",
     "light_css_variables": {
         "color-brand-primary": "#C65D20",
         "color-brand-content": "#A94F1B",
