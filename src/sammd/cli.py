@@ -139,6 +139,16 @@ def build(config: Path, output_dir: Path | None, overwrite: bool) -> None:
                 "SYSTEM Final runtime solution counts: %s",
                 runtime_geometry.molecule_counts,
             )
+        sam_safety = (getattr(export_result, "safety_checks", None) or {}).get(
+            "sam_steric_overlaps",
+            {},
+        )
+        if sam_safety.get("attempts", 1) > 1:
+            LOGGER.warning(
+                "SAM steric-overlap safety accepted retry attempt %s with seed %s",
+                sam_safety["attempts"],
+                sam_safety["accepted_seed"],
+            )
         export_files = export_result.files
         with _timed("Writing Interchange export build summary"):
             build_summary = plan.write_build_summary(overwrite=overwrite)

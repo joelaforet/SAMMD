@@ -31,7 +31,7 @@ from sammd.backends.packmol import (
     packmol_file_stem,
 )
 from sammd.core.io import AtomRecord, safe_write_text
-from sammd.model.sam import SAMPlacement
+from sammd.model.sam import SAMPlacement, SAMPlacementPlan, plan_sam_placements
 from sammd.model.solvation import SolutionPlan, plan_solution_composition
 from sammd.utils.geometry import (
     Vector3,
@@ -53,6 +53,10 @@ ROLE_CHAIN_STARTS = {
     "solvent": "D",
 }
 LOGGER = logging.getLogger(__name__)
+SAM_STERIC_SAFETY_ENABLED = True
+SAM_STERIC_SAFETY_MAX_ATTEMPTS = 25
+SAM_STERIC_WARNING_FRACTION = 0.85
+SAM_STERIC_SEVERE_FRACTION = 0.70
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,7 @@ class BackendExportResult:
     openff_toolkit_version: str | None
     openff_interchange_version: str | None
     runtime_solvent_geometry: RuntimeSolventGeometry | None = None
+    safety_checks: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -91,6 +96,48 @@ class RuntimeSolventGeometry:
     z_shift_nm: float
     molecule_counts: dict[str, int]
     coordinate_shift_nm: Vector3 = (0.0, 0.0, 0.0)
+
+
+@dataclass(frozen=True)
+class _PlacedSAMCoordinates:
+    """Coordinates and vdW radii for one placed SAM molecule."""
+
+    molecule: Any
+    placement: SAMPlacement
+    positions_nm: tuple[Vector3, ...]
+    sigma_nm: tuple[float, ...]
+    atom_symbols: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _SAMOverlapSummary:
+    """Structured result for an inter-SAM steric-overlap check."""
+
+    checked_pairs: int
+    warning_count: int
+    severe_count: int
+    warning_fraction: float
+    severe_fraction: float
+    worst_contacts: tuple[dict[str, object], ...]
+
+    @property
+    def accepted(self) -> bool:
+        """Return whether no warning-threshold contacts were found."""
+
+        return self.warning_count == 0
+
+    def to_summary(self) -> dict[str, object]:
+        """Return a JSON-serializable overlap summary."""
+
+        return {
+            "checked_pairs": self.checked_pairs,
+            "warning_count": self.warning_count,
+            "severe_count": self.severe_count,
+            "warning_fraction": self.warning_fraction,
+            "severe_fraction": self.severe_fraction,
+            "accepted": self.accepted,
+            "worst_contacts": list(self.worst_contacts),
+        }
 
 
 @dataclass(frozen=True)
@@ -266,6 +313,7 @@ def export_interchange_backend(
         openff_toolkit_version=result.openff_toolkit_version,
         openff_interchange_version=result.openff_interchange_version,
         runtime_solvent_geometry=result.runtime_solvent_geometry,
+        safety_checks=result.safety_checks,
     )
 
 
@@ -293,6 +341,9 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
         "sulfur_metal_pair_count": len(result.anchor_pairs),
         "metal_sulfur_override": _anchor_metadata(result),
     }
+    safety_checks = getattr(result, "safety_checks", None)
+    if safety_checks is not None:
+        summary["safety_checks"] = safety_checks
     runtime_solvent_geometry = getattr(result, "runtime_solvent_geometry", None)
     if runtime_solvent_geometry is not None:
         geometry = runtime_solvent_geometry
@@ -405,8 +456,8 @@ def build_interchange_backend(
 
     stage_start = perf_counter()
     _progress(progress, f"Preparing {len(plan.sam_placements.placements)} SAM molecules")
-    templates: dict[tuple[str, str], Any] = {}
-    for placement_index, placement in enumerate(plan.sam_placements.placements, start=1):
+    templates: dict[tuple[str, str], PreparedMoleculeTemplate] = {}
+    for placement in plan.sam_placements.placements:
         template_key = (placement.component_name, placement.component_smiles)
         template = templates.get(template_key)
         if template is None:
@@ -422,14 +473,27 @@ def build_interchange_backend(
                 f"  SAM template ready: {placement.component_name}",
                 stage_start,
             )
-        molecule, transformed = _placed_sam_molecule(template, placement, shift_nm)
+    sam_sigma_nm = {
+        template_key: _openff_vdw_sigma_nm(force_field, toolkit, template)
+        for template_key, template in templates.items()
+    }
+    placed_sams, sam_safety_metadata = _retry_sam_placement_for_steric_safety(
+        plan,
+        templates,
+        sam_sigma_nm,
+        shift_nm,
+        progress=progress,
+    )
+
+    for placement_index, placed_sam in enumerate(placed_sams, start=1):
+        placement = placed_sam.placement
         start = len(positions_nm)
         _append_identified_molecule(
             molecules,
             positions_nm,
             atom_records,
-            molecule,
-            transformed,
+            placed_sam.molecule,
+            placed_sam.positions_nm,
             residue_assigner.allocate(
                 f"sam:{placement.component_name}",
                 placement.component_residue_name,
@@ -658,6 +722,7 @@ def build_interchange_backend(
         openff_toolkit_version=_package_version("openff-toolkit"),
         openff_interchange_version=_package_version("openff-interchange"),
         runtime_solvent_geometry=runtime_geometry,
+        safety_checks={"sam_steric_overlaps": sam_safety_metadata},
     )
 
 
@@ -667,6 +732,8 @@ def _prepare_template(
     name: str,
     charge_model: str,
 ) -> PreparedMoleculeTemplate:
+    """Prepare an OpenFF molecule template for coordinate construction."""
+
     return prepare_molecule_template(
         smiles,
         name,
@@ -674,6 +741,47 @@ def _prepare_template(
         toolkit=toolkit,
         allow_undefined_stereo=True,
     )
+
+
+def _openff_vdw_sigma_nm(
+    force_field: Any,
+    toolkit: Any,
+    template: PreparedMoleculeTemplate,
+) -> tuple[float, ...]:
+    """Return OpenFF-assigned vdW sigma values for template atoms in nanometers."""
+
+    topology = toolkit.Topology.from_molecules([template.molecule])
+    labels = force_field.label_molecules(topology)
+    if not labels:
+        msg = "OpenFF did not return parameter labels for SAM template"
+        raise ValueError(msg)
+    vdw_labels = labels[0].get("vdW")
+    if not vdw_labels:
+        msg = "OpenFF did not assign vdW parameters to SAM template"
+        raise ValueError(msg)
+    sigma_nm: list[float] = []
+    for atom_index in range(len(template.atom_symbols)):
+        parameter = vdw_labels.get((atom_index,)) or vdw_labels.get(atom_index)
+        if parameter is None:
+            msg = f"OpenFF did not assign a vdW parameter to SAM atom {atom_index}"
+            raise ValueError(msg)
+        sigma = parameter.sigma if hasattr(parameter, "sigma") else parameter.parameters["sigma"]
+        sigma_nm.append(_quantity_to_nm(sigma))
+    return tuple(sigma_nm)
+
+
+def _quantity_to_nm(quantity: Any) -> float:
+    """Convert an OpenFF/OpenMM-style quantity to a nanometer float."""
+
+    try:
+        return float(quantity.m_as(_openff_unit_module().nanometer))
+    except AttributeError:
+        pass
+    try:
+        return float(quantity.value_in_unit(_require_openmm().unit.nanometer))
+    except AttributeError:
+        pass
+    return float(quantity)
 
 
 def _metal_atom_molecule(toolkit: Any, symbol: str) -> Any:
@@ -705,6 +813,197 @@ def _placed_sam_molecule(
         azimuth_rad=placement.anchor_pose.azimuth_rad,
     )
     return deepcopy(template.molecule), transformed
+
+
+def _retry_sam_placement_for_steric_safety(
+    plan: Any,
+    templates: dict[tuple[str, str], PreparedMoleculeTemplate],
+    sam_sigma_nm: dict[tuple[str, str], tuple[float, ...]],
+    shift_nm: Vector3,
+    *,
+    progress: ProgressCallback | None = None,
+) -> tuple[tuple[_PlacedSAMCoordinates, ...], dict[str, object]]:
+    """Retry SAM placement until inter-SAM vdW overlaps are absent."""
+
+    if not SAM_STERIC_SAFETY_ENABLED:
+        placed = _placed_sams_for_plan(plan.sam_placements, templates, sam_sigma_nm, shift_nm)
+        return placed, {
+            "enabled": False,
+            "attempts": 1,
+            "max_attempts": SAM_STERIC_SAFETY_MAX_ATTEMPTS,
+            "accepted_seed": plan.sam_placements.seed,
+            "warning_fraction": SAM_STERIC_WARNING_FRACTION,
+            "severe_fraction": SAM_STERIC_SEVERE_FRACTION,
+            "attempt_summaries": (),
+        }
+
+    base_seed = int(plan.sam_placements.seed)
+    lateral_area_nm2 = plan.box_plan.lateral_size_nm[0] * plan.box_plan.lateral_size_nm[1]
+    attempt_summaries: list[dict[str, object]] = []
+    best_summary: _SAMOverlapSummary | None = None
+    best_seed = base_seed
+    for attempt_index in range(SAM_STERIC_SAFETY_MAX_ATTEMPTS):
+        seed = base_seed + attempt_index
+        placement_plan = (
+            plan.sam_placements
+            if attempt_index == 0
+            else plan_sam_placements(
+                plan.config.sam,
+                plan.binding_sites,
+                lateral_area_nm2,
+                seed=seed,
+            )
+        )
+        placed = _placed_sams_for_plan(placement_plan, templates, sam_sigma_nm, shift_nm)
+        overlap_summary = _check_sam_steric_overlaps(
+            placed,
+            plan.box_plan.dimensions_nm,
+            warning_fraction=SAM_STERIC_WARNING_FRACTION,
+            severe_fraction=SAM_STERIC_SEVERE_FRACTION,
+        )
+        attempt_summary = {
+            "attempt": attempt_index + 1,
+            "seed": seed,
+            **overlap_summary.to_summary(),
+        }
+        attempt_summaries.append(attempt_summary)
+        if best_summary is None or overlap_summary.warning_count < best_summary.warning_count:
+            best_summary = overlap_summary
+            best_seed = seed
+        if overlap_summary.accepted:
+            if attempt_index > 0:
+                LOGGER.info(
+                    "Accepted SAM steric-overlap safety attempt %s with seed %s",
+                    attempt_index + 1,
+                    seed,
+                )
+            return placed, {
+                "enabled": True,
+                "attempts": attempt_index + 1,
+                "max_attempts": SAM_STERIC_SAFETY_MAX_ATTEMPTS,
+                "accepted_seed": seed,
+                "attempt_summaries": tuple(attempt_summaries),
+                **overlap_summary.to_summary(),
+            }
+
+    assert best_summary is not None
+    worst_contact = best_summary.worst_contacts[0] if best_summary.worst_contacts else {}
+    msg = (
+        "SAM steric-overlap safety failed to find an overlap-free export placement after "
+        f"{SAM_STERIC_SAFETY_MAX_ATTEMPTS} attempts. Increase sam.grafting_density "
+        "(larger nm^2/molecule means fewer SAMs). "
+        f"Best seed {best_seed} had {best_summary.warning_count} warning contacts and "
+        f"{best_summary.severe_count} severe contacts; worst contact: {worst_contact!r}"
+    )
+    raise ValueError(msg)
+
+
+def _placed_sams_for_plan(
+    placement_plan: SAMPlacementPlan,
+    templates: dict[tuple[str, str], PreparedMoleculeTemplate],
+    sam_sigma_nm: dict[tuple[str, str], tuple[float, ...]],
+    shift_nm: Vector3,
+) -> tuple[_PlacedSAMCoordinates, ...]:
+    """Return transformed SAM coordinates for one placement plan."""
+
+    placed_sams = []
+    for placement in placement_plan.placements:
+        template_key = (placement.component_name, placement.component_smiles)
+        template = templates[template_key]
+        molecule, transformed = _placed_sam_molecule(template, placement, shift_nm)
+        placed_sams.append(
+            _PlacedSAMCoordinates(
+                molecule=molecule,
+                placement=placement,
+                positions_nm=transformed,
+                sigma_nm=sam_sigma_nm[template_key],
+                atom_symbols=template.atom_symbols,
+            )
+        )
+    return tuple(placed_sams)
+
+
+def _check_sam_steric_overlaps(
+    placed_sams: tuple[_PlacedSAMCoordinates, ...],
+    dimensions_nm: Vector3,
+    *,
+    warning_fraction: float = SAM_STERIC_WARNING_FRACTION,
+    severe_fraction: float = SAM_STERIC_SEVERE_FRACTION,
+) -> _SAMOverlapSummary:
+    """Check only inter-SAM atom contacts using minimum-image XY distances."""
+
+    warning_count = 0
+    severe_count = 0
+    checked_pairs = 0
+    worst_contacts: list[dict[str, object]] = []
+    for left_index, left_sam in enumerate(placed_sams):
+        for right_index in range(left_index + 1, len(placed_sams)):
+            right_sam = placed_sams[right_index]
+            for left_atom, left_position in enumerate(left_sam.positions_nm):
+                for right_atom, right_position in enumerate(right_sam.positions_nm):
+                    checked_pairs += 1
+                    sigma_nm = 0.5 * (left_sam.sigma_nm[left_atom] + right_sam.sigma_nm[right_atom])
+                    separation_nm = _minimum_image_xy_distance(
+                        left_position,
+                        right_position,
+                        dimensions_nm,
+                    )
+                    ratio = separation_nm / sigma_nm if sigma_nm > 0.0 else math.inf
+                    if ratio < warning_fraction:
+                        warning_count += 1
+                    if ratio < severe_fraction:
+                        severe_count += 1
+                    if ratio < 1.0:
+                        worst_contacts.append(
+                            {
+                                "sam_indices": [left_index, right_index],
+                                "component_names": [
+                                    left_sam.placement.component_name,
+                                    right_sam.placement.component_name,
+                                ],
+                                "atom_indices": [left_atom, right_atom],
+                                "atom_symbols": [
+                                    left_sam.atom_symbols[left_atom],
+                                    right_sam.atom_symbols[right_atom],
+                                ],
+                                "distance_nm": separation_nm,
+                                "sigma_nm": sigma_nm,
+                                "fraction_of_sigma": ratio,
+                            }
+                        )
+    worst_contacts.sort(key=lambda contact: float(contact["fraction_of_sigma"]))
+    return _SAMOverlapSummary(
+        checked_pairs=checked_pairs,
+        warning_count=warning_count,
+        severe_count=severe_count,
+        warning_fraction=warning_fraction,
+        severe_fraction=severe_fraction,
+        worst_contacts=tuple(worst_contacts[:10]),
+    )
+
+
+def _minimum_image_xy_distance(
+    left: Vector3,
+    right: Vector3,
+    dimensions_nm: Vector3,
+) -> float:
+    """Return distance with periodic minimum image in x/y only."""
+
+    dx = left[0] - right[0]
+    dy = left[1] - right[1]
+    for axis_delta_name, axis_delta, dimension in (
+        ("x", dx, dimensions_nm[0]),
+        ("y", dy, dimensions_nm[1]),
+    ):
+        if dimension <= 0.0:
+            msg = f"{axis_delta_name} box dimension must be positive"
+            raise ValueError(msg)
+        if axis_delta_name == "x":
+            dx = axis_delta - round(axis_delta / dimension) * dimension
+        else:
+            dy = axis_delta - round(axis_delta / dimension) * dimension
+    dz = left[2] - right[2]
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
 
 
 def _molecule_centers_above_solute(
