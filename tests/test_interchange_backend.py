@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import logging
 import subprocess
 import sys
@@ -101,6 +102,7 @@ def test_interchange_export_preserves_runtime_geometry_for_summary(
         dimensions_nm=(2.0, 2.0, 4.0),
         z_shift_nm=1.2,
         molecule_counts={"ethanol": 17},
+        coordinate_shift_nm=(0.3, 0.4, 1.2),
     )
     result = backend.BackendExportResult(
         interchange=SimpleNamespace(model_dump_json=lambda indent: "{}"),
@@ -128,10 +130,27 @@ def test_interchange_export_preserves_runtime_geometry_for_summary(
     assert summary["box"]["dimensions_nm"] == [2.0, 2.0, 4.0]
     assert summary["box"]["actual_solvent_boundary_z_bounds_nm"] == [1.0, 2.5]
     assert summary["box"]["actual_fixed_solute_z_bounds_nm"] == [1.0, 3.0]
+    assert summary["box"]["coordinate_shift_nm"] == [0.3, 0.4, 1.2]
+    assert summary["box"]["z_shift_nm"] == 1.2
     assert summary["box"]["solvent_packing_regions_nm"] == [
         [[0.0, 2.0], [0.0, 2.0], [0.0, 0.8]]
     ]
     assert summary["solution"]["molecule_counts"] == {"ethanol": 17}
+    anchor_metadata = json.loads(plan.output_paths.anchor_metadata.read_text(encoding="utf-8"))
+    assert anchor_metadata["runtime_coordinate_frame"]["coordinate_shift_nm"] == [
+        0.3,
+        0.4,
+        1.2,
+    ]
+    assert anchor_metadata["runtime_coordinate_frame"]["z_shift_nm"] == 1.2
+    assert anchor_metadata["runtime_coordinate_frame"]["bounds_nm"] == [
+        [0.0, 2.0],
+        [0.0, 2.0],
+        [0.0, 4.0],
+    ]
+    assert anchor_metadata["runtime_coordinate_frame"]["solvent_packing_regions_nm"] == [
+        [[0.0, 2.0], [0.0, 2.0], [0.0, 0.8]]
+    ]
 
 
 def test_interchange_export_rejects_salts_before_optional_imports(tmp_path: Path) -> None:

@@ -318,6 +318,8 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
                     [list(axis_bounds) for axis_bounds in region]
                     for region in geometry.solvent_regions_nm
                 ],
+                "coordinate_shift_nm": list(geometry.coordinate_shift_nm),
+                "z_shift_nm": geometry.z_shift_nm,
                 "solvent_count_planning_volume_nm3": (
                     geometry.solvent_count_planning_volume_nm3
                 ),
@@ -1034,12 +1036,44 @@ def _terminal_heavy_axis_index(template: PreparedMoleculeTemplate, anchor_index:
 
 
 def _anchor_metadata(result: BackendExportResult) -> dict[str, object]:
+    """Return anchor override metadata with runtime frame audit fields."""
+
     from sammd.backends.interchange_plugins import metal_sulfur_lj_override_summary
 
     metadata = metal_sulfur_lj_override_summary(result.anchor_pairs)
     metadata["sulfur_indices"] = list(result.sulfur_indices)
     metadata["metal_indices"] = list(result.metal_indices)
+    runtime_solvent_geometry = getattr(result, "runtime_solvent_geometry", None)
+    if runtime_solvent_geometry is not None:
+        metadata["runtime_coordinate_frame"] = _runtime_coordinate_frame_metadata(
+            runtime_solvent_geometry
+        )
     return metadata
+
+
+def _runtime_coordinate_frame_metadata(geometry: RuntimeSolventGeometry) -> dict[str, object]:
+    """Return serializable metadata for the zero-origin Packmol runtime frame."""
+
+    return {
+        "coordinate_shift_nm": list(geometry.coordinate_shift_nm),
+        "z_shift_nm": geometry.z_shift_nm,
+        "dimensions_nm": list(geometry.dimensions_nm),
+        "bounds_nm": [
+            [0.0, geometry.dimensions_nm[0]],
+            [0.0, geometry.dimensions_nm[1]],
+            [0.0, geometry.dimensions_nm[2]],
+        ],
+        "actual_solvent_boundary_z_bounds_nm": list(geometry.solvent_boundary_z_bounds_nm),
+        "actual_fixed_solute_z_bounds_nm": list(geometry.fixed_solute_z_bounds_nm),
+        "solvent_packing_regions_nm": [
+            [list(axis_bounds) for axis_bounds in region]
+            for region in geometry.solvent_regions_nm
+        ],
+        "solvent_count_planning_volume_nm3": geometry.solvent_count_planning_volume_nm3,
+        "solvent_padding_nm": geometry.solvent_padding_nm,
+        "solvent_padding_per_face_nm": geometry.solvent_padding_per_face_nm,
+        "solvent_clearance_nm": geometry.solvent_clearance_nm,
+    }
 
 
 def _write_pdbx(path: Path, topology: Any, positions: Any, *, overwrite: bool) -> None:
