@@ -1,0 +1,85 @@
+[workspace]
+name = "sammd"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64"]
+
+[dependencies]
+python = ">=3.12,<3.14"
+pip = "*"
+ipykernel = "*"
+click = ">=8.1"
+pydantic = ">=2"
+pyyaml = ">=6"
+
+[pypi-dependencies]
+sammd = { path = ".", editable = true }
+
+[feature.dev.dependencies]
+coverage = ">=7"
+pytest = ">=8"
+pytest-cov = ">=5"
+ruff = ">=0.8"
+
+[feature.docs.dependencies]
+sphinx = ">=8"
+myst-parser = ">=4"
+sphinx-copybutton = ">=0.5"
+furo = ">=2024.8.6"
+
+[feature.interchange.dependencies]
+rdkit = "*"
+mbuild = "*"
+openff-toolkit = "*"
+openff-interchange = "*"
+packmol = "*"
+
+[feature.analysis.dependencies]
+numpy = "*"
+pandas = "*"
+scipy = "*"
+matplotlib = "*"
+seaborn = "*"
+pymbar = "*"
+mdanalysis = "*"
+mdtraj = "*"
+
+[feature.cuda-12-4.dependencies]
+# CUDA 12.4 driver line, e.g. CU Boulder Blanca older-GPU nodes.
+openmm = "=8.1.2"
+cuda-version = "=12.4"
+
+[feature.cuda-12-4.system-requirements]
+cuda = "12.4"
+
+[feature.cuda-12-6.dependencies]
+# CUDA 12.6 driver line, e.g. PSC Bridges2.
+openmm = "=8.4.0"
+cuda-version = "=12.6"
+
+[feature.cuda-12-6.system-requirements]
+cuda = "12.6"
+
+[feature.cuda-13-0.dependencies]
+# CUDA 13.0 driver line, matching the previous generic Interchange environment.
+openmm = "=8.5.1"
+cuda-version = "=13.0"
+
+[feature.cuda-13-0.system-requirements]
+cuda = "13.0"
+
+[environments]
+default = ["dev", "interchange"]
+dev = ["dev", "interchange"]
+docs = ["dev", "docs", "interchange"]
+interchange = ["dev", "interchange"]
+analysis = ["dev", "interchange", "analysis"]
+cuda-12-4 = ["dev", "interchange", "analysis", "cuda-12-4"]
+cuda-12-6 = ["dev", "interchange", "analysis", "cuda-12-6"]
+cuda-13-0 = ["dev", "interchange", "analysis", "cuda-13-0"]
+
+[tasks]
+test = "python -m pytest --cov=sammd --cov-report=term-missing"
+lint = "ruff check src/sammd tests"
+interchange-tests = "python -m pytest tests/test_forcefields.py tests/test_openff.py tests/test_interchange_backend.py tests/test_packmol.py -q"
+temporary-openmm-smoke = "python temporary/openmm_smoke.py --platform CUDA --output-dir outputs/openmm_smoke/pd111_propanethiol_cinnamaldehyde --overwrite"
+install-cuda-kernel = "python -m ipykernel install --user --name sammd-cuda --display-name 'Python (SAMMD CUDA)'"

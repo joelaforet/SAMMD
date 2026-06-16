@@ -1,0 +1,1 @@
+"""Packaged SAMMD data resources."""
