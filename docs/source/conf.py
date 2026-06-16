@@ -7,7 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 project = "SAMMD"
-author = "SAMMD contributors"
+author = "Joseph R. Laforet Jr."
 copyright = "Joseph R. Laforet Jr."
 release = "0.1.0"
 
