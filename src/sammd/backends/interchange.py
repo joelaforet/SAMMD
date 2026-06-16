@@ -823,7 +823,7 @@ def _retry_sam_placement_for_steric_safety(
     *,
     progress: ProgressCallback | None = None,
 ) -> tuple[tuple[_PlacedSAMCoordinates, ...], dict[str, object]]:
-    """Retry SAM placement until inter-SAM vdW overlaps are absent."""
+    """Retry SAM placement and return diagnostics for inter-SAM vdW overlaps."""
 
     if not SAM_STERIC_SAFETY_ENABLED:
         placed = _placed_sams_for_plan(plan.sam_placements, templates, sam_sigma_nm, shift_nm)
@@ -841,6 +841,7 @@ def _retry_sam_placement_for_steric_safety(
     lateral_area_nm2 = plan.box_plan.lateral_size_nm[0] * plan.box_plan.lateral_size_nm[1]
     attempt_summaries: list[dict[str, object]] = []
     best_summary: _SAMOverlapSummary | None = None
+    best_placed: tuple[_PlacedSAMCoordinates, ...] | None = None
     best_seed = base_seed
     for attempt_index in range(SAM_STERIC_SAFETY_MAX_ATTEMPTS):
         seed = base_seed + attempt_index
@@ -852,6 +853,7 @@ def _retry_sam_placement_for_steric_safety(
                 plan.binding_sites,
                 lateral_area_nm2,
                 seed=seed,
+                lateral_size_nm=plan.box_plan.lateral_size_nm,
             )
         )
         placed = _placed_sams_for_plan(placement_plan, templates, sam_sigma_nm, shift_nm)
@@ -867,8 +869,15 @@ def _retry_sam_placement_for_steric_safety(
             **overlap_summary.to_summary(),
         }
         attempt_summaries.append(attempt_summary)
-        if best_summary is None or overlap_summary.warning_count < best_summary.warning_count:
+        if best_summary is None or (
+            overlap_summary.warning_count,
+            overlap_summary.severe_count,
+        ) < (
+            best_summary.warning_count,
+            best_summary.severe_count,
+        ):
             best_summary = overlap_summary
+            best_placed = placed
             best_seed = seed
         if overlap_summary.accepted:
             if attempt_index > 0:
@@ -887,15 +896,26 @@ def _retry_sam_placement_for_steric_safety(
             }
 
     assert best_summary is not None
-    worst_contact = best_summary.worst_contacts[0] if best_summary.worst_contacts else {}
-    msg = (
-        "SAM steric-overlap safety failed to find an overlap-free export placement after "
-        f"{SAM_STERIC_SAFETY_MAX_ATTEMPTS} attempts. Increase sam.grafting_density "
-        "(larger nm^2/molecule means fewer SAMs). "
-        f"Best seed {best_seed} had {best_summary.warning_count} warning contacts and "
-        f"{best_summary.severe_count} severe contacts; worst contact: {worst_contact!r}"
+    assert best_placed is not None
+    LOGGER.warning(
+        "SAM steric-overlap diagnostic did not find a zero-warning placement after %s "
+        "attempts; continuing with best seed %s (%s warning contacts, %s severe contacts). "
+        "Run energy minimization before dynamics.",
+        SAM_STERIC_SAFETY_MAX_ATTEMPTS,
+        best_seed,
+        best_summary.warning_count,
+        best_summary.severe_count,
     )
-    raise ValueError(msg)
+    return best_placed, {
+        "enabled": True,
+        "accepted": False,
+        "attempts": SAM_STERIC_SAFETY_MAX_ATTEMPTS,
+        "max_attempts": SAM_STERIC_SAFETY_MAX_ATTEMPTS,
+        "accepted_seed": None,
+        "best_seed": best_seed,
+        "attempt_summaries": tuple(attempt_summaries),
+        **best_summary.to_summary(),
+    }
 
 
 def _placed_sams_for_plan(
@@ -930,7 +950,7 @@ def _check_sam_steric_overlaps(
     warning_fraction: float = SAM_STERIC_WARNING_FRACTION,
     severe_fraction: float = SAM_STERIC_SEVERE_FRACTION,
 ) -> _SAMOverlapSummary:
-    """Check only inter-SAM atom contacts using minimum-image XY distances."""
+    """Check inter-SAM atom contacts using PBC in x/y and direct z separation."""
 
     warning_count = 0
     severe_count = 0
@@ -987,7 +1007,7 @@ def _minimum_image_xy_distance(
     right: Vector3,
     dimensions_nm: Vector3,
 ) -> float:
-    """Return distance with periodic minimum image in x/y only."""
+    """Return 3D distance with periodic minimum image in x/y only."""
 
     dx = left[0] - right[0]
     dy = left[1] - right[1]

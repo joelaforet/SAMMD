@@ -309,6 +309,7 @@ def build_system(
         binding_sites,
         box_plan.lateral_size_nm[0] * box_plan.lateral_size_nm[1],
         seed=active_seed,
+        lateral_size_nm=box_plan.lateral_size_nm,
     )
     solution = plan_solution_composition(
         loaded_config,

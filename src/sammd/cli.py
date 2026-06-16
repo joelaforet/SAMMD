@@ -143,7 +143,15 @@ def build(config: Path, output_dir: Path | None, overwrite: bool) -> None:
             "sam_steric_overlaps",
             {},
         )
-        if sam_safety.get("attempts", 1) > 1:
+        if sam_safety.get("accepted") is False:
+            LOGGER.warning(
+                "SAM steric-overlap diagnostic continued with best seed %s: %s warning "
+                "contacts, %s severe contacts; minimize before dynamics",
+                sam_safety.get("best_seed"),
+                sam_safety.get("warning_count"),
+                sam_safety.get("severe_count"),
+            )
+        elif sam_safety.get("attempts", 1) > 1:
             LOGGER.warning(
                 "SAM steric-overlap safety accepted retry attempt %s with seed %s",
                 sam_safety["attempts"],

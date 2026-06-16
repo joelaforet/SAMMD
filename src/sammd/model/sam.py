@@ -61,6 +61,7 @@ def plan_sam_placements(
     lateral_area_nm2: float,
     *,
     seed: int,
+    lateral_size_nm: tuple[float, float] | None = None,
 ) -> SAMPlacementPlan:
     """Select binding sites and assign SAM components deterministically.
 
@@ -74,6 +75,10 @@ def plan_sam_placements(
         Area of one exposed face in square nanometers. Target site counts use half-up rounding.
     seed
         Random seed controlling deterministic site and component shuffling.
+    lateral_size_nm
+        Optional periodic x/y box lengths. When supplied, site spacing uses
+        minimum-image lateral distances so selected anchors do not cluster
+        across periodic boundaries.
 
     Returns
     -------
@@ -118,7 +123,12 @@ def plan_sam_placements(
             )
             raise ValueError(msg)
 
-        selected_sites = _select_spaced_sites(side_sites, selected_sites_per_side, rng)
+        selected_sites = _select_spaced_sites(
+            side_sites,
+            selected_sites_per_side,
+            rng,
+            lateral_size_nm=lateral_size_nm,
+        )
         components = _components_for_selected_sites(sam_config, selected_sites_per_side, rng)
         for placement_index, (site, component) in enumerate(
             zip(selected_sites, components, strict=True)
@@ -235,8 +245,16 @@ def _select_spaced_sites(
     sites: list[BindingSite],
     selected_sites: int,
     rng: Random,
+    *,
+    lateral_size_nm: tuple[float, float] | None = None,
 ) -> list[BindingSite]:
     """Select sites by farthest-point sampling to avoid local SAM clustering."""
+
+    if lateral_size_nm is not None and (
+        len(lateral_size_nm) != 2 or any(dimension <= 0.0 for dimension in lateral_size_nm)
+    ):
+        msg = "lateral_size_nm must contain two positive dimensions"
+        raise ValueError(msg)
 
     shuffled_sites = list(sites)
     rng.shuffle(shuffled_sites)
@@ -246,12 +264,35 @@ def _select_spaced_sites(
         next_site = max(
             remaining,
             key=lambda site: min(
-                _distance_squared(site.position_nm, other.position_nm) for other in chosen
+                _site_distance_squared(site, other, lateral_size_nm=lateral_size_nm)
+                for other in chosen
             ),
         )
         chosen.append(next_site)
         remaining.remove(next_site)
     return sorted(chosen, key=lambda site: site.position_nm)
+
+
+def _site_distance_squared(
+    left: BindingSite,
+    right: BindingSite,
+    *,
+    lateral_size_nm: tuple[float, float] | None = None,
+) -> float:
+    """Return squared site distance, using minimum-image x/y when configured."""
+
+    if lateral_size_nm is None:
+        return _distance_squared(left.position_nm, right.position_nm)
+    dx = _minimum_image_delta(left.position_nm[0] - right.position_nm[0], lateral_size_nm[0])
+    dy = _minimum_image_delta(left.position_nm[1] - right.position_nm[1], lateral_size_nm[1])
+    dz = left.position_nm[2] - right.position_nm[2]
+    return dx * dx + dy * dy + dz * dz
+
+
+def _minimum_image_delta(delta_nm: float, length_nm: float) -> float:
+    """Return the nearest periodic displacement for one dimension."""
+
+    return delta_nm - round(delta_nm / length_nm) * length_nm
 
 
 def _distance_squared(left: Vector3, right: Vector3) -> float:

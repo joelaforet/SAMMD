@@ -46,6 +46,42 @@ def load_smoke_tool():
     return module
 
 
+def test_openmm_minimization_lowers_finite_repulsive_energy() -> None:
+    """OpenMM minimization should relax a lightweight finite steric clash."""
+
+    openmm = pytest.importorskip("openmm")
+    unit = openmm.unit
+    system = openmm.System()
+    system.addParticle(39.9 * unit.amu)
+    system.addParticle(39.9 * unit.amu)
+    nonbonded = openmm.NonbondedForce()
+    nonbonded.setNonbondedMethod(openmm.NonbondedForce.NoCutoff)
+    for _ in range(2):
+        nonbonded.addParticle(0.0, 0.34 * unit.nanometer, 0.8 * unit.kilojoule_per_mole)
+    system.addForce(nonbonded)
+    integrator = openmm.VerletIntegrator(0.001 * unit.picosecond)
+    context = openmm.Context(system, integrator)
+    context.setPositions(
+        [
+            openmm.Vec3(0.0, 0.0, 0.0),
+            openmm.Vec3(0.15, 0.0, 0.0),
+        ]
+        * unit.nanometer
+    )
+
+    initial = context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
+        unit.kilojoule_per_mole
+    )
+    openmm.LocalEnergyMinimizer.minimize(context)
+    minimized = context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
+        unit.kilojoule_per_mole
+    )
+
+    assert math.isfinite(initial)
+    assert math.isfinite(minimized)
+    assert minimized < initial
+
+
 def actual_fixed_solute_positions(smoke, plan) -> tuple[tuple[float, float, float], ...]:
     """Construct fixed-solute positions after slab, SAM, and reactant placement."""
 

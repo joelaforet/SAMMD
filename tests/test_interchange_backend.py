@@ -695,6 +695,33 @@ def test_sam_overlap_checker_detects_periodic_xy_overlap() -> None:
     assert summary.worst_contacts[0]["distance_nm"] == pytest.approx(0.07)
 
 
+def test_sam_overlap_checker_preserves_z_separation() -> None:
+    """Atoms close in x/y but separated in z should not be flagged as overlaps."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    placed = (
+        backend._PlacedSAMCoordinates(
+            molecule=object(),
+            placement=SimpleNamespace(component_name="bottom"),
+            positions_nm=((0.5, 0.5, 0.0),),
+            sigma_nm=(0.3,),
+            atom_symbols=("C",),
+        ),
+        backend._PlacedSAMCoordinates(
+            molecule=object(),
+            placement=SimpleNamespace(component_name="top"),
+            positions_nm=((0.5, 0.5, 1.0),),
+            sigma_nm=(0.3,),
+            atom_symbols=("C",),
+        ),
+    )
+
+    summary = backend._check_sam_steric_overlaps(placed, (2.0, 2.0, 2.0))
+
+    assert summary.warning_count == 0
+    assert summary.severe_count == 0
+
+
 def test_sam_steric_retry_accepts_later_seed(monkeypatch: pytest.MonkeyPatch) -> None:
     """SAM safety should retry deterministic placement seeds before accepting."""
 
@@ -741,10 +768,16 @@ def test_sam_steric_retry_accepts_later_seed(monkeypatch: pytest.MonkeyPatch) ->
     )
 
     monkeypatch.setattr(backend, "SAM_STERIC_SAFETY_MAX_ATTEMPTS", 2)
+
+    def retry_placement_plan(
+        sam_config, binding_sites, lateral_area_nm2, *, seed, lateral_size_nm=None
+    ):
+        return retry_plan
+
     monkeypatch.setattr(
         backend,
         "plan_sam_placements",
-        lambda sam_config, binding_sites, lateral_area_nm2, *, seed: retry_plan,
+        retry_placement_plan,
     )
     monkeypatch.setattr(
         backend,
@@ -766,6 +799,88 @@ def test_sam_steric_retry_accepts_later_seed(monkeypatch: pytest.MonkeyPatch) ->
     assert metadata["accepted_seed"] == 101
     assert metadata["attempt_summaries"][0]["warning_count"] == 1
     assert metadata["attempt_summaries"][1]["warning_count"] == 0
+
+
+def test_sam_steric_retry_returns_best_diagnostic_without_hard_fail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SAM safety diagnostics should not block exports before minimization."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    initial_plan = SimpleNamespace(seed=100, placements=(object(),))
+    retry_plan = SimpleNamespace(seed=101, placements=(object(),))
+    plan = SimpleNamespace(
+        sam_placements=initial_plan,
+        box_plan=SimpleNamespace(lateral_size_nm=(2.0, 2.0), dimensions_nm=(2.0, 2.0, 2.0)),
+        config=SimpleNamespace(sam=object()),
+        binding_sites=(object(),),
+    )
+    severe = (
+        backend._PlacedSAMCoordinates(
+            molecule=object(),
+            placement=SimpleNamespace(component_name="left"),
+            positions_nm=((0.0, 0.0, 0.0),),
+            sigma_nm=(0.3,),
+            atom_symbols=("C",),
+        ),
+        backend._PlacedSAMCoordinates(
+            molecule=object(),
+            placement=SimpleNamespace(component_name="right"),
+            positions_nm=((0.1, 0.0, 0.0),),
+            sigma_nm=(0.3,),
+            atom_symbols=("C",),
+        ),
+    )
+    warning_only = (
+        backend._PlacedSAMCoordinates(
+            molecule=object(),
+            placement=SimpleNamespace(component_name="left"),
+            positions_nm=((0.0, 0.0, 0.0),),
+            sigma_nm=(0.3,),
+            atom_symbols=("C",),
+        ),
+        backend._PlacedSAMCoordinates(
+            molecule=object(),
+            placement=SimpleNamespace(component_name="right"),
+            positions_nm=((0.24, 0.0, 0.0),),
+            sigma_nm=(0.3,),
+            atom_symbols=("C",),
+        ),
+    )
+
+    monkeypatch.setattr(backend, "SAM_STERIC_SAFETY_MAX_ATTEMPTS", 2)
+
+    def retry_placement_plan(
+        sam_config, binding_sites, lateral_area_nm2, *, seed, lateral_size_nm=None
+    ):
+        return retry_plan
+
+    monkeypatch.setattr(
+        backend,
+        "plan_sam_placements",
+        retry_placement_plan,
+    )
+    monkeypatch.setattr(
+        backend,
+        "_placed_sams_for_plan",
+        lambda placement_plan, templates, sam_sigma_nm, shift_nm: (
+            severe if placement_plan.seed == 100 else warning_only
+        ),
+    )
+
+    placed, metadata = backend._retry_sam_placement_for_steric_safety(
+        plan,
+        {},
+        {},
+        (0.0, 0.0, 0.0),
+    )
+
+    assert placed == warning_only
+    assert metadata["accepted"] is False
+    assert metadata["accepted_seed"] is None
+    assert metadata["best_seed"] == 101
+    assert metadata["warning_count"] == 1
+    assert metadata["severe_count"] == 0
 
 
 def _region_volume(region) -> float:

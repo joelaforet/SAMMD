@@ -81,7 +81,10 @@ def test_site_selection_avoids_nearest_neighbor_clustering() -> None:
     slab = plan_fcc111_slab("Pd", (2.0, 2.0), 5)
     lateral_area_nm2 = slab.lateral_size_nm[0] * slab.lateral_size_nm[1]
     plan = plan_sam_placements(
-        SAMConfig(), generate_binding_sites(slab), lateral_area_nm2=lateral_area_nm2, seed=2026
+        SAMConfig(),
+        generate_binding_sites(slab),
+        lateral_area_nm2=lateral_area_nm2,
+        seed=2026,
     )
 
     for side in ("bottom", "top"):
@@ -90,6 +93,34 @@ def test_site_selection_avoids_nearest_neighbor_clustering() -> None:
         ]
         min_distance = min(
             dist(left, right)
+            for index, left in enumerate(positions)
+            for right in positions[index + 1 :]
+        )
+
+        assert min_distance > 0.45
+
+
+def test_site_selection_avoids_periodic_edge_clustering() -> None:
+    """Do not choose anchors that overlap through the periodic x/y image."""
+
+    slab = plan_fcc111_slab("Pd", (5.0, 5.0), 11)
+    lateral_area_nm2 = slab.lateral_size_nm[0] * slab.lateral_size_nm[1]
+
+    plan = plan_sam_placements(
+        SAMConfig(grafting_density=0.40),
+        generate_binding_sites(slab),
+        lateral_area_nm2=lateral_area_nm2,
+        seed=2026,
+        lateral_size_nm=slab.lateral_size_nm,
+    )
+
+    assert plan.selected_sites_per_side == 68
+    for side in ("bottom", "top"):
+        positions = [
+            placement.position_nm for placement in plan.placements if placement.side == side
+        ]
+        min_distance = min(
+            _minimum_image_xy_distance(left, right, slab.lateral_size_nm)
             for index, left in enumerate(positions)
             for right in positions[index + 1 :]
         )
@@ -220,3 +251,17 @@ def test_sam_azimuth_rad_uses_deterministic_golden_angle_sequence() -> None:
         assert [placement.anchor_pose.azimuth_rad for placement in side_placements] == [
             sam_azimuth_rad(index) for index in range(len(side_placements))
         ]
+
+
+def _minimum_image_xy_distance(
+    left: tuple[float, float, float],
+    right: tuple[float, float, float],
+    lateral_size_nm: tuple[float, float],
+) -> float:
+    dx = _minimum_image_delta(left[0] - right[0], lateral_size_nm[0])
+    dy = _minimum_image_delta(left[1] - right[1], lateral_size_nm[1])
+    return sqrt(dx * dx + dy * dy)
+
+
+def _minimum_image_delta(delta_nm: float, length_nm: float) -> float:
+    return delta_nm - round(delta_nm / length_nm) * length_nm
