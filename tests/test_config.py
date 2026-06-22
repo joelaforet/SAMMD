@@ -112,6 +112,30 @@ def test_sam_extended_length_override_is_optional_and_positive() -> None:
         load_config_dict(data)
 
 
+def test_sam_null_disables_sam_while_omission_keeps_default() -> None:
+    """Use explicit YAML null for bare-surface controls without changing defaults."""
+
+    default_config = load_config_dict({})
+    bare_data = _template_data()
+    bare_data["sam"] = None
+
+    bare_config = load_config_dict(bare_data)
+
+    assert default_config.sam is not None
+    assert default_config.sam.components[0].name == "propanethiol"
+    assert bare_config.sam is None
+
+
+def test_sam_string_none_is_rejected() -> None:
+    """Require YAML null, not the string 'None', for no-SAM controls."""
+
+    data = _template_data()
+    data["sam"] = "None"
+
+    with pytest.raises(ValidationError, match="Input should be a valid dictionary"):
+        load_config_dict(data)
+
+
 def test_yaml_template_describes_neutral_thiols_and_internal_nonbonded_attachment() -> None:
     """Keep beginner SAM wording aligned with the current validation contract."""
 
@@ -128,6 +152,18 @@ def test_yaml_template_describes_neutral_thiols_and_internal_nonbonded_attachmen
     assert "length from sulfur anchor to tail tip" in normalized
     assert "total z reservoir thickness across both exposed SAM faces" in normalized
     assert "split equally across both faces" in normalized
+
+
+def test_yaml_template_describes_bare_slab_controls() -> None:
+    """Teach users the explicit null syntax for no-SAM control systems."""
+
+    normalized = " ".join(CONFIG_TEMPLATE.split())
+
+    assert "sam: null" in normalized
+    assert "bare metal-slab control" in normalized
+    assert "default propanethiol SAM" in normalized
+    assert "string \"None\"" in normalized
+    assert "above the exposed metal surface" in normalized
 
 
 def test_beginner_template_defers_sam_attachment_knobs() -> None:

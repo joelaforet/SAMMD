@@ -187,8 +187,8 @@ def _validate_sam_count(plan: Any) -> ValidationGateResult:
     return _gate(
         "sam_count_selected_sites",
         actual == expected,
-        "SAM placement count equals two faces times selected sites per side",
-        "SAM placement count must equal two faces times selected sites per side",
+        "SAM placement count matches selected sites, including zero-SAM bare slabs",
+        "SAM placement count must match selected sites, including zero-SAM bare slabs",
         {"actual": actual, "expected": expected},
     )
 

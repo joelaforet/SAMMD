@@ -78,7 +78,7 @@ def validate(config: Path) -> None:
     """Validate a SAMMD YAML configuration."""
 
     loaded = load_config(config)
-    component_count = len(loaded.sam.components)
+    component_count = 0 if loaded.sam is None else len(loaded.sam.components)
     LOGGER.info(
         "OK Configuration valid: %s(%s) with %s SAM component(s)",
         loaded.surface.metal,

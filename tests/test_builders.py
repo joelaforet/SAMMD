@@ -197,6 +197,38 @@ def test_solvent_regions_exclude_sam_anchor_envelope() -> None:
     assert top_region[2][0] == pytest.approx(top_anchor_z + plan.box_plan.sam_extended_length_nm)
 
 
+def test_bare_surface_build_uses_slab_faces_for_solvent_regions(tmp_path) -> None:
+    """Build a no-SAM control with solvent regions starting from slab faces."""
+
+    plan = build_system(SAMMDConfig(sam=None), output_dir=tmp_path)
+    expected_padding_per_face = DEFAULT_SOLVENT_PADDING_NM / 2.0
+    expected_z_min = plan.slab.bottom_z_nm - expected_padding_per_face
+    expected_z_max = plan.slab.top_z_nm + expected_padding_per_face
+
+    assert plan.config.sam is None
+    assert plan.sam_placements.selected_sites_per_side == 0
+    assert plan.sam_placements.placements == ()
+    assert plan.box_plan.sam_extended_length_nm == 0.0
+    assert plan.box_plan.sam_length_estimates == ()
+    assert plan.box_plan.bounds_nm[2] == pytest.approx((expected_z_min, expected_z_max))
+    assert plan.box_plan.solvent_packing_regions_nm[0][2] == pytest.approx(
+        (expected_z_min, plan.slab.bottom_z_nm)
+    )
+    assert plan.box_plan.solvent_packing_regions_nm[1][2] == pytest.approx(
+        (plan.slab.top_z_nm, expected_z_max)
+    )
+
+    summary = plan.build_summary()["sam"]
+    assert summary["enabled"] is False
+    assert summary["molecules_total"] == 0
+    assert summary["components"] == []
+
+    topology = plan.write_topology_cif()
+    text = topology.read_text(encoding="utf-8")
+    assert text.count("HETATM") == len(plan.slab.positions_nm)
+    assert " PTL " not in text
+
+
 def test_padding_three_nanometers_gives_one_point_five_per_face() -> None:
     """Interpret solvent padding as a total reservoir split across exposed faces."""
 

@@ -119,37 +119,7 @@ class SAMMDBuildPlan:
                 "automatic_layers": self.slab.layers,
                 "metal_atoms": len(self.slab.positions_nm),
             },
-            "sam": {
-                "grafting_density_nm2_per_molecule": self.config.sam.grafting_density,
-                "molecules_total": len(self.sam_placements.placements),
-                "molecules_per_side": self.sam_placements.selected_sites_per_side,
-                "metal_sulfur_interaction": default_metal_sulfur_interaction().to_summary(),
-                "placements": [
-                    {
-                        "component_name": placement.component_name,
-                        "residue_name": placement.component_residue_name,
-                        "side": placement.side,
-                        "site_kind": placement.site_kind,
-                        "site_position_nm": list(placement.anchor_pose.site_position_nm),
-                        "sulfur_position_nm": list(placement.anchor_pose.sulfur_position_nm),
-                        "normal": list(placement.anchor_pose.normal),
-                        "axis_direction": list(placement.anchor_pose.axis_direction),
-                        "azimuth_rad": placement.anchor_pose.azimuth_rad,
-                        "sulfur_height_nm": placement.anchor_pose.sulfur_height_nm,
-                        "nearest_metal_atom_indices": list(
-                            placement.anchor_pose.nearest_metal_atom_indices
-                        ),
-                        "attachment_mode": placement.anchor_pose.attachment_mode,
-                        "metal_sulfur_interaction": (
-                            placement.anchor_pose.metal_sulfur_interaction.to_summary()
-                        ),
-                    }
-                    for placement in self.sam_placements.placements
-                ],
-                "components": [
-                    component.model_dump(mode="json") for component in self.config.sam.components
-                ],
-            },
+            "sam": self._sam_summary(),
             "box": {
                 "lateral_size_nm": list(self.box_plan.lateral_size_nm),
                 "dimensions_nm": list(self.box_plan.dimensions_nm),
@@ -203,6 +173,52 @@ class SAMMDBuildPlan:
                 ),
                 "anchor_metadata": self._artifact_summary("anchor_metadata", "reserved"),
             },
+        }
+
+    def _sam_summary(self) -> dict[str, object]:
+        """Return SAM metadata, including explicit no-SAM control systems."""
+
+        if self.config.sam is None:
+            return {
+                "enabled": False,
+                "grafting_density_nm2_per_molecule": None,
+                "molecules_total": 0,
+                "molecules_per_side": 0,
+                "metal_sulfur_interaction": None,
+                "placements": [],
+                "components": [],
+            }
+        return {
+            "enabled": True,
+            "grafting_density_nm2_per_molecule": self.config.sam.grafting_density,
+            "molecules_total": len(self.sam_placements.placements),
+            "molecules_per_side": self.sam_placements.selected_sites_per_side,
+            "metal_sulfur_interaction": default_metal_sulfur_interaction().to_summary(),
+            "placements": [
+                {
+                    "component_name": placement.component_name,
+                    "residue_name": placement.component_residue_name,
+                    "side": placement.side,
+                    "site_kind": placement.site_kind,
+                    "site_position_nm": list(placement.anchor_pose.site_position_nm),
+                    "sulfur_position_nm": list(placement.anchor_pose.sulfur_position_nm),
+                    "normal": list(placement.anchor_pose.normal),
+                    "axis_direction": list(placement.anchor_pose.axis_direction),
+                    "azimuth_rad": placement.anchor_pose.azimuth_rad,
+                    "sulfur_height_nm": placement.anchor_pose.sulfur_height_nm,
+                    "nearest_metal_atom_indices": list(
+                        placement.anchor_pose.nearest_metal_atom_indices
+                    ),
+                    "attachment_mode": placement.anchor_pose.attachment_mode,
+                    "metal_sulfur_interaction": (
+                        placement.anchor_pose.metal_sulfur_interaction.to_summary()
+                    ),
+                }
+                for placement in self.sam_placements.placements
+            ],
+            "components": [
+                component.model_dump(mode="json") for component in self.config.sam.components
+            ],
         }
 
     def _artifact_summary(self, key: str, status: str) -> dict[str, object]:
@@ -304,13 +320,22 @@ def build_system(
     )
     binding_sites = generate_binding_sites(slab)
     box_plan = _derive_box_plan(loaded_config, slab)
-    sam_placements = plan_sam_placements(
-        loaded_config.sam,
-        binding_sites,
-        box_plan.lateral_size_nm[0] * box_plan.lateral_size_nm[1],
-        seed=active_seed,
-        lateral_size_nm=box_plan.lateral_size_nm,
-    )
+    lateral_area_nm2 = box_plan.lateral_size_nm[0] * box_plan.lateral_size_nm[1]
+    if loaded_config.sam is None:
+        sam_placements = SAMPlacementPlan(
+            placements=(),
+            selected_sites_per_side=0,
+            lateral_area_nm2=lateral_area_nm2,
+            seed=active_seed,
+        )
+    else:
+        sam_placements = plan_sam_placements(
+            loaded_config.sam,
+            binding_sites,
+            lateral_area_nm2,
+            seed=active_seed,
+            lateral_size_nm=box_plan.lateral_size_nm,
+        )
     solution = plan_solution_composition(
         loaded_config,
         box_plan.solvent_count_planning_volume_nm3,
@@ -384,12 +409,18 @@ def _derive_box_plan(config: SAMMDConfig, slab: SurfaceSlab) -> BoxPlan:
 
     padding_nm = getattr(config.solvent, "padding", DEFAULT_SOLVENT_PADDING_NM)
     padding_per_face_nm = padding_nm / 2.0
-    sam_length_estimates = tuple(
-        _estimate_sam_length(component) for component in config.sam.components
-    )
-    sam_extended_length_nm = max(estimate.length_nm for estimate in sam_length_estimates)
-    bottom_solute_z_nm = slab.bottom_z_nm - DEFAULT_SULFUR_HEIGHT_NM - sam_extended_length_nm
-    top_solute_z_nm = slab.top_z_nm + DEFAULT_SULFUR_HEIGHT_NM + sam_extended_length_nm
+    if config.sam is None:
+        sam_length_estimates = ()
+        sam_extended_length_nm = 0.0
+        bottom_solute_z_nm = slab.bottom_z_nm
+        top_solute_z_nm = slab.top_z_nm
+    else:
+        sam_length_estimates = tuple(
+            _estimate_sam_length(component) for component in config.sam.components
+        )
+        sam_extended_length_nm = max(estimate.length_nm for estimate in sam_length_estimates)
+        bottom_solute_z_nm = slab.bottom_z_nm - DEFAULT_SULFUR_HEIGHT_NM - sam_extended_length_nm
+        top_solute_z_nm = slab.top_z_nm + DEFAULT_SULFUR_HEIGHT_NM + sam_extended_length_nm
     z_min = bottom_solute_z_nm - padding_per_face_nm
     z_max = top_solute_z_nm + padding_per_face_nm
     box_z_nm = z_max - z_min

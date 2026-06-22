@@ -172,6 +172,20 @@ def test_validate_cli_accepts_template() -> None:
         assert "Configuration valid" in result.output
 
 
+def test_validate_cli_accepts_bare_slab_config() -> None:
+    """Validate explicit no-SAM controls from the CLI."""
+
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("bare.yaml").write_text("sam: null\n", encoding="utf-8")
+
+        result = runner.invoke(main, ["validate", "bare.yaml"])
+
+        assert result.exit_code == 0
+        assert "Configuration valid" in result.output
+        assert "with 0 SAM component(s)" in result.output
+
+
 def test_cli_contract_exposes_only_config_builder_commands() -> None:
     """Keep simulation wrappers out of the first-release CLI surface."""
 
