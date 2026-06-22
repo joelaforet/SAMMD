@@ -332,7 +332,11 @@ def backend_build_summary(plan: Any, result: BackendExportResult) -> dict[str, o
         artifacts[key] = artifact
     summary["artifacts"] = artifacts
     summary["backend_export"] = {
-        "mode": "openff_interchange_with_plugin_pair_overrides",
+        "mode": (
+            "openff_interchange_with_plugin_pair_overrides"
+            if result.anchor_pairs
+            else "openff_interchange_without_sam_overrides"
+        ),
         "openff_toolkit_version": result.openff_toolkit_version,
         "openff_interchange_version": result.openff_interchange_version,
         "atom_count": len(result.positions_nm),
@@ -686,9 +690,13 @@ def build_interchange_backend(
     _timed_progress(progress, "  OpenFF Interchange ready", stage_start)
     stage_start = perf_counter()
     _progress(progress, f"Recording {len(anchor_pairs)} sulfur-metal pair overrides")
-    metal_sulfur_collection = create_metal_sulfur_lj_collection(tuple(anchor_pairs))
-    interchange.collections[metal_sulfur_collection.type] = metal_sulfur_collection
-    _timed_progress(progress, "  sulfur-metal override collection attached", stage_start)
+    metal_sulfur_collection = None
+    if anchor_pairs:
+        metal_sulfur_collection = create_metal_sulfur_lj_collection(tuple(anchor_pairs))
+        interchange.collections[metal_sulfur_collection.type] = metal_sulfur_collection
+        _timed_progress(progress, "  sulfur-metal override collection attached", stage_start)
+    else:
+        _timed_progress(progress, "  no sulfur-metal overrides needed", stage_start)
     stage_start = perf_counter()
     _progress(progress, "Exporting OpenMM topology and positions")
     openmm_topology = interchange.to_openmm_topology()
@@ -1379,7 +1387,19 @@ def _anchor_metadata(result: BackendExportResult) -> dict[str, object]:
 
     from sammd.backends.interchange_plugins import metal_sulfur_lj_override_summary
 
-    metadata = metal_sulfur_lj_override_summary(result.anchor_pairs)
+    if result.anchor_pairs:
+        metadata = metal_sulfur_lj_override_summary(result.anchor_pairs)
+    else:
+        metadata = {
+            "mode": "none",
+            "collection_type": None,
+            "sulfur_metal_pairs": [],
+            "sigma_nm": None,
+            "epsilon_kcal_mol": None,
+            "epsilon_kj_mol": None,
+            "charge_product": None,
+            "openmm_exception_replace": False,
+        }
     metadata["sulfur_indices"] = list(result.sulfur_indices)
     metadata["metal_indices"] = list(result.metal_indices)
     runtime_solvent_geometry = getattr(result, "runtime_solvent_geometry", None)

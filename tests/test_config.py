@@ -112,6 +112,30 @@ def test_sam_extended_length_override_is_optional_and_positive() -> None:
         load_config_dict(data)
 
 
+def test_sam_null_disables_sam_while_omission_keeps_default() -> None:
+    """Use explicit YAML null for bare-surface controls without changing defaults."""
+
+    default_config = load_config_dict({})
+    bare_data = _template_data()
+    bare_data["sam"] = None
+
+    bare_config = load_config_dict(bare_data)
+
+    assert default_config.sam is not None
+    assert default_config.sam.components[0].name == "propanethiol"
+    assert bare_config.sam is None
+
+
+def test_sam_string_none_is_rejected() -> None:
+    """Require YAML null, not the string 'None', for no-SAM controls."""
+
+    data = _template_data()
+    data["sam"] = "None"
+
+    with pytest.raises(ValidationError, match="Input should be a valid dictionary"):
+        load_config_dict(data)
+
+
 def test_yaml_template_describes_neutral_thiols_and_internal_nonbonded_attachment() -> None:
     """Keep beginner SAM wording aligned with the current validation contract."""
 

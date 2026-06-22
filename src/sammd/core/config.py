@@ -296,7 +296,7 @@ class SAMMDConfig(SAMMDBaseModel):
 
     experiment: ExperimentConfig = Field(default_factory=ExperimentConfig)
     surface: SurfaceConfig = Field(default_factory=SurfaceConfig)
-    sam: SAMConfig = Field(default_factory=SAMConfig)
+    sam: SAMConfig | None = Field(default_factory=SAMConfig)
     reactants: list[ReactantConfig] = Field(
         default_factory=lambda: [
             ReactantConfig(

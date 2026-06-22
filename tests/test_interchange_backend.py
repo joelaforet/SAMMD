@@ -83,6 +83,33 @@ def test_interchange_build_summary_marks_completed_exports(tmp_path: Path) -> No
     assert override["epsilon_kcal_mol"] == METAL_SULFUR_EPSILON_KCAL_MOL
 
 
+def test_bare_interchange_summary_reports_no_metal_sulfur_overrides(tmp_path: Path) -> None:
+    """Bare slabs should not require a SAMMD metal-S plugin collection."""
+
+    backend = importlib.import_module("sammd.backends.interchange")
+    plan = build_system(SAMMDConfig(sam=None), output_dir=tmp_path)
+    result = SimpleNamespace(
+        openff_toolkit_version="0.18.0",
+        openff_interchange_version="0.5.3",
+        positions_nm=((0.0, 0.0, 0.0),),
+        metal_indices=(0,),
+        sulfur_indices=(),
+        anchor_pairs=(),
+        runtime_solvent_geometry=None,
+        safety_checks=None,
+    )
+
+    summary = backend.backend_build_summary(plan, result)
+    metadata = summary["backend_export"]["metal_sulfur_override"]
+
+    assert summary["backend_export"]["mode"] == "openff_interchange_without_sam_overrides"
+    assert summary["backend_export"]["sam_sulfur_count"] == 0
+    assert summary["backend_export"]["sulfur_metal_pair_count"] == 0
+    assert metadata["mode"] == "none"
+    assert metadata["sulfur_metal_pairs"] == []
+    assert metadata["sulfur_indices"] == []
+
+
 def test_interchange_export_preserves_runtime_geometry_for_summary(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

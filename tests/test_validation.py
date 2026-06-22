@@ -29,6 +29,20 @@ def test_default_build_plan_passes_validation(tmp_path: Path) -> None:
     assert report.to_summary()["passed"] is True
 
 
+def test_bare_surface_build_plan_passes_validation(tmp_path: Path) -> None:
+    """A no-SAM control is valid when the selected SAM site count is zero."""
+
+    plan = build_system({"sam": None}, output_dir=tmp_path)
+
+    report = validate_build_plan(plan)
+
+    assert report.passed
+    assert _gate(report, "sam_count_selected_sites").details == {
+        "actual": 0,
+        "expected": 0,
+    }
+
+
 def test_current_validation_gates_do_not_require_export_artifacts(tmp_path: Path) -> None:
     """Interchange reload/export/minimization gates stay deferred for this release."""
 
