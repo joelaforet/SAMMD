@@ -383,6 +383,12 @@ surface:
 #
 # For mixed SAMs, list multiple components and make fractions sum to 1.0.
 # Larger grafting_density values mean fewer SAM molecules on the surface.
+# To build a bare metal-slab control with no SAM molecules, set exactly:
+#
+# sam: null
+#
+# Omitting this section keeps the default propanethiol SAM. The string "None"
+# is not YAML null and will be rejected.
 #
 # extended_length_nm is an optional advanced override for the fully extended SAM
 # length from sulfur anchor to tail tip. If omitted, SAMMD estimates it from an
@@ -415,7 +421,8 @@ sam:
 # ============================================================================
 # Reactants
 # ============================================================================
-# Molecules that will be placed near the SAM surface.
+# Molecules that will be placed near the SAM surface. In bare-slab controls
+# (sam: null), the same height is interpreted above the metal surface.
 #
 # residue_name must be a 3-character PDB residue code.
 #
@@ -425,7 +432,8 @@ sam:
 #
 # concentration is interpreted as millimolar.
 #
-# initial_height_above_sam controls the starting distance above the SAM.
+# initial_height_above_sam controls the starting distance above the SAM or,
+# for bare slabs, above the exposed metal surface.
 # This is only an initial placement choice. It is not a restraint.
 #
 reactants:

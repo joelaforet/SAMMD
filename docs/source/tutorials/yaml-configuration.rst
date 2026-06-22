@@ -34,6 +34,9 @@ Important sections
 
 ``sam``
    Defines grafting density and one or more neutral thiol SAM components.
+   Omitting this section keeps the default propanethiol SAM. For a bare metal
+   control with no SAM molecules, set ``sam: null`` explicitly; do not use the
+   string ``None``.
    Components should include the HS/implicit-H thiol sulfur in the SMILES, not a
    pre-deprotonated thiolate. SAMMD models the metal-S attachment as a stronger
    nonbonded interaction, not as a covalent bond or chemical reaction. You cannot
@@ -46,6 +49,7 @@ Important sections
    Advanced users may set ``extended_length_nm`` to change the estimated fully
    extended SAM length used to size the box. If you do not set it, SAMMD
    estimates the length from an OpenFF conformer derived from the SMILES string.
+   Bare controls use the slab faces directly as the fixed-solute z envelope.
 
 ``solvent``
    Defines ``padding``, the total solvent reservoir thickness in ``z`` across
@@ -63,7 +67,9 @@ Important sections
    Define optional ions and reactants. Reactants use exactly one of ``count`` or
    ``concentration``. Reactant concentration is mM. Salt concentration is M, and
    salts define separate cation and anion entries with explicit stoichiometry so
-   each ion can have its own residue name.
+   each ion can have its own residue name. ``initial_height_above_sam`` remains
+   the configuration key; in bare controls, read it as the initial height above
+   the exposed metal surface.
 
 ``packing``
    Defines PACKMOL packing options such as tolerance and maximum loop count.
@@ -94,6 +100,7 @@ Resolved defaults to notice
 * The surface defaults to a ``[2.0, 2.0]`` nm Pd(111) size in ``x`` and ``y``.
 * SAMMD chooses the slab thickness automatically.
 * The SAM defaults to neutral propanethiol ``CCCS`` at ``0.25 nm^2 / molecule``.
+* Set ``sam: null`` for a bare metal slab with no SAM molecules.
 * The solvent defaults to ethanol ``CCO`` with 3.0 nm total padding, split as
   1.5 nm per exposed SAM face.
 * The default reactant is one cinnamaldehyde molecule.

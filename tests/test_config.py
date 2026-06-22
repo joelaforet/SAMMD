@@ -154,6 +154,18 @@ def test_yaml_template_describes_neutral_thiols_and_internal_nonbonded_attachmen
     assert "split equally across both faces" in normalized
 
 
+def test_yaml_template_describes_bare_slab_controls() -> None:
+    """Teach users the explicit null syntax for no-SAM control systems."""
+
+    normalized = " ".join(CONFIG_TEMPLATE.split())
+
+    assert "sam: null" in normalized
+    assert "bare metal-slab control" in normalized
+    assert "default propanethiol SAM" in normalized
+    assert "string \"None\"" in normalized
+    assert "above the exposed metal surface" in normalized
+
+
 def test_beginner_template_defers_sam_attachment_knobs() -> None:
     """Do not expose advanced metal-S controls in the beginner YAML template."""
 
